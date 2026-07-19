@@ -1,0 +1,9 @@
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-pngs-0 E:\sticky-keys\keyboard-core\build\generated\res\pngs\debug
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-updated_navigation_xml-1 E:\sticky-keys\keyboard-core\build\generated\updated_navigation_xml\debug
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-mergeDebugResources-2 E:\sticky-keys\keyboard-core\build\intermediates\incremental\debug\mergeDebugResources\merged.dir
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-mergeDebugResources-3 E:\sticky-keys\keyboard-core\build\intermediates\incremental\debug\mergeDebugResources\stripped.dir
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-debug-4 E:\sticky-keys\keyboard-core\build\intermediates\merged_res\debug\mergeDebugResources
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-debug-5 E:\sticky-keys\keyboard-core\build\intermediates\packaged_res\debug\packageDebugResources
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-debug-6 E:\sticky-keys\keyboard-core\src\debug\res
+com.uncoalesced.stickykeys.keyboardcore.keyboard-core-main-7 E:\sticky-keys\keyboard-core\src\main\res
+gradleHome-0 C:\Users\Joel Anthony\scoop\persist\gradle\.gradle
