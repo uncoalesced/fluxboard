@@ -1,0 +1,9 @@
+com.uncoalesced.stickykeys.transfer-pngs-0 E:\sticky-keys\transfer\build\generated\res\pngs\debug
+com.uncoalesced.stickykeys.transfer-updated_navigation_xml-1 E:\sticky-keys\transfer\build\generated\updated_navigation_xml\debug
+com.uncoalesced.stickykeys.transfer-mergeDebugResources-2 E:\sticky-keys\transfer\build\intermediates\incremental\debug\mergeDebugResources\merged.dir
+com.uncoalesced.stickykeys.transfer-mergeDebugResources-3 E:\sticky-keys\transfer\build\intermediates\incremental\debug\mergeDebugResources\stripped.dir
+com.uncoalesced.stickykeys.transfer-debug-4 E:\sticky-keys\transfer\build\intermediates\merged_res\debug\mergeDebugResources
+com.uncoalesced.stickykeys.transfer-debug-5 E:\sticky-keys\transfer\build\intermediates\packaged_res\debug\packageDebugResources
+com.uncoalesced.stickykeys.transfer-debug-6 E:\sticky-keys\transfer\src\debug\res
+com.uncoalesced.stickykeys.transfer-main-7 E:\sticky-keys\transfer\src\main\res
+gradleHome-0 C:\Users\Joel Anthony\scoop\persist\gradle\.gradle

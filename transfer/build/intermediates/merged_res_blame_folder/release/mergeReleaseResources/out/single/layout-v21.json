@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/layout-v21/notification_template_icon_group.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-core-1.12.0-7:/layout-v21/notification_template_icon_group.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/layout-v21/notification_template_custom_big.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-core-1.12.0-7:/layout-v21/notification_template_custom_big.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/layout-v21/notification_action.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-core-1.12.0-7:/layout-v21/notification_action.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/layout-v21/notification_action_tombstone.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-core-1.12.0-7:/layout-v21/notification_action_tombstone.xml"
+    }
+]
