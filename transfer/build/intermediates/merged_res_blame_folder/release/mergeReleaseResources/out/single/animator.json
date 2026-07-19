@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/animator/fragment_close_exit.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-fragment-1.5.1-4:/animator/fragment_close_exit.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/animator/fragment_open_exit.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-fragment-1.5.1-4:/animator/fragment_open_exit.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/animator/fragment_open_enter.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-fragment-1.5.1-4:/animator/fragment_open_enter.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/animator/fragment_close_enter.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-fragment-1.5.1-4:/animator/fragment_close_enter.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/animator/fragment_fade_exit.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-fragment-1.5.1-4:/animator/fragment_fade_exit.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.transfer-release-12:/animator/fragment_fade_enter.xml",
+        "source": "com.uncoalesced.stickykeys.transfer-fragment-1.5.1-4:/animator/fragment_fade_enter.xml"
+    }
+]

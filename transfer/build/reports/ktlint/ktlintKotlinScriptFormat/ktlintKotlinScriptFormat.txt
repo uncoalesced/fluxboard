@@ -1,0 +1,4 @@
+[90mE:\sticky-keys\transfer\[0mbuild.gradle.kts[90m:[0m20[90m:1:[0m Unexpected blank line(s) before "}" [90m(standard:no-blank-line-before-rbrace)[0m
+
+Summary error count (descending) by rule:
+  standard:no-blank-line-before-rbrace: 1
