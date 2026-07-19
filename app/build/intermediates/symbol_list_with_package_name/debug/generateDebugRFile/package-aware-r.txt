@@ -1,0 +1,2 @@
+com.uncoalesced.stickykeys
+style Theme_StickyKeys

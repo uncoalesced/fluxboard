@@ -1,0 +1,1 @@
+-keep,allowobfuscation,allowshrinking class com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel
