@@ -510,3 +510,5 @@ int styleable SplitPlaceholderRule_splitOpenAnimation 11
 int styleable SplitPlaceholderRule_splitRatio 12
 int styleable SplitPlaceholderRule_stickyPlaceholder 13
 int styleable SplitPlaceholderRule_tag 14
+int xml file_paths 0x7f0d0000
+int xml method 0x7f0d0001

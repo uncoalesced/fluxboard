@@ -13,24 +13,24 @@
 10-->INJECTED
 11
 12    <permission
-12-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\6be0248e081a6e2ca4c4cd211eb37ef7\transformed\core-1.16.0\AndroidManifest.xml:22:5-24:47
+12-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\19f69a684aa396b7d0b44ce120215d96\transformed\core-1.16.0\AndroidManifest.xml:22:5-24:47
 13        android:name="com.uncoalesced.stickykeys.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
-13-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\6be0248e081a6e2ca4c4cd211eb37ef7\transformed\core-1.16.0\AndroidManifest.xml:23:9-81
+13-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\19f69a684aa396b7d0b44ce120215d96\transformed\core-1.16.0\AndroidManifest.xml:23:9-81
 14        android:protectionLevel="signature" />
-14-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\6be0248e081a6e2ca4c4cd211eb37ef7\transformed\core-1.16.0\AndroidManifest.xml:24:9-44
+14-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\19f69a684aa396b7d0b44ce120215d96\transformed\core-1.16.0\AndroidManifest.xml:24:9-44
 15
 16    <uses-permission android:name="com.uncoalesced.stickykeys.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
-16-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\6be0248e081a6e2ca4c4cd211eb37ef7\transformed\core-1.16.0\AndroidManifest.xml:26:5-97
-16-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\6be0248e081a6e2ca4c4cd211eb37ef7\transformed\core-1.16.0\AndroidManifest.xml:26:22-94
+16-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\19f69a684aa396b7d0b44ce120215d96\transformed\core-1.16.0\AndroidManifest.xml:26:5-97
+16-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\19f69a684aa396b7d0b44ce120215d96\transformed\core-1.16.0\AndroidManifest.xml:26:22-94
 17
 18    <application
-18-->E:\sticky-keys\app\src\main\AndroidManifest.xml:4:5-17:19
+18-->E:\sticky-keys\app\src\main\AndroidManifest.xml:4:5-22:19
 19        android:name="com.uncoalesced.stickykeys.StickyKeysApplication"
 19-->E:\sticky-keys\app\src\main\AndroidManifest.xml:5:9-46
 20        android:allowBackup="true"
 20-->E:\sticky-keys\app\src\main\AndroidManifest.xml:6:9-35
 21        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
-21-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\6be0248e081a6e2ca4c4cd211eb37ef7\transformed\core-1.16.0\AndroidManifest.xml:28:18-86
+21-->[androidx.core:core:1.16.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\19f69a684aa396b7d0b44ce120215d96\transformed\core-1.16.0\AndroidManifest.xml:28:18-86
 22        android:debuggable="true"
 23        android:extractNativeLibs="false"
 23-->INJECTED
@@ -39,7 +39,7 @@
 25        android:theme="@style/Theme.StickyKeys" >
 25-->E:\sticky-keys\app\src\main\AndroidManifest.xml:8:9-48
 26        <activity
-26-->E:\sticky-keys\app\src\main\AndroidManifest.xml:9:9-16:20
+26-->E:\sticky-keys\app\src\main\AndroidManifest.xml:9:9-21:20
 27            android:name="com.uncoalesced.stickykeys.MainActivity"
 27-->E:\sticky-keys\app\src\main\AndroidManifest.xml:10:13-41
 28            android:exported="true" >
@@ -54,95 +54,151 @@
 32-->E:\sticky-keys\app\src\main\AndroidManifest.xml:14:17-77
 32-->E:\sticky-keys\app\src\main\AndroidManifest.xml:14:27-74
 33            </intent-filter>
-34        </activity>
-35
-36        <provider
-36-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7153b32f24333c6115b97cdc7fdb6579\transformed\emoji2-1.4.0\AndroidManifest.xml:24:9-32:20
-37            android:name="androidx.startup.InitializationProvider"
-37-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7153b32f24333c6115b97cdc7fdb6579\transformed\emoji2-1.4.0\AndroidManifest.xml:25:13-67
-38            android:authorities="com.uncoalesced.stickykeys.androidx-startup"
-38-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7153b32f24333c6115b97cdc7fdb6579\transformed\emoji2-1.4.0\AndroidManifest.xml:26:13-68
-39            android:exported="false" >
-39-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7153b32f24333c6115b97cdc7fdb6579\transformed\emoji2-1.4.0\AndroidManifest.xml:27:13-37
-40            <meta-data
-40-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7153b32f24333c6115b97cdc7fdb6579\transformed\emoji2-1.4.0\AndroidManifest.xml:29:13-31:52
-41                android:name="androidx.emoji2.text.EmojiCompatInitializer"
-41-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7153b32f24333c6115b97cdc7fdb6579\transformed\emoji2-1.4.0\AndroidManifest.xml:30:17-75
-42                android:value="androidx.startup" />
-42-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7153b32f24333c6115b97cdc7fdb6579\transformed\emoji2-1.4.0\AndroidManifest.xml:31:17-49
-43            <meta-data
-43-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\fa31a517e20f8de285853603b8eda434\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:29:13-31:52
-44                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
-44-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\fa31a517e20f8de285853603b8eda434\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:30:17-78
-45                android:value="androidx.startup" />
-45-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\fa31a517e20f8de285853603b8eda434\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:31:17-49
-46            <meta-data
-46-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:29:13-31:52
-47                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
-47-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:30:17-85
-48                android:value="androidx.startup" />
-48-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:31:17-49
-49        </provider>
-50
-51        <uses-library
-51-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7e73c14afc6bc4d9720fe884866cf9e3\transformed\window-1.5.0\AndroidManifest.xml:23:9-25:40
-52            android:name="androidx.window.extensions"
-52-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7e73c14afc6bc4d9720fe884866cf9e3\transformed\window-1.5.0\AndroidManifest.xml:24:13-54
-53            android:required="false" />
-53-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7e73c14afc6bc4d9720fe884866cf9e3\transformed\window-1.5.0\AndroidManifest.xml:25:13-37
-54        <uses-library
-54-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7e73c14afc6bc4d9720fe884866cf9e3\transformed\window-1.5.0\AndroidManifest.xml:26:9-28:40
-55            android:name="androidx.window.sidecar"
-55-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7e73c14afc6bc4d9720fe884866cf9e3\transformed\window-1.5.0\AndroidManifest.xml:27:13-51
-56            android:required="false" />
-56-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\7e73c14afc6bc4d9720fe884866cf9e3\transformed\window-1.5.0\AndroidManifest.xml:28:13-37
-57
-58        <service
-58-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\5a43a4b985615574c3d49808785d746b\transformed\room-runtime-2.6.1\AndroidManifest.xml:24:9-28:63
-59            android:name="androidx.room.MultiInstanceInvalidationService"
-59-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\5a43a4b985615574c3d49808785d746b\transformed\room-runtime-2.6.1\AndroidManifest.xml:25:13-74
-60            android:directBootAware="true"
-60-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\5a43a4b985615574c3d49808785d746b\transformed\room-runtime-2.6.1\AndroidManifest.xml:26:13-43
-61            android:exported="false" />
-61-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\5a43a4b985615574c3d49808785d746b\transformed\room-runtime-2.6.1\AndroidManifest.xml:27:13-37
-62
-63        <receiver
-63-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:34:9-52:20
-64            android:name="androidx.profileinstaller.ProfileInstallReceiver"
-64-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:35:13-76
-65            android:directBootAware="false"
-65-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:36:13-44
-66            android:enabled="true"
-66-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:37:13-35
-67            android:exported="true"
-67-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:38:13-36
-68            android:permission="android.permission.DUMP" >
-68-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:39:13-57
-69            <intent-filter>
-69-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:40:13-42:29
-70                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
-70-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:17-91
-70-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:25-88
-71            </intent-filter>
-72            <intent-filter>
-72-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:43:13-45:29
-73                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
-73-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:17-85
-73-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:25-82
-74            </intent-filter>
-75            <intent-filter>
-75-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:46:13-48:29
-76                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
-76-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:17-88
-76-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:25-85
-77            </intent-filter>
-78            <intent-filter>
-78-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:49:13-51:29
-79                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
-79-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:17-95
-79-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b281ee410ad6947f144b411e5d15e681\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:25-92
-80            </intent-filter>
-81        </receiver>
-82    </application>
-83
-84</manifest>
+34            <intent-filter>
+34-->E:\sticky-keys\app\src\main\AndroidManifest.xml:16:13-20:29
+35                <action android:name="android.intent.action.SEND" />
+35-->E:\sticky-keys\app\src\main\AndroidManifest.xml:17:17-69
+35-->E:\sticky-keys\app\src\main\AndroidManifest.xml:17:25-66
+36
+37                <category android:name="android.intent.category.DEFAULT" />
+37-->E:\sticky-keys\app\src\main\AndroidManifest.xml:18:17-76
+37-->E:\sticky-keys\app\src\main\AndroidManifest.xml:18:27-73
+38
+39                <data android:mimeType="image/*" />
+39-->E:\sticky-keys\app\src\main\AndroidManifest.xml:19:17-52
+39-->E:\sticky-keys\app\src\main\AndroidManifest.xml:19:23-49
+40            </intent-filter>
+41        </activity>
+42
+43        <service
+43-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:9:9-21:19
+44            android:name="com.uncoalesced.stickykeys.keyboardcore.ime.StickyKeysIME"
+44-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:10:13-85
+45            android:exported="true"
+45-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:11:13-36
+46            android:label="Sticky Keys"
+46-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:12:13-40
+47            android:permission="android.permission.BIND_INPUT_METHOD" >
+47-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:13:13-70
+48            <intent-filter>
+48-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:14:13-16:29
+49                <action android:name="android.view.InputMethod" />
+49-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:15:17-67
+49-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:15:25-64
+50            </intent-filter>
+51
+52            <meta-data
+52-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:18:13-20:50
+53                android:name="android.view.im"
+53-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:19:17-47
+54                android:resource="@xml/method" />
+54-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:20:17-47
+55        </service>
+56
+57        <provider
+57-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:23:9-31:20
+58            android:name="androidx.core.content.FileProvider"
+58-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:24:13-62
+59            android:authorities="com.uncoalesced.stickykeys.fileprovider"
+59-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:25:13-64
+60            android:exported="false"
+60-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:26:13-37
+61            android:grantUriPermissions="true" >
+61-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:27:13-47
+62            <meta-data
+62-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:28:13-30:54
+63                android:name="android.support.FILE_PROVIDER_PATHS"
+63-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:29:17-67
+64                android:resource="@xml/file_paths" />
+64-->[:keyboard-core] E:\sticky-keys\keyboard-core\build\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:30:17-51
+65        </provider>
+66        <provider
+66-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b4d8a2fc7122419a11e46cd3eb53b09d\transformed\emoji2-1.4.0\AndroidManifest.xml:24:9-32:20
+67            android:name="androidx.startup.InitializationProvider"
+67-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b4d8a2fc7122419a11e46cd3eb53b09d\transformed\emoji2-1.4.0\AndroidManifest.xml:25:13-67
+68            android:authorities="com.uncoalesced.stickykeys.androidx-startup"
+68-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b4d8a2fc7122419a11e46cd3eb53b09d\transformed\emoji2-1.4.0\AndroidManifest.xml:26:13-68
+69            android:exported="false" >
+69-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b4d8a2fc7122419a11e46cd3eb53b09d\transformed\emoji2-1.4.0\AndroidManifest.xml:27:13-37
+70            <meta-data
+70-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b4d8a2fc7122419a11e46cd3eb53b09d\transformed\emoji2-1.4.0\AndroidManifest.xml:29:13-31:52
+71                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+71-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b4d8a2fc7122419a11e46cd3eb53b09d\transformed\emoji2-1.4.0\AndroidManifest.xml:30:17-75
+72                android:value="androidx.startup" />
+72-->[androidx.emoji2:emoji2:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\b4d8a2fc7122419a11e46cd3eb53b09d\transformed\emoji2-1.4.0\AndroidManifest.xml:31:17-49
+73            <meta-data
+73-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\05b9186eac378455f772911cc620a663\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:29:13-31:52
+74                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+74-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\05b9186eac378455f772911cc620a663\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:30:17-78
+75                android:value="androidx.startup" />
+75-->[androidx.lifecycle:lifecycle-process:2.9.4] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\05b9186eac378455f772911cc620a663\transformed\lifecycle-process-2.9.4\AndroidManifest.xml:31:17-49
+76            <meta-data
+76-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:29:13-31:52
+77                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+77-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:30:17-85
+78                android:value="androidx.startup" />
+78-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:31:17-49
+79        </provider>
+80
+81        <uses-library
+81-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\59e76e7005d0e9238b51f1a0e0d7d298\transformed\window-1.5.0\AndroidManifest.xml:23:9-25:40
+82            android:name="androidx.window.extensions"
+82-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\59e76e7005d0e9238b51f1a0e0d7d298\transformed\window-1.5.0\AndroidManifest.xml:24:13-54
+83            android:required="false" />
+83-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\59e76e7005d0e9238b51f1a0e0d7d298\transformed\window-1.5.0\AndroidManifest.xml:25:13-37
+84        <uses-library
+84-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\59e76e7005d0e9238b51f1a0e0d7d298\transformed\window-1.5.0\AndroidManifest.xml:26:9-28:40
+85            android:name="androidx.window.sidecar"
+85-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\59e76e7005d0e9238b51f1a0e0d7d298\transformed\window-1.5.0\AndroidManifest.xml:27:13-51
+86            android:required="false" />
+86-->[androidx.window:window:1.5.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\59e76e7005d0e9238b51f1a0e0d7d298\transformed\window-1.5.0\AndroidManifest.xml:28:13-37
+87
+88        <service
+88-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\58e55b59e19fe5638657d5ae335ce37d\transformed\room-runtime-2.6.1\AndroidManifest.xml:24:9-28:63
+89            android:name="androidx.room.MultiInstanceInvalidationService"
+89-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\58e55b59e19fe5638657d5ae335ce37d\transformed\room-runtime-2.6.1\AndroidManifest.xml:25:13-74
+90            android:directBootAware="true"
+90-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\58e55b59e19fe5638657d5ae335ce37d\transformed\room-runtime-2.6.1\AndroidManifest.xml:26:13-43
+91            android:exported="false" />
+91-->[androidx.room:room-runtime:2.6.1] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\58e55b59e19fe5638657d5ae335ce37d\transformed\room-runtime-2.6.1\AndroidManifest.xml:27:13-37
+92
+93        <receiver
+93-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:34:9-52:20
+94            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+94-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:35:13-76
+95            android:directBootAware="false"
+95-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:36:13-44
+96            android:enabled="true"
+96-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:37:13-35
+97            android:exported="true"
+97-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:38:13-36
+98            android:permission="android.permission.DUMP" >
+98-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:39:13-57
+99            <intent-filter>
+99-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:40:13-42:29
+100                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+100-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:17-91
+100-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:41:25-88
+101            </intent-filter>
+102            <intent-filter>
+102-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:43:13-45:29
+103                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+103-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:17-85
+103-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:44:25-82
+104            </intent-filter>
+105            <intent-filter>
+105-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:46:13-48:29
+106                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+106-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:17-88
+106-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:47:25-85
+107            </intent-filter>
+108            <intent-filter>
+108-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:49:13-51:29
+109                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+109-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:17-95
+109-->[androidx.profileinstaller:profileinstaller:1.4.0] C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\4fcf14db118dff660f080b3d2df63407\transformed\profileinstaller-1.4.0\AndroidManifest.xml:50:25-92
+110            </intent-filter>
+111        </receiver>
+112    </application>
+113
+114</manifest>
