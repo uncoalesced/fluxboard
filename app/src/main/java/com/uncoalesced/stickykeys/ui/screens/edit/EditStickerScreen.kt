@@ -67,8 +67,8 @@ fun EditStickerScreen(
                 EditTool.Crop -> {
                     CropScreen(
                         uriString = state.currentUriString,
-                        onCropComplete = { newUri ->
-                            viewModel.updateCurrentUri(newUri)
+                        onCropComplete = { _, segmentedUri ->
+                            viewModel.updateCurrentUri(segmentedUri)
                             activeTool = EditTool.Overview
                         },
                         onCancel = { activeTool = EditTool.Overview }
