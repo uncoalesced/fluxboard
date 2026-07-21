@@ -1,1 +1,3 @@
 com.uncoalesced.stickykeys.keyboardcore
+xml file_paths
+xml method

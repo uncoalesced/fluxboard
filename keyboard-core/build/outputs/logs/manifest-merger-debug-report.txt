@@ -1,11 +1,51 @@
 -- Merging decision tree log ---
 manifest
-ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:3:1-72
-INJECTED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:3:1-72
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:3:1-30:12
+INJECTED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:3:1-30:12
 	package
 		INJECTED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml
 	xmlns:android
 		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:3:11-69
+application
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:5:5-28:19
+service#com.uncoalesced.stickykeys.keyboardcore.ime.StickyKeysIME
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:6:9-17:19
+	android:label
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:8:13-40
+	android:exported
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:10:13-36
+	android:permission
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:9:13-70
+	android:name
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:7:13-46
+intent-filter#action:name:android.view.InputMethod
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:11:13-13:29
+action#android.view.InputMethod
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:12:17-67
+	android:name
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:12:25-64
+meta-data#android.view.im
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:14:13-16:50
+	android:resource
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:16:17-47
+	android:name
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:15:17-47
+provider#androidx.core.content.FileProvider
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:19:9-27:20
+	android:grantUriPermissions
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:23:13-47
+	android:authorities
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:21:13-64
+	android:exported
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:22:13-37
+	android:name
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:20:13-62
+meta-data#android.support.FILE_PROVIDER_PATHS
+ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:24:13-26:54
+	android:resource
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:26:17-51
+	android:name
+		ADDED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:25:17-67
 uses-sdk
 INJECTED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml

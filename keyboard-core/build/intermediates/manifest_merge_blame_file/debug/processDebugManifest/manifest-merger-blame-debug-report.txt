@@ -7,4 +7,50 @@
 6-->INJECTED
 6-->INJECTED
 7
-8</manifest>
+8    <application>
+8-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:5:5-28:19
+9        <service
+9-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:6:9-17:19
+10            android:name="com.uncoalesced.stickykeys.keyboardcore.ime.StickyKeysIME"
+10-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:7:13-46
+11            android:exported="true"
+11-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:10:13-36
+12            android:label="Sticky Keys"
+12-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:8:13-40
+13            android:permission="android.permission.BIND_INPUT_METHOD" >
+13-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:9:13-70
+14            <intent-filter>
+14-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:11:13-13:29
+15                <action android:name="android.view.InputMethod" />
+15-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:12:17-67
+15-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:12:25-64
+16            </intent-filter>
+17
+18            <meta-data
+18-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:14:13-16:50
+19                android:name="android.view.im"
+19-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:15:17-47
+20                android:resource="@xml/method" />
+20-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:16:17-47
+21        </service>
+22
+23        <provider
+23-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:19:9-27:20
+24            android:name="androidx.core.content.FileProvider"
+24-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:20:13-62
+25            android:authorities="${applicationId}.fileprovider"
+25-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:21:13-64
+26            android:exported="false"
+26-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:22:13-37
+27            android:grantUriPermissions="true" >
+27-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:23:13-47
+28            <meta-data
+28-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:24:13-26:54
+29                android:name="android.support.FILE_PROVIDER_PATHS"
+29-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:25:17-67
+30                android:resource="@xml/file_paths" />
+30-->E:\sticky-keys\keyboard-core\src\main\AndroidManifest.xml:26:17-51
+31        </provider>
+32    </application>
+33
+34</manifest>
