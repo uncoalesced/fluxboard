@@ -1,18 +1,42 @@
 [
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable/notification_icon_background.xml",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable/notification_icon_background.xml"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/notification_bg.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/notification_bg.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable/notification_tile_bg.xml",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable/notification_tile_bg.xml"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/ic_call_answer_low.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/ic_call_answer_low.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable/notification_bg_low.xml",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable/notification_bg_low.xml"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/ic_call_decline_low.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/ic_call_decline_low.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable/notification_bg.xml",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable/notification_bg.xml"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/notification_icon_background.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/notification_icon_background.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/ic_call_answer_video.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/ic_call_answer_video.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/ic_call_answer.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/ic_call_answer.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/notification_tile_bg.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/notification_tile_bg.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/ic_call_answer_video_low.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/ic_call_answer_video_low.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/ic_call_decline.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/ic_call_decline.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable/notification_bg_low.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable/notification_bg_low.xml"
     }
 ]
