@@ -44,3 +44,7 @@ Thumbs.db
 
 # Kotlin Gradle plugin data
 .kotlin/
+
+# Agents
+.agent/
+.agents/
