@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,33 +27,43 @@ import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.TextButton
+
 @Composable
 fun StickerIMEView(
     viewModel: StickerIMEViewModel,
     fileManager: StickerFileManager,
-    onStickerClick: (Sticker) -> Unit
+    onStickerClick: (Sticker) -> Unit,
+    onBackToKeyboard: () -> Unit
 ) {
     val selectedTabIndex by viewModel.selectedTabIndex.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val stickers by viewModel.stickersForCurrentTab.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        ScrollableTabRow(
-            selectedTabIndex = selectedTabIndex,
-            edgePadding = 8.dp
-        ) {
-            Tab(
-                selected = selectedTabIndex == 0,
-                onClick = { viewModel.selectTab(0) },
-                text = { Text("Favourites") }
-            )
-            categories.forEachIndexed { index, category ->
-                val tabIndex = index + 1
+        Row {
+            TextButton(onClick = onBackToKeyboard) {
+                Text("Back")
+            }
+            PrimaryScrollableTabRow(
+                selectedTabIndex = selectedTabIndex,
+                edgePadding = 8.dp,
+                modifier = Modifier.weight(1f)
+            ) {
                 Tab(
-                    selected = selectedTabIndex == tabIndex,
-                    onClick = { viewModel.selectTab(tabIndex) },
-                    text = { Text(category.name) }
+                    selected = selectedTabIndex == 0,
+                    onClick = { viewModel.selectTab(0) },
+                    text = { Text("Favourites") }
                 )
+                categories.forEachIndexed { index, category ->
+                    val tabIndex = index + 1
+                    Tab(
+                        selected = selectedTabIndex == tabIndex,
+                        onClick = { viewModel.selectTab(tabIndex) },
+                        text = { Text(category.name) }
+                    )
+                }
             }
         }
 
