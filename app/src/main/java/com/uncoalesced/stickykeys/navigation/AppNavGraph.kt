@@ -20,9 +20,20 @@ import com.uncoalesced.stickykeys.ui.screens.StickersLibraryScreen
 import com.uncoalesced.stickykeys.ui.screens.StyleSheetScreen
 import com.uncoalesced.stickykeys.ui.screens.TransferShareScreen
 
+import androidx.compose.runtime.LaunchedEffect
+
 @Composable
-fun AppNavGraph() {
+fun AppNavGraph(
+    initialImageUri: String? = null
+) {
     val navController = rememberNavController()
+
+    LaunchedEffect(initialImageUri) {
+        if (!initialImageUri.isNullOrEmpty()) {
+            val encodedUri = java.net.URLEncoder.encode(initialImageUri, "UTF-8")
+            navController.navigate("crop/$encodedUri")
+        }
+    }
 
     val screens = listOf(
         "stickers" to "Styles",
@@ -67,6 +78,10 @@ fun AppNavGraph() {
                         val encodedUri = java.net.URLEncoder.encode(uri, "UTF-8")
                         navController.navigate("crop/$encodedUri")
                     },
+                    onVideoPicked = { uri ->
+                        val encodedUri = java.net.URLEncoder.encode(uri, "UTF-8")
+                        navController.navigate("trim_video/$encodedUri")
+                    },
                     onStickerClick = { stickerId ->
                         navController.navigate("edit/$stickerId")
                     }
@@ -75,6 +90,33 @@ fun AppNavGraph() {
             composable("keyboard") { KeyboardSettingsScreen() }
             composable("transfer") { TransferShareScreen() }
             composable("settings") { AppSettingsScreen() }
+
+            // Video Trim & Convert Flow
+            composable("trim_video/{uri}") { backStackEntry ->
+                val uri = backStackEntry.arguments?.getString("uri") ?: ""
+                com.uncoalesced.stickykeys.ui.screens.video.VideoTrimScreen(
+                    videoUriString = java.net.URLDecoder.decode(uri, "UTF-8"),
+                    onTrimComplete = { videoUri, startMs, endMs ->
+                        val encodedUri = java.net.URLEncoder.encode(videoUri, "UTF-8")
+                        navController.navigate("convert_video/$encodedUri/$startMs/$endMs")
+                    },
+                    onCancel = { navController.popBackStack("stickers", false) }
+                )
+            }
+
+            composable("convert_video/{uri}/{startMs}/{endMs}") { backStackEntry ->
+                val uri = backStackEntry.arguments?.getString("uri") ?: ""
+                val startMs = backStackEntry.arguments?.getString("startMs")?.toLongOrNull() ?: 0L
+                val endMs = backStackEntry.arguments?.getString("endMs")?.toLongOrNull() ?: 5000L
+
+                com.uncoalesced.stickykeys.ui.screens.video.VideoConvertScreen(
+                    videoUriString = java.net.URLDecoder.decode(uri, "UTF-8"),
+                    startMs = startMs,
+                    endMs = endMs,
+                    onConversionComplete = { navController.popBackStack("stickers", false) },
+                    onCancel = { navController.popBackStack("stickers", false) }
+                )
+            }
             
             // Edit Flow
             composable("edit/{stickerId}") { backStackEntry ->
@@ -91,9 +133,24 @@ fun AppNavGraph() {
                 val uri = backStackEntry.arguments?.getString("uri") ?: ""
                 com.uncoalesced.stickykeys.ui.screens.creation.CropScreen(
                     uriString = java.net.URLDecoder.decode(uri, "UTF-8"),
-                    onCropComplete = { croppedUri ->
-                        val encodedUri = java.net.URLEncoder.encode(croppedUri, "UTF-8")
-                        navController.navigate("erase/$encodedUri")
+                    onCropComplete = { origUri, segUri ->
+                        val encodedOrig = java.net.URLEncoder.encode(origUri, "UTF-8")
+                        val encodedSeg = java.net.URLEncoder.encode(segUri, "UTF-8")
+                        navController.navigate("touchup/$encodedOrig/$encodedSeg")
+                    },
+                    onCancel = { navController.popBackStack("stickers", false) }
+                )
+            }
+            
+            composable("touchup/{origUri}/{segUri}") { backStackEntry ->
+                val origUri = backStackEntry.arguments?.getString("origUri") ?: ""
+                val segUri = backStackEntry.arguments?.getString("segUri") ?: ""
+                com.uncoalesced.stickykeys.ui.screens.creation.TouchUpScreen(
+                    originalUriString = java.net.URLDecoder.decode(origUri, "UTF-8"),
+                    segmentedUriString = java.net.URLDecoder.decode(segUri, "UTF-8"),
+                    onTouchUpComplete = { finalUri ->
+                        val encodedUri = java.net.URLEncoder.encode(finalUri, "UTF-8")
+                        navController.navigate("save/$encodedUri")
                     },
                     onCancel = { navController.popBackStack("stickers", false) }
                 )
