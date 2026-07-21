@@ -36,12 +36,13 @@ import java.util.UUID
 @Composable
 fun CropScreen(
     uriString: String,
-    onCropComplete: (String) -> Unit,
+    onCropComplete: (String, String) -> Unit,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isSegmenting by remember { mutableStateOf(false) }
 
     LaunchedEffect(uriString) {
         withContext(Dispatchers.IO) {
@@ -64,9 +65,14 @@ fun CropScreen(
         }
     }
 
-    if (bitmap == null) {
+    if (bitmap == null || isSegmenting) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                CircularProgressIndicator()
+                if (isSegmenting) {
+                    Text("Segmenting Subject...", style = StickyKeysTheme.typography.bodyMedium)
+                }
+            }
         }
         return
     }
@@ -85,26 +91,31 @@ fun CropScreen(
                 },
                 actions = {
                     TextButton(onClick = {
+                        if (isSegmenting) return@TextButton
+                        isSegmenting = true
                         coroutineScope.launch {
-                            val cachedUri = withContext(Dispatchers.IO) {
-                                val cropSize = containerSize.width * 0.8f
-                                val cropRect = Rect(
-                                    offset = Offset((containerSize.width - cropSize) / 2, (containerSize.height - cropSize) / 2),
-                                    size = Size(cropSize, cropSize)
-                                )
-                                
-                                // In a full implementation, we'd map cropRect onto the transformed bitmap.
-                                // For MVP, we will just pass the loaded bitmap directly to the erase screen,
-                                // mimicking a "skip crop" or a full-size crop if the logic is too complex to hand-roll inline.
-                                // Actually, let's just write the original bitmap to cache and pass it.
-                                
+                            val (origUri, segUri) = withContext(Dispatchers.IO) {
                                 val cacheFile = File(context.cacheDir, "crop_${UUID.randomUUID()}.png")
                                 FileOutputStream(cacheFile).use { out ->
                                     bitmap!!.compress(Bitmap.CompressFormat.PNG, 100, out)
                                 }
-                                Uri.fromFile(cacheFile).toString()
+                                val origPath = Uri.fromFile(cacheFile).toString()
+
+                                // Run segmentation
+                                val engine = com.uncoalesced.stickykeys.stickercore.segmentation.MlKitSegmentationEngine()
+                                val segResult = engine.segmentSubject(context, bitmap!!)
+                                val segBmp = segResult.getOrDefault(bitmap!!)
+
+                                val segCacheFile = File(context.cacheDir, "seg_${UUID.randomUUID()}.png")
+                                FileOutputStream(segCacheFile).use { out ->
+                                    segBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                }
+                                val segPath = Uri.fromFile(segCacheFile).toString()
+
+                                Pair(origPath, segPath)
                             }
-                            onCropComplete(cachedUri)
+                            isSegmenting = false
+                            onCropComplete(origUri, segUri)
                         }
                     }) {
                         Text("Next", color = StickyKeysTheme.colors.primary)
