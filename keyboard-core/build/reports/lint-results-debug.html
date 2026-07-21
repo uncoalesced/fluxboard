@@ -179,7 +179,7 @@ document.getElementById(id).style.display = 'none';
     <div class="mdl-layout__header-row">
       <span class="mdl-layout-title">Lint Report: 1 warning</span>
       <div class="mdl-layout-spacer"></div>
-      <nav class="mdl-navigation mdl-layout--large-screen-only">Check performed at Sun Jul 19 17:31:58 IST 2026 by AGP (9.3.0)</nav>
+      <nav class="mdl-navigation mdl-layout--large-screen-only">Check performed at Tue Jul 21 22:26:48 IST 2026 by AGP (9.3.0)</nav>
     </div>
   </header>
   <div class="mdl-layout__drawer">
@@ -204,9 +204,9 @@ document.getElementById(id).style.display = 'none';
 <tr>
 <td class="countColumn">1</td><td class="issueColumn"><i class="material-icons warning-icon">warning</i>
 <a href="#GradleDependency">GradleDependency</a>: Obsolete Gradle Dependency</td></tr>
-<tr><td></td><td class="categoryColumn"><a href="#ExtraIssues">Included Additional Checks (18)</a>
+<tr><td></td><td class="categoryColumn"><a href="#ExtraIssues">Included Additional Checks (75)</a>
 </td></tr>
-<tr><td></td><td class="categoryColumn"><a href="#MissingIssues">Disabled Checks (40)</a>
+<tr><td></td><td class="categoryColumn"><a href="#MissingIssues">Disabled Checks (42)</a>
 </td></tr>
 </table>
 <br/>              </div>
@@ -225,14 +225,14 @@ Dismiss</button>            </div>
               <div class="mdl-card__supporting-text">
 <div class="issue">
 <div class="warningslist">
-<span class="location"><a href="../../build.gradle.kts">../../build.gradle.kts</a>:9</span>: <span class="message">A newer version of <code>compileSdk</code> than 36 is available: 37</span><br /><pre class="errorlines">
-<span class="lineno">  6 </span>
-<span class="lineno">  7 </span>android {
-<span class="lineno">  8 </span>    namespace = "com.uncoalesced.stickykeys.keyboardcore"
-<span class="caretline"><span class="lineno">  9 </span>    <span class="warning">compileSdk = 36</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-<span class="lineno"> 10 </span>
-<span class="lineno"> 11 </span>    defaultConfig {
-<span class="lineno"> 12 </span>        minSdk = 26
+<span class="location"><a href="../../build.gradle.kts">../../build.gradle.kts</a>:10</span>: <span class="message">A newer version of <code>compileSdk</code> than 36 is available: 37</span><br /><pre class="errorlines">
+<span class="lineno">  7 </span>
+<span class="lineno">  8 </span>android {
+<span class="lineno">  9 </span>    namespace = "com.uncoalesced.stickykeys.keyboardcore"
+<span class="caretline"><span class="lineno"> 10 </span>    <span class="warning">compileSdk = 36</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+<span class="lineno"> 11 </span>
+<span class="lineno"> 12 </span>    defaultConfig {
+<span class="lineno"> 13 </span>        minSdk = 26
 </pre>
 
 </div>
@@ -276,6 +276,111 @@ whether a particular check is included in analysis when configuring builds.
 (Note that the list does not include the hundreds of built-in checks into lint,
 only additional ones.)
 <div id="IncludedIssues" style="display: none;"><br/><br/><div class="issue">
+<div class="id">ArcAnimationSpecTypeIssue<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+ArcAnimationSpec is designed for 2D values. Particularly, for positional values such as Offset.<br/>
+Trying to use it for values of different dimensions (Float, Size, Color, etc.) will result in unpredictable animation behavior.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation.core<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">AutoboxingStateCreation<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Calling <code>mutableStateOf&lt;T>()</code> when <code>T</code> is either backed by a primitive type on the JVM or is a value class results in a state implementation that requires all state values to be boxed. This usually causes an additional allocation for each state write, and adds some additional work to auto-unbox values when reading the value of the state. Instead, prefer to use a specialized primitive state implementation for <code>Int</code>, <code>Long</code>, <code>Float</code>, and <code>Double</code> when the state does not need to track null values and does not override the default <code>SnapshotMutationPolicy</code>. See <code>mutableIntStateOf()</code>, <code>mutableLongStateOf()</code>, <code>mutableFloatStateOf()</code>, and <code>mutableDoubleStateOf()</code> for more information.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">AutoboxingStateValueProperty<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Avoid using the generic <code>value</code> property when using a specialized State type. Reading or writing to the state's generic <code>value</code> property will result in an unnecessary autoboxing operation. Prefer the specialized value property (e.g. <code>intValue</code> for <code>MutableIntState</code>), or use property delegation to avoid unnecessary allocations.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ComposableNaming<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+@Composable functions without a return type should use similar naming to classes, starting with an uppercase letter and ending with a noun. @Composable functions with a return type should be treated as normal Kotlin functions, starting with a lowercase letter.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">CompositionLocalNaming<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+CompositionLocal properties should be prefixed with <code>Local</code>. This helps make it clear at their use site that these values are local to the current composition. Typically the full name will be <code>Local</code> + the type of the CompositionLocal, for example val LocalFoo = compositionLocalOf { Foo() }.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ConfigurationScreenWidthHeight<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Configuration.screenWidthDp and Configuration.screenHeightDp have different insets behaviour depending on target SDK version, and are rounded to the nearest Dp. This means that using these values in composition to size a layout can result in issues, as these values do not accurately represent the actual available window size. Instead it is recommended to use WindowInfo.containerSize which accurately represents the window size.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ConstantContentStateKeyInItemsCall<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+When using shared elements (<code>Modifier.sharedElement</code> or <code>Modifier.sharedBounds</code>) in a LazyList, each Composable within an <code>items</code> block should have its own unique key. Otherwise, only one item of the visible layout will be rendered, regardless if there's an ongoing shared element transition.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">CoroutineCreationDuringComposition<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Creating a coroutine with <code>async</code> or <code>launch</code> during composition is often incorrect - this means that a coroutine will be created even if the composition fails / is rolled back, and it also means that multiple coroutines could end up mutating the same state, causing inconsistent results. Instead, use <code>LaunchedEffect</code> and create coroutines inside the suspending block. The block will only run after a successful composition, and will cancel existing coroutines when <code>key</code> changes, allowing correct cleanup.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
 <div class="id">DetachAndAttachSameFragment<div class="issueSeparator"></div>
 </div>
 <div class="metadata"><div class="explanation">
@@ -296,6 +401,47 @@ When using a <code>DialogFragment</code>, the <code>setOnCancelListener</code> a
 Vendor: Android Open Source Project<br/>
 Identifier: androidx.fragment<br/>
 Feedback: <a href="https://issuetracker.google.com/issues/new?component=460964">https://issuetracker.google.com/issues/new?component=460964</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">DisallowLookaheadAnimationVisualDebug<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Remove LookaheadAnimationVisualDebugging and CustomizedLookaheadAnimationVisualDebugging. They are debugging tools<br/>
+for shared element and animated bounds animations that can introduce performance overhead.<br/>
+They are not intended for use in release builds.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">EnsureInitializerMetadata<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+When a library defines a Initializer, it needs to be accompanied by a corresponding &lt;meta-data> entry in the AndroidManifest.xml file.<br/><div class="vendor">
+Vendor: Android Open Source Project<br/>
+Identifier: androidx.startup<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=823348">https://issuetracker.google.com/issues/new?component=823348</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">EnsureInitializerNoArgConstr<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Every <code>Initializer</code> must have a no argument constructor.<br/><div class="vendor">
+Vendor: Android Open Source Project<br/>
+Identifier: androidx.startup<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=823348">https://issuetracker.google.com/issues/new?component=823348</a><br/>
 </div>
 <br/>
 <br/></div>
@@ -323,6 +469,19 @@ Vendor: Google<br/>
 Identifier: com.google.dagger:dagger-lint<br/>
 Contact: <a href="https://github.com/google/dagger">https://github.com/google/dagger</a><br/>
 Feedback: <a href="https://github.com/google/dagger/issues">https://github.com/google/dagger/issues</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">FlowOperatorInvokedInComposition<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Calling a Flow operator function within composition will result in a new Flow being created every recomposition, which will reset collectAsState() and cause other related problems. Instead Flow operators should be called inside <code>remember</code>, or a side effect such as LaunchedEffect.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
 </div>
 <br/>
 <br/></div>
@@ -382,6 +541,36 @@ Feedback: <a href="https://issuetracker.google.com/issues/new?component=460964">
 </div>
 </div>
 <div class="issue">
+<div class="id">FrequentlyChangingValue<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Reading a value annotated with @FrequentlyChangingValue inside composition can cause performance issues due to frequent recompositions. To avoid frequent recompositions, instead consider:<br/>
+<br/>
+- Using derivedStateOf to filter state changes based on a provided calculation. For example, rather than recomposing on every scroll position change, only recomposing if the scroll position changes from 0 (at the top of the list) to greater than 0 (not at the top of the list), and vice versa.<br/>
+- Using snapshotFlow to create a flow of changes from a provided state. This can then be collected inside a LaunchedEffect, and used to make changes without needing to recompose.<br/>
+- If using Compose UI, read this value inside measure / layout / draw, depending on where it is needed. This will cause invalidation of the corresponding phase, instead of a recomposition. See developer.android.com for more information on Jetpack Compose phases.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">InvalidColorHexValue<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Creating a Color with a hex value requires a 32 bit value (such as 0xFF000000), with 8 bits being used per channel (ARGB). Not passing a full 32 bit value will result in channels being undefined / incorrect.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui.graphics<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
 <div class="id">InvalidFragmentVersionForActivityResult<div class="issueSeparator"></div>
 </div>
 <div class="metadata"><div class="explanation">
@@ -396,6 +585,19 @@ Feedback: <a href="https://issuetracker.google.com/issues/new?component=527362">
 </div>
 </div>
 <div class="issue">
+<div class="id">InvalidLanguageTagDelimiter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+A language tag must be compliant with IETF BCP47, specifically a sequence of subtags must be separated by hyphens (-) instead of underscores (_)<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui.text<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=779818">https://issuetracker.google.com/issues/new?component=779818</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
 <div class="id">JvmStaticProvidesInObjectDetector<div class="issueSeparator"></div>
 </div>
 <div class="metadata"><div class="explanation">
@@ -404,6 +606,153 @@ Vendor: Google<br/>
 Identifier: com.google.dagger:dagger-lint<br/>
 Contact: <a href="https://github.com/google/dagger">https://github.com/google/dagger</a><br/>
 Feedback: <a href="https://github.com/google/dagger/issues">https://github.com/google/dagger/issues</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">LaunchDuringComposition<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Calling <code>launch</code> during composition is incorrect. Doing so will cause launch to be called multiple times resulting in a RuntimeException. Instead, use <code>SideEffect</code> and <code>launch</code> inside of the suspending block. The block will only run after a successful composition.<br/><div class="vendor">
+Vendor: Jetpack Activity Compose<br/>
+Identifier: androidx.activity.compose<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">LifecycleCurrentStateInComposition<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Calling Lifecycle.currentState within composition will not observe changes to the Lifecycle, so changes might not be reflected within the composition. Instead you should use lifecycle.currentStateAsState() to observe changes to the Lifecycle, and recompose when it changes.<br/><div class="vendor">
+Vendor: Android Open Source Project<br/>
+Identifier: androidx.lifecycle<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=413132">https://issuetracker.google.com/issues/new?component=413132</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">LocalContextConfigurationRead<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Changes to the Configuration object will not cause LocalContext reads to be invalidated, so you may end up with stale values when the Configuration changes. Instead, use LocalConfiguration.current to retrieve the Configuration - this will recompose callers when the Configuration object changes.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">LocalContextGetResourceValueCall<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Changes to the Configuration object will not cause LocalContext.current reads to be invalidated, so calls to APIs such as Context.getString() will not be updated when the Configuration changes, and so stale values might be used. Instead, you can use Compose APIs such as stringResource, colorResource, and painterResource - or LocalResources.current and query properties from Resources directly. Using these APIs will invalidate callers when the Configuration changes, to ensure that these calls reflect the latest values.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">LocalContextResourcesRead<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Changes to the Configuration object will not cause LocalContext.current.resources reads to be invalidated, so calls to APIs such as Resources.getString() will not be updated when the Configuration changes. Instead, use LocalResources.current to retrieve the Resources - this will invalidate callers when the Configuration changes, to ensure that these calls reflect the latest values.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">MissingColorAlphaChannel<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Creating a Color with a hex value requires a 32 bit value (such as 0xFF000000), with 8 bits being used per channel (ARGB). Not passing a full 32 bit value will result in channels being undefined. For example, passing 0xFF0000 will result in a missing alpha channel, so the color will not appear visible.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui.graphics<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ModifierFactoryExtensionFunction<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Modifier factory functions should be defined as extension functions on Modifier to allow modifiers to be fluently chained.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ModifierFactoryReturnType<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Modifier factory functions should return Modifier as their type, and not a subtype of Modifier (such as Modifier.Element).<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ModifierFactoryUnreferencedReceiver<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Modifier factory functions are fluently chained to construct a chain of Modifier objects that will be applied to a layout. As a result, each factory function <i>must</i> use the receiver <code>Modifier</code> parameter, to ensure that the function is returning a chain that includes previous items in the chain. Make sure the returned chain either explicitly includes <code>this</code>, such as <code>return this.then(MyModifier)</code> or implicitly by returning a chain that starts with an implicit call to another factory function, such as <code>return myModifier()</code>, where <code>myModifier</code> is defined as <code>fun Modifier.myModifier(): Modifier</code>.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ModifierNodeInspectableProperties<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+ModifierNodeElements may override inspectableProperties() to provide information about the modifier in the layout inspector. The default implementation attempts to read all of the properties on the class reflectively, which may not comprehensively or effectively describe the modifier.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ModifierParameter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+The first (or only) Modifier parameter in a Composable function should follow the following rules:<br/>
+- Be named <code>modifier</code><br/>
+- Have a type of <code>Modifier</code><br/>
+- Either have no default value, or have a default value of <code>Modifier</code><br/>
+- If optional, be the first optional parameter in the parameter list<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
 </div>
 <br/>
 <br/></div>
@@ -435,6 +784,300 @@ Vendor: Google<br/>
 Identifier: com.google.dagger:dagger-lint<br/>
 Contact: <a href="https://github.com/google/dagger">https://github.com/google/dagger</a><br/>
 Feedback: <a href="https://github.com/google/dagger/issues">https://github.com/google/dagger/issues</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">MultipleAwaitPointerEventScopes<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Pointer Input events are queued inside awaitPointerEventScope. Multiple calls to awaitPointerEventScope may exit the scope. During this time there is no guarantee that the events will be queued and some events may be dropped. It is recommended to use a single top-level block and perform the pointer events processing within such block.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">MutableCollectionMutableState<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Writes to mutable collections inside a MutableState will not cause a recomposition - only writes to the MutableState itself will. In most cases you should either use a read-only collection (such as List or Map) and assign a new instance to the MutableState when your data changes, or you can use an snapshot-backed collection such as SnapshotStateList or SnapshotStateMap which will correctly cause a recomposition when their contents are modified.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">NoCollectCallFound<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+You must call collect on the progress in the onBack function. The collect call is what properly splits the callback so it knows what to do when the back gestures is started vs when it is completed. Failing to call collect will cause all code in the block to run when the gesture is started.<br/><div class="vendor">
+Vendor: Jetpack Activity Compose<br/>
+Identifier: androidx.activity.compose<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">NonObservableLocale<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Calling <code>java.util.Locale.getDefault()</code>, <code>android.os.LocaleList.getAdjustedDefault()</code> or <code>androidx.core.os.LocaleListCompat.getAdjustedDefault()</code> within a composable function is not recommended. Calling these functions does not read observable state and will not be updated if the user changes the locale. This can lead to subtle bugs in your UI where the wrong locale is used for formatting dates, times, numbers, and other locale-sensitive information. To fix this, you should use <code>androidx.compose.ui.platform.LocalLocale.current.platformLocale</code> instead. This will ensure that your UI is always up-to-date with the current locale.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">NullSafeMutableLiveData<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+This check ensures that LiveData values are not null when explicitly                 declared as non-nullable.<br/>
+<br/>
+                Kotlin interoperability does not support enforcing explicit null-safety when using                 generic Java type parameters. Since LiveData is a Java class its value can always                 be null even when its type is explicitly declared as non-nullable. This can lead                 to runtime exceptions from reading a null LiveData value that is assumed to be                 non-nullable.<br/><div class="vendor">
+Vendor: Android Open Source Project<br/>
+Identifier: androidx.lifecycle<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=413132">https://issuetracker.google.com/issues/new?component=413132</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">OpaqueUnitKey<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Certain Compose functions including <code>remember</code>, <code>LaunchedEffect</code>, and <code>DisposableEffect</code> declare (and sometimes require) one or more key parameters. When a key parameter changes, it is a signal that the previous invocation is now invalid. In certain cases, it may be required to pass <code>Unit</code> as a key to one of these functions, indicating that the invocation never becomes invalid. Using <code>Unit</code> as a key should be done infrequently, and should always be done explicitly by passing the <code>Unit</code> literal. This inspection checks for invocations where <code>Unit</code> is being passed as a key argument in any form other than the <code>Unit</code> literal. This is usually done by mistake, and can harm readability. If a Unit expression is being passed as a key, it is always equivalent to move the expression before the function invocation and pass the <code>Unit</code> literal instead.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ProduceStateDoesNotAssignValue<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+produceState returns an observable State using values assigned inside the producer lambda. If the lambda never assigns (i.e <code>value = foo</code>), then the State will never change. Make sure to assign a value when the source you are producing values from changes / emits a new value. For sample usage see the produceState documentation.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RememberInComposition<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+APIs annotated with @RememberInComposition must not be called inside composition. This can lead to correctness issues and / or performance issues. Instead, use <code>remember</code> to cache the value across compositions, or hoist this call outside of composition.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RememberReturnType<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+A call to <code>remember</code> that returns <code>Unit</code> is always an error. This typically happens when using <code>remember</code> to mutate variables on an object. <code>remember</code> is executed during the composition, which means that if the composition fails or is happening on a separate thread, the mutated variables may not reflect the true state of the composition. Instead, use <code>SideEffect</code> to make deferred changes once the composition succeeds, or mutate <code>MutableState</code> backed variables directly, as these will handle composition failure for you.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RememberSaveableSaverParameter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+The first parameter to <code>rememberSaveable</code> is a vararg parameter for inputs that when changed will cause the state to reset. Passing a <code>Saver</code> object to this parameter is an error, as the intention is to pass the <code>Saver</code> object to the saver parameter. Since the saver parameter is not the first parameter, it must be explicitly named.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime.saveable<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RepeatOnLifecycleWrongUsage<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+The repeatOnLifecycle APIs should be used when the View is created,                 that is in the <code>onCreate</code> lifecycle method for Activities, or <code>onViewCreated</code> in                 case you're using Fragments.<br/><div class="vendor">
+Vendor: Android Open Source Project<br/>
+Identifier: androidx.lifecycle<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=413132">https://issuetracker.google.com/issues/new?component=413132</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RetainLeaksContext<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+The lifespan of a retained object or one of its keys can extend beyond the lifecycle of the host activity. Retaining a <code>Context</code> (or another type that holds a strong reference to a <code>Context</code>) as either the return type of <code>calculation</code> or as a key input to <code>retain</code> will leak the Context and prevent its memory from being properly reclaimed.<br/>
+<br/>
+If caching is necessary, consider remembering offending values instead of retaining them.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime.retain<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RetainRememberObserver<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Objects that implement RememberObserver and not RetainObserver are unaware of the retainment lifecycle. They cannot be correctly retained because there is no valid way to dispatch the RememberObserver callbacks and are therefore prohibited as return values to the <code>calculation</code> lambda of <code>retain</code>. Attempting to retain a value that implements <code>RememberObserver</code> without also implementing <code>RetainObserver</code> will throw an exception. Either remember the value instead of retaining it, or implement RetainObserver on the object.<br/>
+<br/>
+Note that this inspection checks the statically declared return type to ensure it does not declare itself as implementing <code>RememberObserver</code> without also implementing <code>RetainObserver</code>. The actual runtime types are not checked, which may lead to false negatives or false positives if the <code>calculation</code> lambda returns a different type than the call to <code>retain</code>.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime.retain<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RetainUnitType<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+A call to <code>retain</code> that returns <code>Unit</code> is always an error. This typically happens when using <code>retain</code> to perform an action or mutate variables on an object. Instead, use <code>SideEffect</code> (or <code>RetainedEffect</code>) to make deferred changes once the composition succeeds, or mutate <code>MutableState</code> backed variables directly, as these will handle composition failure for you.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime.retain<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">RetainingDoNotRetainType<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Objects annotated with <code>@DoNotRetain</code> are not intended to be used with retain. Types marked with this annotation are not designed for retention, generally because they have an independent lifecycle that exceeds the retention lifespan and will leak resources. The type'sdocumentation may have more information about why it does not support retention.<br/>
+<br/>
+This inspection checks that marked types are never directly returned by the <code>calculation</code> lambda of <code>retain</code> or as a key input to <code>retain</code>. Types marked with <code>@DoNotRetain</code> may optionally specify more information about why they should not be retained.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime.retain<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ReturnFromAwaitPointerEventScope<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Pointer Input events are queued inside awaitPointerEventScope. By using the return value of awaitPointerEventScope one might unexpectedly lose events. If another awaitPointerEventScope is restarted there is no guarantee that the events will persist between those calls. In this case you should keep all events inside the awaitPointerEventScope block<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">StateFlowValueCalledInComposition<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Calling StateFlow.value within composition will not observe changes to the StateFlow, so changes might not be reflected within the composition. Instead you should use stateFlow.collectAsState() to observe changes to the StateFlow, and recompose when it changes.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">SuspiciousCompositionLocalModifierRead<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Jetpack Compose is unable to send updated values of a CompositionLocal when it's read in a Modifier.Node's initializer and onAttach() or onDetach() callbacks. Modifier.Node's callbacks are not aware of snapshot reads, and their lifecycle callbacks are not invoked on every recomposition. If you read a CompositionLocal in onAttach() or onDetach(), you will only get the CompositionLocal's value once at the moment of the read, which may lead to unexpected behaviors. We recommend instead reading CompositionLocals at time-of-use in callbacks that apply your Modifier's behavior, like measure() for LayoutModifierNode, draw() for DrawModifierNode, and so on. To observe the value of the CompositionLocal manually, extend from the ObserverNode interface and place the read inside an observeReads {} block within the onObservedReadsChanged() callback.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">SuspiciousModifierThen<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Calling a Modifier factory function with an implicit receiver inside Modifier.then will result in the receiver (<code>this</code>) being added twice to the chain. For example, fun Modifier.myModifier() = this.then(otherModifier()) - the implementation of factory functions such as Modifier.otherModifier() will internally call this.then(...) to chain the provided modifier with their implementation. When you expand this.then(otherModifier()), it becomes: this.then(this.then(OtherModifierImplementation)) - so you can see that <code>this</code> is included twice in the chain, which results in modifiers such as padding being applied twice, for example. Instead, you should either remove the then() and directly chain the factory function on the receiver, this.otherModifier(), or add the empty Modifier as the receiver for the factory, such as this.then(Modifier.otherModifier())<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnnecessaryComposedModifier<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+<code>Modifier.composed</code> allows invoking @Composable functions when creating a <code>Modifier</code> instance - for example, using <code>remember</code> to have instance-specific state, allowing the same <code>Modifier</code> object to be safely used in multiple places. Using <code>Modifier.composed</code> without calling any @Composable functions inside is unnecessary, and since the Modifier is no longer skippable, this can cause a lot of extra work inside the composed body, leading to worse performance.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.ui<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnrememberedMutableState<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+State objects created during composition need to be `remember`ed, otherwise they will be recreated during recomposition, and lose their state. Either hoist the state to an object that is not created during composition, or wrap the state in a call to <code>remember</code>.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.runtime<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnsafeLifecycleWhenUsage<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+If the <code>Lifecycle</code> is destroyed within the block of                     <code>Lifecycle.whenStarted</code> or any similar <code>Lifecycle.when</code> method is suspended,                     the block will be cancelled, which will also cancel any child coroutine                     launched inside the block. As as a result, If you have a try finally block                     in your code, the finally might run after the Lifecycle moves outside                     the desired state. It is recommended to check the <code>Lifecycle.isAtLeast</code>                     before accessing UI in finally block. Similarly,                     if you have a catch statement that might catch <code>CancellationException</code>,                     you should check the <code>Lifecycle.isAtLeast</code> before accessing the UI. See                     documentation of <code>Lifecycle.whenStateAtLeast</code> for more details<br/><div class="vendor">
+Vendor: Android Open Source Project<br/>
+Identifier: androidx.lifecycle<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=413132">https://issuetracker.google.com/issues/new?component=413132</a><br/>
 </div>
 <br/>
 <br/></div>
@@ -516,6 +1159,97 @@ Feedback: <a href="https://issuetracker.google.com/issues/new?component=460964">
 </div>
 </div>
 <div class="issue">
+<div class="id">UnusedBoxWithConstraintsScope<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+The <code>content</code> lambda in BoxWithConstraints has a scope which will include the incoming constraints. If this scope is ignored, then the cost of subcomposition is being wasted and this BoxWithConstraints should be replaced with a Box.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.foundation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnusedContentLambdaTargetStateParameter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+<code>content</code> lambda in AnimatedContent works as a lookup function that returns the corresponding content based on the parameter (a state of type <code>T</code>). It is important for this lambda to return content <i>specific</i> to the input parameter, so that the different contents can be properly animated. Not using the input parameter to the content lambda will result in the same content for different input (i.e. target state) and therefore an erroneous transition between the exact same content.`<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnusedCrossfadeTargetStateParameter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+<code>content</code> lambda in Crossfade works as a lookup function that returns the corresponding content based on the parameter (a state of type <code>T</code>). It is important for this lambda to return content <i>specific</i> to the input parameter, so that the different contents can be properly crossfaded. Not using the input parameter to the content lambda will result in the same content for different input (i.e. target state) and therefore an erroneous crossfade between the exact same content.`<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnusedMaterial3ScaffoldPaddingParameter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+The <code>content</code> lambda in Scaffold has a padding parameter which will include any inner padding for the content due to app bars. If this parameter is ignored, then content may be obscured by the app bars resulting in visual issues or elements that can't be interacted with.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.material3<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnusedSharedTransitionModifierParameter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+When using <code>SharedTransitionScope</code> the provided <code>Modifier</code> should always be used on the top-most child, as the <code>Modifier</code> both obtains the root coordinates and creates an overlay. Otherwise, consider using <code>SharedTransitionLayout</code>.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnusedTargetStateInContentKeyLambda<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+In <code>AnimatedContent</code>, the <code>contentKey</code> lambda may be used when the <code>targetState</code> is expected to mutate frequently but not all mutations are desired to be considered a target state change. So <code>contentKey</code> is expected to always use the given <code>targetState</code> parameter to calculate its result.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UnusedTransitionTargetStateParameter<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+Transition.animate* functions provide a target state parameter in the lambda that will be used to calculate the value for a given state. This target state parameter in the lambda may or may not be the same as the actual state, as the animation system occasionally needs to look up target values for other states to do proper seeking/tooling preview. Relying on other state than the provided <code>targetState</code> could also result in unnecessary recompositions. Therefore, it is generally considered an error if this <code>targetState</code> parameter is not used.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.animation.core<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
 <div class="id">UseGetLayoutInflater<div class="issueSeparator"></div>
 </div>
 <div class="metadata"><div class="explanation">
@@ -529,6 +1263,19 @@ Feedback: <a href="https://issuetracker.google.com/issues/new?component=460964">
 </div>
 </div>
 <div class="issue">
+<div class="id">UseOfNonLambdaOffsetOverload<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+<code>Modifier.offset()</code> is recommended to be used with static arguments only to avoid unnecessary recompositions. <code>Modifier.offset{ }</code> is preferred in the cases where the arguments are backed by a <code>State</code>.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.foundation<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
 <div class="id">UseRequireInsteadOfGet<div class="issueSeparator"></div>
 </div>
 <div class="metadata"><div class="explanation">
@@ -536,6 +1283,19 @@ AndroidX added new "require____()" versions of common "get___()" APIs, such as g
 Vendor: Android Open Source Project<br/>
 Identifier: androidx.fragment<br/>
 Feedback: <a href="https://issuetracker.google.com/issues/new?component=460964">https://issuetracker.google.com/issues/new?component=460964</a><br/>
+</div>
+<br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">UsingMaterialAndMaterial3Libraries<div class="issueSeparator"></div>
+</div>
+<div class="metadata"><div class="explanation">
+material and material3 are separate design system libraries that are incompatible with each other, as they have their own distinct theming systems. Using components from both libraries concurrently can cause issues: for example material components will not pick up the correct content color from a material3 container, and vice versa.<br/><div class="vendor">
+Vendor: Jetpack Compose<br/>
+Identifier: androidx.compose.material3<br/>
+Feedback: <a href="https://issuetracker.google.com/issues/new?component=612128">https://issuetracker.google.com/issues/new?component=612128</a><br/>
 </div>
 <br/>
 <br/></div>
@@ -607,6 +1367,24 @@ According to the Android Design Guide,<br/>
 <br/>
 This check is not very sophisticated (it just looks for buttons with the label "Back"), so it is disabled by default to not trigger on common scenarios like pairs of Back/Next buttons to paginate through screens.<br/><div class="moreinfo">More info: <a href="https://d.android.com/r/studio-ui/designer/material/design">https://d.android.com/r/studio-ui/designer/material/design</a>
 </div><br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ComposableLambdaParameterNaming<div class="issueSeparator"></div>
+</div>
+<div class="metadata">Disabled By: Default<br/>
+<div class="explanation">
+Composable functions with only one composable lambda parameter should use the name <code>content</code> for the parameter.<br/><br/>
+<br/></div>
+</div>
+</div>
+<div class="issue">
+<div class="id">ComposableLambdaParameterPosition<div class="issueSeparator"></div>
+</div>
+<div class="metadata">Disabled By: Default<br/>
+<div class="explanation">
+Composable functions with only one composable lambda parameter should place the parameter at the end of the parameter list, so it can be used as a trailing lambda.<br/><br/>
 <br/></div>
 </div>
 </div>
