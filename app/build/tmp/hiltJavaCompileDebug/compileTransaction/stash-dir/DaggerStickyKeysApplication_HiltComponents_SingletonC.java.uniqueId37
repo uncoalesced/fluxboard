@@ -36,6 +36,10 @@ import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel;
 import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey;
 import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey;
 import dagger.hilt.android.ActivityRetainedLifecycle;
 import dagger.hilt.android.ViewModelLifecycle;
 import dagger.hilt.android.internal.builders.ActivityComponentBuilder;
@@ -385,8 +389,9 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     }
 
     Map keySetMapOfClassOfObjectAndBooleanBuilder() {
-      MapBuilder mapBuilder = MapBuilder.<String, Boolean>newMapBuilder(5);
+      MapBuilder mapBuilder = MapBuilder.<String, Boolean>newMapBuilder(6);
       mapBuilder.put(AppSettingsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, AppSettingsViewModel_HiltModules.KeyModule.provide());
+      mapBuilder.put(EditStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, EditStickerViewModel_HiltModules.KeyModule.provide());
       mapBuilder.put(KeyboardSettingsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, KeyboardSettingsViewModel_HiltModules.KeyModule.provide());
       mapBuilder.put(SaveStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, SaveStickerViewModel_HiltModules.KeyModule.provide());
       mapBuilder.put(StickersViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, StickersViewModel_HiltModules.KeyModule.provide());
@@ -433,6 +438,8 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
 
     Provider<AppSettingsViewModel> appSettingsViewModelProvider;
 
+    Provider<EditStickerViewModel> editStickerViewModelProvider;
+
     Provider<KeyboardSettingsViewModel> keyboardSettingsViewModelProvider;
 
     Provider<SaveStickerViewModel> saveStickerViewModelProvider;
@@ -451,8 +458,9 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     }
 
     Map hiltViewModelMapMapOfClassOfObjectAndProviderOfViewModelBuilder() {
-      MapBuilder mapBuilder = MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(5);
+      MapBuilder mapBuilder = MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(6);
       mapBuilder.put(AppSettingsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (appSettingsViewModelProvider)));
+      mapBuilder.put(EditStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (editStickerViewModelProvider)));
       mapBuilder.put(KeyboardSettingsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (keyboardSettingsViewModelProvider)));
       mapBuilder.put(SaveStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (saveStickerViewModelProvider)));
       mapBuilder.put(StickersViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (stickersViewModelProvider)));
@@ -464,10 +472,11 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     private void initialize(final SavedStateHandle savedStateHandleParam,
         final ViewModelLifecycle viewModelLifecycleParam) {
       this.appSettingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 0);
-      this.keyboardSettingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 1);
-      this.saveStickerViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
-      this.stickersViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
-      this.transferShareViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 4);
+      this.editStickerViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 1);
+      this.keyboardSettingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
+      this.saveStickerViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
+      this.stickersViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 4);
+      this.transferShareViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 5);
     }
 
     @Override
@@ -504,16 +513,19 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
           case 0: // com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel
           return (T) new AppSettingsViewModel();
 
-          case 1: // com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsViewModel
+          case 1: // com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel
+          return (T) new EditStickerViewModel(singletonCImpl.stickerRepositoryImplProvider.get());
+
+          case 2: // com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsViewModel
           return (T) new KeyboardSettingsViewModel();
 
-          case 2: // com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel
+          case 3: // com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel
           return (T) new SaveStickerViewModel(singletonCImpl.stickerRepositoryImplProvider.get());
 
-          case 3: // com.uncoalesced.stickykeys.ui.screens.StickersViewModel
-          return (T) new StickersViewModel();
+          case 4: // com.uncoalesced.stickykeys.ui.screens.StickersViewModel
+          return (T) new StickersViewModel(singletonCImpl.stickerRepositoryImplProvider.get());
 
-          case 4: // com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel
+          case 5: // com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel
           return (T) new TransferShareViewModel();
 
           default: throw new AssertionError(id);
