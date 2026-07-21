@@ -15,10 +15,10 @@
       proguardRules="proguard.txt"/>
   <library
       name=":@@:keyboard-core::debug"
-      jars="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\20bc35a53c689a3a617a5dd54096c9a0\transformed\out\jars\classes.jar;C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\20bc35a53c689a3a617a5dd54096c9a0\transformed\out\jars\libs\R.jar"
+      jars="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\116814d6f6481efc1598c2ba524bb87a\transformed\out\jars\classes.jar;C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\116814d6f6481efc1598c2ba524bb87a\transformed\out\jars\libs\R.jar"
       resolved="StickyKeys:keyboard-core:unspecified"
       partialResultsDir="E:\sticky-keys\keyboard-core\build\intermediates\lint_partial_results\debug\lintAnalyzeDebug\out"
-      folder="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\20bc35a53c689a3a617a5dd54096c9a0\transformed\out"
+      folder="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\116814d6f6481efc1598c2ba524bb87a\transformed\out"
       manifest="AndroidManifest.xml"
       resFolder="res"
       assetsFolder="assets"
