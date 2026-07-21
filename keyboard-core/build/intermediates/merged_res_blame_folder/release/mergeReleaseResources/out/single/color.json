@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/color/vector_tint_color.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-ui-23:/color/vector_tint_color.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/color/vector_tint_theme_color.xml",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-ui-23:/color/vector_tint_theme_color.xml"
+    }
+]

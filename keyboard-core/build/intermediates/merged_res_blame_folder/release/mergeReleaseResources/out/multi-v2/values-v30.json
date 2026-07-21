@@ -1,0 +1,34 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/values-v30/values-v30.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\8f38a638234a843813eb818016a36b57\\transformed\\material3\\res\\values-v30\\values-v30.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "72",
+                        "endOffsets": "123"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-mergeReleaseResources-38:/values-v30/values-v30.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\8f38a638234a843813eb818016a36b57\\transformed\\material3\\res\\values-v30\\values-v30.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "72",
+                        "endOffsets": "123"
+                    }
+                }
+            ]
+        }
+    ]
+}

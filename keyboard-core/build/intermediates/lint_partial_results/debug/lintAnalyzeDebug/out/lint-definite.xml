@@ -12,12 +12,12 @@
             priority="0"/>
         <location
             file="${:keyboard-core*projectDir}/build.gradle.kts"
-            line="9"
+            line="10"
             column="5"
-            startOffset="182"
-            endLine="9"
+            startOffset="223"
+            endLine="10"
             endColumn="20"
-            endOffset="197"/>
+            endOffset="238"/>
     </incident>
 
 </incidents>

@@ -1,46 +1,22 @@
 [
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/notification_bg_normal.9.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/notification_bg_normal.9.png"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/ic_call_answer_video_low.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/ic_call_answer_video_low.png"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/notification_bg_low_pressed.9.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/notification_bg_low_pressed.9.png"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable-xhdpi-v4/notification_bg_low_normal.9.png",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable-xhdpi-v4/notification_bg_low_normal.9.png"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/ic_call_decline.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/ic_call_decline.png"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable-xhdpi-v4/notification_bg_normal.9.png",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable-xhdpi-v4/notification_bg_normal.9.png"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/notify_panel_notification_icon_bg.png"
-    },
-    {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/ic_call_decline_low.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/ic_call_decline_low.png"
-    },
-    {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/ic_call_answer.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/ic_call_answer.png"
-    },
-    {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/ic_call_answer_video.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/ic_call_answer_video.png"
-    },
-    {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/ic_call_answer_low.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/ic_call_answer_low.png"
-    },
-    {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/notification_bg_low_normal.9.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/notification_bg_low_normal.9.png"
-    },
-    {
-        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-17:/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png",
-        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.12.0-11:/drawable-xhdpi-v4/notification_bg_normal_pressed.9.png"
+        "merged": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-release-40:/drawable-xhdpi-v4/notification_bg_low_pressed.9.png",
+        "source": "com.uncoalesced.stickykeys.keyboardcore.keyboard-core-core-1.16.0-16:/drawable-xhdpi-v4/notification_bg_low_pressed.9.png"
     }
 ]
