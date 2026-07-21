@@ -1,5 +1,30 @@
 # Changelog
 
+## Phase 6: Sticker Editing Suite
+- Added `updateStickerData` to `StickerRepository` and `StickerRepositoryImpl` to support overwriting sticker files on disk and updating DB entities without re-inserting.
+- Created `FilterScreen.kt` using `android.graphics.ColorMatrix` for real-time Brightness, Contrast, and Saturation adjustments.
+- Created `TextOverlayScreen.kt` for typing, sizing, coloring, and positioning text over sticker images.
+- Created `EditStickerScreen.kt` and `EditStickerViewModel.kt` uniting Crop, Erase, Filter, and Text tools with explicit Overwrite vs. Save As New options.
+- Connected `StickersLibraryScreen` grid items to `edit/{stickerId}` navigation route.
+- Implemented `CropScreen` with standard pan/zoom gestures over a fixed crop mask.
+- Implemented `EraseScreen` using Compose `Canvas` and `PorterDuff.Mode.CLEAR` to allow manual background erasing.
+- Implemented `SaveStickerScreen` to preview and compress final assets into `.webp` format (lossless for full size, lossy for 256x256 thumbnails).
+- Integrated `ActivityResultContracts.PickVisualMedia` as the creation entry point in `StickersLibraryScreen`.
+- Created `SaveStickerViewModel` to coordinate with `StickerRepository`.
+
+## Phase 4: Local Data Model & Room Schema
+- Defined `StickerEntity`, `PackEntity`, and `CategoryEntity` in `sticker-core` using Room.
+- Hand-rolled `StickerFileManager` to decouple blob storage from the database.
+- Implemented DAOs with non-blocking Flow queries and `Dispatchers.IO` suspend functions to bypass KSP Kotlin 2.0 limitations.
+- Built unified `StickerRepository` to coordinate Room DB and file system operations cleanly.
+
+## Phase 3: Design System & Theming Tokens
+- Created `keyboard-core` base theme primitives (`Color`, `Typography`, `Spacing`, `Shape`) using plain Kotlin data classes.
+- Enabled Compose in `keyboard-core` to utilize Compose `Color`, `Dp`, and `TextStyle`.
+- Implemented `StickyKeysTheme` with `ProvidableCompositionLocal` wrappers for seamless Compose integration.
+- Designed a vibrant Indigo (`#6366F1`) and Teal (`#2DD4BF`) palette.
+- Developed `StyleSheetScreen` in `app` to visually render and test tokens.
+
 ## Phase 2: Architecture Foundation
 - Successfully resolved build failures related to AGP 9.3.0 and Kotlin 2.0.21.
 - Updated Kotlin to 2.0.21 and KSP to 2.0.21-1.0.28 to support built-in Kotlin compilation.
