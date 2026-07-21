@@ -1,6 +1,0 @@
--keep class androidx.core.app.CoreComponentFactory { <init>(); }
--keep class androidx.profileinstaller.ProfileInstallReceiver { <init>(); }
--keep class androidx.room.MultiInstanceInvalidationService { <init>(); }
--keep class androidx.startup.InitializationProvider { <init>(); }
--keep class com.uncoalesced.stickykeys.MainActivity { <init>(); }
--keep class com.uncoalesced.stickykeys.StickyKeysApplication { <init>(); }
