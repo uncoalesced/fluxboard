@@ -1,4 +1,4 @@
-E:\sticky-keys\keyboard-core\build.gradle.kts:9: Warning: A newer version of compileSdk than 36 is available: 37 [GradleDependency]
+E:\sticky-keys\keyboard-core\build.gradle.kts:10: Warning: A newer version of compileSdk than 36 is available: 37 [GradleDependency]
     compileSdk = 36
     ~~~~~~~~~~~~~~~
 
