@@ -1,5 +1,7 @@
 package com.uncoalesced.stickykeys;
 
+import com.uncoalesced.stickykeys.keyboardcore.ime.StickerIMEViewModel_HiltModules;
+import com.uncoalesced.stickykeys.keyboardcore.ime.StickyKeysIME_GeneratedInjector;
 import com.uncoalesced.stickykeys.stickercore.di.DatabaseModule;
 import com.uncoalesced.stickykeys.stickercore.di.RepositoryModule;
 import com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel_HiltModules;
@@ -8,6 +10,7 @@ import com.uncoalesced.stickykeys.ui.screens.StickersViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules;
+import com.uncoalesced.stickykeys.ui.screens.video.VideoConvertViewModel_HiltModules;
 import dagger.Binds;
 import dagger.Component;
 import dagger.Module;
@@ -152,7 +155,8 @@ public final class StickyKeysApplication_HiltComponents {
 
   @Subcomponent
   @ServiceScoped
-  public abstract static class ServiceC implements ServiceComponent,
+  public abstract static class ServiceC implements StickyKeysIME_GeneratedInjector,
+      ServiceComponent,
       GeneratedComponent {
     @Subcomponent.Builder
     abstract interface Builder extends ServiceComponentBuilder {
@@ -167,10 +171,12 @@ public final class StickyKeysApplication_HiltComponents {
           HiltWrapper_ActivitySavedStateHandleModule.class,
           KeyboardSettingsViewModel_HiltModules.KeyModule.class,
           SaveStickerViewModel_HiltModules.KeyModule.class,
+          StickerIMEViewModel_HiltModules.KeyModule.class,
           StickersViewModel_HiltModules.KeyModule.class,
           ActivityCBuilderModule.class,
           ViewModelCBuilderModule.class,
-          TransferShareViewModel_HiltModules.KeyModule.class
+          TransferShareViewModel_HiltModules.KeyModule.class,
+          VideoConvertViewModel_HiltModules.KeyModule.class
       }
   )
   @ActivityRetainedScoped
@@ -211,8 +217,10 @@ public final class StickyKeysApplication_HiltComponents {
           HiltWrapper_HiltViewModelFactory_ViewModelModule.class,
           KeyboardSettingsViewModel_HiltModules.BindsModule.class,
           SaveStickerViewModel_HiltModules.BindsModule.class,
+          StickerIMEViewModel_HiltModules.BindsModule.class,
           StickersViewModel_HiltModules.BindsModule.class,
-          TransferShareViewModel_HiltModules.BindsModule.class
+          TransferShareViewModel_HiltModules.BindsModule.class,
+          VideoConvertViewModel_HiltModules.BindsModule.class
       }
   )
   @ViewModelScoped
