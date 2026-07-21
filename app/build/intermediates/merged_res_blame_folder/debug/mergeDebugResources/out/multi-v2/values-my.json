@@ -4,7 +4,24 @@
             "outputFile": "com.uncoalesced.stickykeys.app-mergeDebugResources-45:/values-my/values-my.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\6be0248e081a6e2ca4c4cd211eb37ef7\\transformed\\core-1.16.0\\res\\values-my\\values-my.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3ce361f52a3fc2ba9b4863ade9a4836b\\transformed\\foundation\\res\\values-my\\values-my.xml",
+                    "from": {
+                        "startLines": "2,3,4",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,163,258",
+                        "endColumns": "107,94,107",
+                        "endOffsets": "158,253,361"
+                    },
+                    "to": {
+                        "startLines": "2,97,98",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "107,10195,10290",
+                        "endColumns": "107,94,107",
+                        "endOffsets": "210,10285,10393"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19f69a684aa396b7d0b44ce120215d96\\transformed\\core-1.16.0\\res\\values-my\\values-my.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -21,7 +38,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\9252b16697267e9f4788ed08fbfaf1c1\\transformed\\ui\\res\\values-my\\values-my.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19ae5b73eafc88044b24265a0214562c\\transformed\\ui\\res\\values-my\\values-my.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -38,7 +55,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\8f38a638234a843813eb818016a36b57\\transformed\\material3\\res\\values-my\\values-my.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\536cf711e1fc3c1c53864e7b5abcf39b\\transformed\\material3\\res\\values-my\\values-my.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -52,23 +69,6 @@
                         "startOffsets": "1713,1850,1984,2095,2229,2344,2444,2561,2710,2834,2997,3083,3182,3275,3377,3497,3624,3728,3854,3985,4129,4297,4419,4536,4655,4782,4876,4973,5104,5241,5343,5455,5560,5686,5815,5918,6021,6102,6200,6296,6404,6511,6615,6702,6788,6881,7000,7098,7178,7278,7362,7462,7564,7660,7758,7845,7952,8051,8152,8273,8353,8494,8629,8752,8870,8975",
                         "endColumns": "136,133,110,133,114,99,116,148,123,162,85,98,92,101,119,126,103,125,130,143,167,121,116,118,126,93,96,130,136,101,111,104,125,128,102,102,80,97,95,107,106,103,86,85,92,118,97,79,99,83,99,101,95,97,86,106,98,100,120,79,140,134,122,117,104,110",
                         "endOffsets": "1845,1979,2090,2224,2339,2439,2556,2705,2829,2992,3078,3177,3270,3372,3492,3619,3723,3849,3980,4124,4292,4414,4531,4650,4777,4871,4968,5099,5236,5338,5450,5555,5681,5810,5913,6016,6097,6195,6291,6399,6506,6610,6697,6783,6876,6995,7093,7173,7273,7357,7457,7559,7655,7753,7840,7947,8046,8147,8268,8348,8489,8624,8747,8865,8970,9081"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3c43a818e859314179980676dd242969\\transformed\\foundation\\res\\values-my\\values-my.xml",
-                    "from": {
-                        "startLines": "2,3,4",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "55,163,258",
-                        "endColumns": "107,94,107",
-                        "endOffsets": "158,253,361"
-                    },
-                    "to": {
-                        "startLines": "2,97,98",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "107,10195,10290",
-                        "endColumns": "107,94,107",
-                        "endOffsets": "210,10285,10393"
                     }
                 }
             ]

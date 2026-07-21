@@ -4,41 +4,7 @@
             "outputFile": "com.uncoalesced.stickykeys.app-mergeDebugResources-45:/values-nb/values-nb.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3c43a818e859314179980676dd242969\\transformed\\foundation\\res\\values-nb\\values-nb.xml",
-                    "from": {
-                        "startLines": "2,3,4",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "55,159,249",
-                        "endColumns": "103,89,87",
-                        "endOffsets": "154,244,332"
-                    },
-                    "to": {
-                        "startLines": "2,97,98",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "107,9860,9950",
-                        "endColumns": "103,89,87",
-                        "endOffsets": "206,9945,10033"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\9252b16697267e9f4788ed08fbfaf1c1\\transformed\\ui\\res\\values-nb\\values-nb.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "107,203,296,377,474,574,662,738,826,915,997,1077,1159,1229,1314,1388,1459,1529,1606,1673",
-                        "endColumns": "95,92,80,96,99,87,75,87,88,81,79,81,69,84,73,70,69,76,66,123",
-                        "endOffsets": "198,291,372,469,569,657,733,821,910,992,1072,1154,1224,1309,1383,1454,1524,1601,1668,1792"
-                    },
-                    "to": {
-                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "211,1033,1126,1207,1304,1404,1492,1568,8788,8877,8959,9039,9121,9191,9276,9350,9421,9592,9669,9736",
-                        "endColumns": "95,92,80,96,99,87,75,87,88,81,79,81,69,84,73,70,69,76,66,123",
-                        "endOffsets": "302,1121,1202,1299,1399,1487,1563,1651,8872,8954,9034,9116,9186,9271,9345,9416,9486,9664,9731,9855"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\8f38a638234a843813eb818016a36b57\\transformed\\material3\\res\\values-nb\\values-nb.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\536cf711e1fc3c1c53864e7b5abcf39b\\transformed\\material3\\res\\values-nb\\values-nb.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -55,7 +21,41 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\6be0248e081a6e2ca4c4cd211eb37ef7\\transformed\\core-1.16.0\\res\\values-nb\\values-nb.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3ce361f52a3fc2ba9b4863ade9a4836b\\transformed\\foundation\\res\\values-nb\\values-nb.xml",
+                    "from": {
+                        "startLines": "2,3,4",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,159,249",
+                        "endColumns": "103,89,87",
+                        "endOffsets": "154,244,332"
+                    },
+                    "to": {
+                        "startLines": "2,97,98",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "107,9860,9950",
+                        "endColumns": "103,89,87",
+                        "endOffsets": "206,9945,10033"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19ae5b73eafc88044b24265a0214562c\\transformed\\ui\\res\\values-nb\\values-nb.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "107,203,296,377,474,574,662,738,826,915,997,1077,1159,1229,1314,1388,1459,1529,1606,1673",
+                        "endColumns": "95,92,80,96,99,87,75,87,88,81,79,81,69,84,73,70,69,76,66,123",
+                        "endOffsets": "198,291,372,469,569,657,733,821,910,992,1072,1154,1224,1309,1383,1454,1524,1601,1668,1792"
+                    },
+                    "to": {
+                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "211,1033,1126,1207,1304,1404,1492,1568,8788,8877,8959,9039,9121,9191,9276,9350,9421,9592,9669,9736",
+                        "endColumns": "95,92,80,96,99,87,75,87,88,81,79,81,69,84,73,70,69,76,66,123",
+                        "endOffsets": "302,1121,1202,1299,1399,1487,1563,1651,8872,8954,9034,9116,9186,9271,9345,9416,9486,9664,9731,9855"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19f69a684aa396b7d0b44ce120215d96\\transformed\\core-1.16.0\\res\\values-nb\\values-nb.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",

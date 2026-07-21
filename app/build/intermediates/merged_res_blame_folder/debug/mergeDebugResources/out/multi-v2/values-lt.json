@@ -4,41 +4,7 @@
             "outputFile": "com.uncoalesced.stickykeys.app-mergeDebugResources-45:/values-lt/values-lt.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3c43a818e859314179980676dd242969\\transformed\\foundation\\res\\values-lt\\values-lt.xml",
-                    "from": {
-                        "startLines": "2,3,4",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "55,171,259",
-                        "endColumns": "115,87,87",
-                        "endOffsets": "166,254,342"
-                    },
-                    "to": {
-                        "startLines": "2,97,98",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "107,10210,10298",
-                        "endColumns": "115,87,87",
-                        "endOffsets": "218,10293,10381"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\9252b16697267e9f4788ed08fbfaf1c1\\transformed\\ui\\res\\values-lt\\values-lt.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "107,215,308,392,490,595,690,767,858,945,1029,1115,1203,1278,1366,1443,1520,1595,1675,1758",
-                        "endColumns": "107,92,83,97,104,94,76,90,86,83,85,87,74,87,76,76,74,79,82,125",
-                        "endOffsets": "210,303,387,485,590,685,762,853,940,1024,1110,1198,1273,1361,1438,1515,1590,1670,1753,1879"
-                    },
-                    "to": {
-                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "223,1082,1175,1259,1357,1462,1557,1634,9083,9170,9254,9340,9428,9503,9591,9668,9745,9921,10001,10084",
-                        "endColumns": "107,92,83,97,104,94,76,90,86,83,85,87,74,87,76,76,74,79,82,125",
-                        "endOffsets": "326,1170,1254,1352,1457,1552,1629,1720,9165,9249,9335,9423,9498,9586,9663,9740,9815,9996,10079,10205"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\8f38a638234a843813eb818016a36b57\\transformed\\material3\\res\\values-lt\\values-lt.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\536cf711e1fc3c1c53864e7b5abcf39b\\transformed\\material3\\res\\values-lt\\values-lt.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -55,7 +21,41 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\6be0248e081a6e2ca4c4cd211eb37ef7\\transformed\\core-1.16.0\\res\\values-lt\\values-lt.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3ce361f52a3fc2ba9b4863ade9a4836b\\transformed\\foundation\\res\\values-lt\\values-lt.xml",
+                    "from": {
+                        "startLines": "2,3,4",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,171,259",
+                        "endColumns": "115,87,87",
+                        "endOffsets": "166,254,342"
+                    },
+                    "to": {
+                        "startLines": "2,97,98",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "107,10210,10298",
+                        "endColumns": "115,87,87",
+                        "endOffsets": "218,10293,10381"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19ae5b73eafc88044b24265a0214562c\\transformed\\ui\\res\\values-lt\\values-lt.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "107,215,308,392,490,595,690,767,858,945,1029,1115,1203,1278,1366,1443,1520,1595,1675,1758",
+                        "endColumns": "107,92,83,97,104,94,76,90,86,83,85,87,74,87,76,76,74,79,82,125",
+                        "endOffsets": "210,303,387,485,590,685,762,853,940,1024,1110,1198,1273,1361,1438,1515,1590,1670,1753,1879"
+                    },
+                    "to": {
+                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "223,1082,1175,1259,1357,1462,1557,1634,9083,9170,9254,9340,9428,9503,9591,9668,9745,9921,10001,10084",
+                        "endColumns": "107,92,83,97,104,94,76,90,86,83,85,87,74,87,76,76,74,79,82,125",
+                        "endOffsets": "326,1170,1254,1352,1457,1552,1629,1720,9165,9249,9335,9423,9498,9586,9663,9740,9815,9996,10079,10205"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19f69a684aa396b7d0b44ce120215d96\\transformed\\core-1.16.0\\res\\values-lt\\values-lt.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",

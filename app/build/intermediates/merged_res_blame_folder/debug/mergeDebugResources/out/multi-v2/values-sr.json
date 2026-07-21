@@ -4,7 +4,24 @@
             "outputFile": "com.uncoalesced.stickykeys.app-mergeDebugResources-45:/values-sr/values-sr.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\8f38a638234a843813eb818016a36b57\\transformed\\material3\\res\\values-sr\\values-sr.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3ce361f52a3fc2ba9b4863ade9a4836b\\transformed\\foundation\\res\\values-sr\\values-sr.xml",
+                    "from": {
+                        "startLines": "2,3,4",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,168,256",
+                        "endColumns": "112,87,89",
+                        "endOffsets": "163,251,341"
+                    },
+                    "to": {
+                        "startLines": "2,97,98",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "107,10073,10161",
+                        "endColumns": "112,87,89",
+                        "endOffsets": "215,10156,10246"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\536cf711e1fc3c1c53864e7b5abcf39b\\transformed\\material3\\res\\values-sr\\values-sr.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -21,24 +38,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\9252b16697267e9f4788ed08fbfaf1c1\\transformed\\ui\\res\\values-sr\\values-sr.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "107,212,309,396,493,594,680,757,848,940,1025,1105,1190,1263,1352,1429,1507,1583,1662,1732",
-                        "endColumns": "104,96,86,96,100,85,76,90,91,84,79,84,72,88,76,77,75,78,69,121",
-                        "endOffsets": "207,304,391,488,589,675,752,843,935,1020,1100,1185,1258,1347,1424,1502,1578,1657,1727,1849"
-                    },
-                    "to": {
-                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "220,1051,1148,1235,1332,1433,1519,1596,8966,9058,9143,9223,9308,9381,9470,9547,9625,9802,9881,9951",
-                        "endColumns": "104,96,86,96,100,85,76,90,91,84,79,84,72,88,76,77,75,78,69,121",
-                        "endOffsets": "320,1143,1230,1327,1428,1514,1591,1682,9053,9138,9218,9303,9376,9465,9542,9620,9696,9876,9946,10068"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\6be0248e081a6e2ca4c4cd211eb37ef7\\transformed\\core-1.16.0\\res\\values-sr\\values-sr.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19f69a684aa396b7d0b44ce120215d96\\transformed\\core-1.16.0\\res\\values-sr\\values-sr.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -55,20 +55,20 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3c43a818e859314179980676dd242969\\transformed\\foundation\\res\\values-sr\\values-sr.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19ae5b73eafc88044b24265a0214562c\\transformed\\ui\\res\\values-sr\\values-sr.xml",
                     "from": {
-                        "startLines": "2,3,4",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "55,168,256",
-                        "endColumns": "112,87,89",
-                        "endOffsets": "163,251,341"
+                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "107,212,309,396,493,594,680,757,848,940,1025,1105,1190,1263,1352,1429,1507,1583,1662,1732",
+                        "endColumns": "104,96,86,96,100,85,76,90,91,84,79,84,72,88,76,77,75,78,69,121",
+                        "endOffsets": "207,304,391,488,589,675,752,843,935,1020,1100,1185,1258,1347,1424,1502,1578,1657,1727,1849"
                     },
                     "to": {
-                        "startLines": "2,97,98",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "107,10073,10161",
-                        "endColumns": "112,87,89",
-                        "endOffsets": "215,10156,10246"
+                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "220,1051,1148,1235,1332,1433,1519,1596,8966,9058,9143,9223,9308,9381,9470,9547,9625,9802,9881,9951",
+                        "endColumns": "104,96,86,96,100,85,76,90,91,84,79,84,72,88,76,77,75,78,69,121",
+                        "endOffsets": "320,1143,1230,1327,1428,1514,1591,1682,9053,9138,9218,9303,9376,9465,9542,9620,9696,9876,9946,10068"
                     }
                 }
             ]

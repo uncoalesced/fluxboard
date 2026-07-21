@@ -4,7 +4,7 @@
             "outputFile": "com.uncoalesced.stickykeys.app-mergeDebugResources-45:/values-pt-rPT/values-pt-rPT.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\6be0248e081a6e2ca4c4cd211eb37ef7\\transformed\\core-1.16.0\\res\\values-pt-rPT\\values-pt-rPT.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19f69a684aa396b7d0b44ce120215d96\\transformed\\core-1.16.0\\res\\values-pt-rPT\\values-pt-rPT.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -21,24 +21,24 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3c43a818e859314179980676dd242969\\transformed\\foundation\\res\\values-pt-rPT\\values-pt-rPT.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\19ae5b73eafc88044b24265a0214562c\\transformed\\ui\\res\\values-pt-rPT\\values-pt-rPT.xml",
                     "from": {
-                        "startLines": "2,3,4",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "55,175,262",
-                        "endColumns": "119,86,88",
-                        "endOffsets": "170,257,346"
+                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "107,219,314,397,494,593,679,758,855,946,1033,1118,1208,1284,1369,1445,1524,1599,1675,1747",
+                        "endColumns": "111,94,82,96,98,85,78,96,90,86,84,89,75,84,75,78,74,75,71,125",
+                        "endOffsets": "214,309,392,489,588,674,753,850,941,1028,1113,1203,1279,1364,1440,1519,1594,1670,1742,1868"
                     },
                     "to": {
-                        "startLines": "2,97,98",
-                        "startColumns": "4,4,4",
-                        "startOffsets": "107,10278,10365",
-                        "endColumns": "119,86,88",
-                        "endOffsets": "222,10360,10449"
+                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
+                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
+                        "startOffsets": "227,1071,1166,1249,1346,1445,1531,1610,9159,9250,9337,9422,9512,9588,9673,9749,9828,10004,10080,10152",
+                        "endColumns": "111,94,82,96,98,85,78,96,90,86,84,89,75,84,75,78,74,75,71,125",
+                        "endOffsets": "334,1161,1244,1341,1440,1526,1605,1702,9245,9332,9417,9507,9583,9668,9744,9823,9898,10075,10147,10273"
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\8f38a638234a843813eb818016a36b57\\transformed\\material3\\res\\values-pt-rPT\\values-pt-rPT.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\536cf711e1fc3c1c53864e7b5abcf39b\\transformed\\material3\\res\\values-pt-rPT\\values-pt-rPT.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -55,20 +55,20 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\9252b16697267e9f4788ed08fbfaf1c1\\transformed\\ui\\res\\values-pt-rPT\\values-pt-rPT.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\3ce361f52a3fc2ba9b4863ade9a4836b\\transformed\\foundation\\res\\values-pt-rPT\\values-pt-rPT.xml",
                     "from": {
-                        "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "107,219,314,397,494,593,679,758,855,946,1033,1118,1208,1284,1369,1445,1524,1599,1675,1747",
-                        "endColumns": "111,94,82,96,98,85,78,96,90,86,84,89,75,84,75,78,74,75,71,125",
-                        "endOffsets": "214,309,392,489,588,674,753,850,941,1028,1113,1203,1279,1364,1440,1519,1594,1670,1742,1868"
+                        "startLines": "2,3,4",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,175,262",
+                        "endColumns": "119,86,88",
+                        "endOffsets": "170,257,346"
                     },
                     "to": {
-                        "startLines": "3,11,12,13,14,15,16,17,84,85,86,87,88,89,90,91,92,94,95,96",
-                        "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
-                        "startOffsets": "227,1071,1166,1249,1346,1445,1531,1610,9159,9250,9337,9422,9512,9588,9673,9749,9828,10004,10080,10152",
-                        "endColumns": "111,94,82,96,98,85,78,96,90,86,84,89,75,84,75,78,74,75,71,125",
-                        "endOffsets": "334,1161,1244,1341,1440,1526,1605,1702,9245,9332,9417,9507,9583,9668,9744,9823,9898,10075,10147,10273"
+                        "startLines": "2,97,98",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "107,10278,10365",
+                        "endColumns": "119,86,88",
+                        "endOffsets": "222,10360,10449"
                     }
                 }
             ]
