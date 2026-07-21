@@ -32,4 +32,8 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+    
+    // For GIF encoding
+    implementation("com.shakster:gifkt-jvm:0.3.3")
+    implementation("com.squareup.okio:okio:3.9.0")
 }
