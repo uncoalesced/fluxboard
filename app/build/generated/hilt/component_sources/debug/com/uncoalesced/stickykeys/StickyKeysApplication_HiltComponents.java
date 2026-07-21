@@ -1,9 +1,13 @@
 package com.uncoalesced.stickykeys;
 
+import com.uncoalesced.stickykeys.stickercore.di.DatabaseModule;
+import com.uncoalesced.stickykeys.stickercore.di.RepositoryModule;
 import com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.StickersViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel_HiltModules;
+import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules;
 import dagger.Binds;
 import dagger.Component;
 import dagger.Module;
@@ -129,7 +133,9 @@ public final class StickyKeysApplication_HiltComponents {
   @Component(
       modules = {
           ApplicationContextModule.class,
+          DatabaseModule.class,
           HiltWrapper_FragmentGetContextFix_FragmentGetContextFixModule.class,
+          RepositoryModule.class,
           ActivityRetainedCBuilderModule.class,
           ServiceCBuilderModule.class
       }
@@ -156,9 +162,11 @@ public final class StickyKeysApplication_HiltComponents {
   @Subcomponent(
       modules = {
           AppSettingsViewModel_HiltModules.KeyModule.class,
+          EditStickerViewModel_HiltModules.KeyModule.class,
           HiltWrapper_ActivityRetainedComponentManager_LifecycleModule.class,
           HiltWrapper_ActivitySavedStateHandleModule.class,
           KeyboardSettingsViewModel_HiltModules.KeyModule.class,
+          SaveStickerViewModel_HiltModules.KeyModule.class,
           StickersViewModel_HiltModules.KeyModule.class,
           ActivityCBuilderModule.class,
           ViewModelCBuilderModule.class,
@@ -199,8 +207,10 @@ public final class StickyKeysApplication_HiltComponents {
   @Subcomponent(
       modules = {
           AppSettingsViewModel_HiltModules.BindsModule.class,
+          EditStickerViewModel_HiltModules.BindsModule.class,
           HiltWrapper_HiltViewModelFactory_ViewModelModule.class,
           KeyboardSettingsViewModel_HiltModules.BindsModule.class,
+          SaveStickerViewModel_HiltModules.BindsModule.class,
           StickersViewModel_HiltModules.BindsModule.class,
           TransferShareViewModel_HiltModules.BindsModule.class
       }
