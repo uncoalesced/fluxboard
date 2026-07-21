@@ -30,8 +30,11 @@ import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepositor
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+
 @AndroidEntryPoint
-class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner, KeyboardController {
 
     @Inject
     lateinit var fileManager: StickerFileManager
@@ -66,8 +69,9 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
                     }
                 }
                 val viewModel = ViewModelProvider(this@StickyKeysIME, factory)[StickerIMEViewModel::class.java]
-                StickerIMEView(
-                    viewModel = viewModel,
+                MainIMEView(
+                    keyboardController = this@StickyKeysIME,
+                    stickerIMEViewModel = viewModel,
                     fileManager = fileManager,
                     onStickerClick = { commitStickerContent(it) }
                 )
@@ -92,6 +96,39 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
         super.onDestroy()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()
+    }
+
+    override fun commitText(text: String) {
+        currentInputConnection?.commitText(text, 1)
+    }
+
+    override fun sendDelete() {
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+    }
+
+    override fun sendEnter() {
+        val editorInfo = currentInputEditorInfo ?: return
+        if (editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0) {
+            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+        } else {
+            handleEditorAction()
+        }
+    }
+
+    override fun handleEditorAction() {
+        val actionId = currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION)
+        if (actionId != null && actionId != EditorInfo.IME_ACTION_NONE) {
+            currentInputConnection?.performEditorAction(actionId)
+        } else {
+            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+        }
+    }
+
+    override fun switchMode(mode: AppMode) {
+        // Mode state is mostly handled internally in MainIMEView
     }
 
     private fun commitStickerContent(sticker: Sticker) {
