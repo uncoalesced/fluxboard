@@ -1,9 +1,9 @@
 <libraries>
   <library
       name=":@@:sticker-core::debug"
-      jars="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\381e295e3cf20a2fa4544360d6701a29\transformed\out\jars\classes.jar;C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\381e295e3cf20a2fa4544360d6701a29\transformed\out\jars\libs\R.jar"
+      jars="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\aa17578f739fe3d33f6949a02cda61c0\transformed\out\jars\classes.jar;C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\aa17578f739fe3d33f6949a02cda61c0\transformed\out\jars\libs\R.jar"
       resolved="StickyKeys:sticker-core:unspecified"
-      folder="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\381e295e3cf20a2fa4544360d6701a29\transformed\out"
+      folder="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\aa17578f739fe3d33f6949a02cda61c0\transformed\out"
       manifest="AndroidManifest.xml"
       resFolder="res"
       assetsFolder="assets"
