@@ -6,6 +6,16 @@ import android.view.View;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.ViewModel;
+import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager;
+import com.uncoalesced.stickykeys.stickercore.data.local.StickyKeysDatabase;
+import com.uncoalesced.stickykeys.stickercore.data.local.dao.CategoryDao;
+import com.uncoalesced.stickykeys.stickercore.data.local.dao.PackDao;
+import com.uncoalesced.stickykeys.stickercore.data.local.dao.StickerDao;
+import com.uncoalesced.stickykeys.stickercore.data.repository.StickerRepositoryImpl;
+import com.uncoalesced.stickykeys.stickercore.di.DatabaseModule_ProvideCategoryDaoFactory;
+import com.uncoalesced.stickykeys.stickercore.di.DatabaseModule_ProvidePackDaoFactory;
+import com.uncoalesced.stickykeys.stickercore.di.DatabaseModule_ProvideStickerDaoFactory;
+import com.uncoalesced.stickykeys.stickercore.di.DatabaseModule_ProvideStickyKeysDatabaseFactory;
 import com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel;
 import com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel_HiltModules_BindsModule_Binds_LazyMapKey;
@@ -22,6 +32,14 @@ import com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel;
 import com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel_HiltModules;
 import com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel_HiltModules_BindsModule_Binds_LazyMapKey;
 import com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel_HiltModules_KeyModule_Provide_LazyMapKey;
+import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel;
+import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules;
+import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey;
+import com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey;
+import com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey;
 import dagger.hilt.android.ActivityRetainedLifecycle;
 import dagger.hilt.android.ViewModelLifecycle;
 import dagger.hilt.android.internal.builders.ActivityComponentBuilder;
@@ -36,6 +54,7 @@ import dagger.hilt.android.internal.lifecycle.DefaultViewModelFactories_Internal
 import dagger.hilt.android.internal.managers.ActivityRetainedComponentManager_LifecycleModule_ProvideActivityRetainedLifecycleFactory;
 import dagger.hilt.android.internal.managers.SavedStateHandleHolder;
 import dagger.hilt.android.internal.modules.ApplicationContextModule;
+import dagger.hilt.android.internal.modules.ApplicationContextModule_ProvideContextFactory;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.DoubleCheck;
 import dagger.internal.LazyClassKeyMap;
@@ -69,21 +88,20 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     return new Builder();
   }
 
-  public static StickyKeysApplication_HiltComponents.SingletonC create() {
-    return new Builder().build();
-  }
-
   public static final class Builder {
+    private ApplicationContextModule applicationContextModule;
+
     private Builder() {
     }
 
     public Builder applicationContextModule(ApplicationContextModule applicationContextModule) {
-      Preconditions.checkNotNull(applicationContextModule);
+      this.applicationContextModule = Preconditions.checkNotNull(applicationContextModule);
       return this;
     }
 
     public StickyKeysApplication_HiltComponents.SingletonC build() {
-      return new SingletonCImpl();
+      Preconditions.checkBuilderRequirement(applicationContextModule, ApplicationContextModule.class);
+      return new SingletonCImpl(applicationContextModule);
     }
   }
 
@@ -371,9 +389,11 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     }
 
     Map keySetMapOfClassOfObjectAndBooleanBuilder() {
-      MapBuilder mapBuilder = MapBuilder.<String, Boolean>newMapBuilder(4);
+      MapBuilder mapBuilder = MapBuilder.<String, Boolean>newMapBuilder(6);
       mapBuilder.put(AppSettingsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, AppSettingsViewModel_HiltModules.KeyModule.provide());
+      mapBuilder.put(EditStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, EditStickerViewModel_HiltModules.KeyModule.provide());
       mapBuilder.put(KeyboardSettingsViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, KeyboardSettingsViewModel_HiltModules.KeyModule.provide());
+      mapBuilder.put(SaveStickerViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, SaveStickerViewModel_HiltModules.KeyModule.provide());
       mapBuilder.put(StickersViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, StickersViewModel_HiltModules.KeyModule.provide());
       mapBuilder.put(TransferShareViewModel_HiltModules_KeyModule_Provide_LazyMapKey.lazyClassKeyName, TransferShareViewModel_HiltModules.KeyModule.provide());
       return mapBuilder.build();
@@ -418,7 +438,11 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
 
     Provider<AppSettingsViewModel> appSettingsViewModelProvider;
 
+    Provider<EditStickerViewModel> editStickerViewModelProvider;
+
     Provider<KeyboardSettingsViewModel> keyboardSettingsViewModelProvider;
+
+    Provider<SaveStickerViewModel> saveStickerViewModelProvider;
 
     Provider<StickersViewModel> stickersViewModelProvider;
 
@@ -434,9 +458,11 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     }
 
     Map hiltViewModelMapMapOfClassOfObjectAndProviderOfViewModelBuilder() {
-      MapBuilder mapBuilder = MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(4);
+      MapBuilder mapBuilder = MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(6);
       mapBuilder.put(AppSettingsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (appSettingsViewModelProvider)));
+      mapBuilder.put(EditStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (editStickerViewModelProvider)));
       mapBuilder.put(KeyboardSettingsViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (keyboardSettingsViewModelProvider)));
+      mapBuilder.put(SaveStickerViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (saveStickerViewModelProvider)));
       mapBuilder.put(StickersViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (stickersViewModelProvider)));
       mapBuilder.put(TransferShareViewModel_HiltModules_BindsModule_Binds_LazyMapKey.lazyClassKeyName, ((Provider) (transferShareViewModelProvider)));
       return mapBuilder.build();
@@ -446,9 +472,11 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     private void initialize(final SavedStateHandle savedStateHandleParam,
         final ViewModelLifecycle viewModelLifecycleParam) {
       this.appSettingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 0);
-      this.keyboardSettingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 1);
-      this.stickersViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
-      this.transferShareViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
+      this.editStickerViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 1);
+      this.keyboardSettingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 2);
+      this.saveStickerViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 3);
+      this.stickersViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 4);
+      this.transferShareViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 5);
     }
 
     @Override
@@ -485,13 +513,19 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
           case 0: // com.uncoalesced.stickykeys.ui.screens.AppSettingsViewModel
           return (T) new AppSettingsViewModel();
 
-          case 1: // com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsViewModel
+          case 1: // com.uncoalesced.stickykeys.ui.screens.edit.EditStickerViewModel
+          return (T) new EditStickerViewModel(singletonCImpl.stickerRepositoryImplProvider.get());
+
+          case 2: // com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsViewModel
           return (T) new KeyboardSettingsViewModel();
 
-          case 2: // com.uncoalesced.stickykeys.ui.screens.StickersViewModel
-          return (T) new StickersViewModel();
+          case 3: // com.uncoalesced.stickykeys.ui.screens.creation.SaveStickerViewModel
+          return (T) new SaveStickerViewModel(singletonCImpl.stickerRepositoryImplProvider.get());
 
-          case 3: // com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel
+          case 4: // com.uncoalesced.stickykeys.ui.screens.StickersViewModel
+          return (T) new StickersViewModel(singletonCImpl.stickerRepositoryImplProvider.get());
+
+          case 5: // com.uncoalesced.stickykeys.ui.screens.TransferShareViewModel
           return (T) new TransferShareViewModel();
 
           default: throw new AssertionError(id);
@@ -570,15 +604,43 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
   }
 
   private static final class SingletonCImpl extends StickyKeysApplication_HiltComponents.SingletonC {
+    private final ApplicationContextModule applicationContextModule;
+
     private final SingletonCImpl singletonCImpl = this;
 
-    SingletonCImpl() {
+    Provider<StickyKeysDatabase> provideStickyKeysDatabaseProvider;
 
+    Provider<StickerFileManager> stickerFileManagerProvider;
+
+    Provider<StickerRepositoryImpl> stickerRepositoryImplProvider;
+
+    SingletonCImpl(ApplicationContextModule applicationContextModuleParam) {
+      this.applicationContextModule = applicationContextModuleParam;
+      initialize(applicationContextModuleParam);
 
     }
 
+    StickerDao stickerDao() {
+      return DatabaseModule_ProvideStickerDaoFactory.provideStickerDao(provideStickyKeysDatabaseProvider.get());
+    }
+
+    PackDao packDao() {
+      return DatabaseModule_ProvidePackDaoFactory.providePackDao(provideStickyKeysDatabaseProvider.get());
+    }
+
+    CategoryDao categoryDao() {
+      return DatabaseModule_ProvideCategoryDaoFactory.provideCategoryDao(provideStickyKeysDatabaseProvider.get());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void initialize(final ApplicationContextModule applicationContextModuleParam) {
+      this.provideStickyKeysDatabaseProvider = DoubleCheck.provider(new SwitchingProvider<StickyKeysDatabase>(singletonCImpl, 1));
+      this.stickerFileManagerProvider = DoubleCheck.provider(new SwitchingProvider<StickerFileManager>(singletonCImpl, 2));
+      this.stickerRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<StickerRepositoryImpl>(singletonCImpl, 0));
+    }
+
     @Override
-    public void injectStickyKeysApplication(StickyKeysApplication arg0) {
+    public void injectStickyKeysApplication(StickyKeysApplication stickyKeysApplication) {
     }
 
     @Override
@@ -594,6 +656,34 @@ public final class DaggerStickyKeysApplication_HiltComponents_SingletonC {
     @Override
     public ServiceComponentBuilder serviceComponentBuilder() {
       return new ServiceCBuilder(singletonCImpl);
+    }
+
+    private static final class SwitchingProvider<T> implements Provider<T> {
+      private final SingletonCImpl singletonCImpl;
+
+      private final int id;
+
+      SwitchingProvider(SingletonCImpl singletonCImpl, int id) {
+        this.singletonCImpl = singletonCImpl;
+        this.id = id;
+      }
+
+      @Override
+      @SuppressWarnings("unchecked")
+      public T get() {
+        switch (id) {
+          case 0: // com.uncoalesced.stickykeys.stickercore.data.repository.StickerRepositoryImpl
+          return (T) new StickerRepositoryImpl(singletonCImpl.stickerDao(), singletonCImpl.packDao(), singletonCImpl.categoryDao(), singletonCImpl.stickerFileManagerProvider.get());
+
+          case 1: // com.uncoalesced.stickykeys.stickercore.data.local.StickyKeysDatabase
+          return (T) DatabaseModule_ProvideStickyKeysDatabaseFactory.provideStickyKeysDatabase(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+
+          case 2: // com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
+          return (T) new StickerFileManager(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+
+          default: throw new AssertionError(id);
+        }
+      }
     }
   }
 }
