@@ -1,8 +1,0 @@
-com.uncoalesced.stickykeys.app-pngs-0 E:\sticky-keys\app\build\generated\res\pngs\release
-com.uncoalesced.stickykeys.app-updated_navigation_xml-1 E:\sticky-keys\app\build\generated\updated_navigation_xml\release
-com.uncoalesced.stickykeys.app-packageReleaseResources-2 E:\sticky-keys\app\build\intermediates\incremental\release\packageReleaseResources\merged.dir
-com.uncoalesced.stickykeys.app-packageReleaseResources-3 E:\sticky-keys\app\build\intermediates\incremental\release\packageReleaseResources\stripped.dir
-com.uncoalesced.stickykeys.app-release-4 E:\sticky-keys\app\build\intermediates\merged_res\release\mergeReleaseResources
-com.uncoalesced.stickykeys.app-main-5 E:\sticky-keys\app\src\main\res
-com.uncoalesced.stickykeys.app-release-6 E:\sticky-keys\app\src\release\res
-gradleHome-0 C:\Users\Joel Anthony\scoop\persist\gradle\.gradle
