@@ -1,5 +1,44 @@
 # Changelog
 
+## Phase 13: Video-to-GIF / Animated WebP Conversion Pipeline
+- Created `AnimatedStickerConverter` interface in `sticker-core` for zero-FFmpeg video animation conversion.
+- Implemented `AndroidAnimatedStickerConverter` using native `MediaMetadataRetriever` frame extraction and downsampling (15 FPS, max 512px).
+- Defaulted to **Animated WebP** as internal storage format (`image/webp`) for superior compression and alpha channel support.
+- Built `VideoConvertScreen.kt` displaying real-time progress indicator during conversion.
+
+## Phase 12: Video Import & Trim UI
+- Added "Import Video" action in `StickersLibraryScreen` leveraging privacy-friendly `PickVisualMedia(VideoOnly)` contract.
+- Built `VideoTrimScreen.kt` featuring a timeline scrubber, live keyframe frame preview, and a strict **10-second (10,000ms) trim duration ceiling**.
+- Registered `trim_video/{uri}` route in `AppNavGraph` for forwarding video sub-ranges to the Phase 13 conversion pipeline.
+
+## Phase 11: Gallery/Photo Picker Import Flow
+- Upgraded Photo Picker launcher in `StickersLibraryScreen` to privacy-friendly `PickMultipleVisualMedia(maxItems = 10)` contract.
+- Added `batchImportStickers` to `StickersViewModel` for parallel background segmentation and library persistence.
+- Added import options dialog giving users a choice between **⚡ Auto-Segment (Batch)** and **✏️ Custom Edit**.
+
+## Phase 10: On-Device Segmentation Integration & Touch-Up UI
+- Created `SegmentationEngine` interface to decouple auto-segmentation execution.
+- Implemented `MlKitSegmentationEngine` with Play Services availability check and graceful fallback.
+- Created `TouchUpScreen.kt` with interactive **Erase** and **Restore** brush modes for refining automatic subject cutouts.
+- Connected `CropScreen` to run auto-segmentation on "Next" and pass both original and segmented bitmaps into `TouchUpScreen`.
+
+## Phase 9: Screenshot & Share-Intent Capture Pipeline
+- Registered `ACTION_SEND` intent filter in `AndroidManifest.xml` for `image/*` MIME types.
+- Extended `MainActivity` to process shared image URIs from external apps (`Intent.EXTRA_STREAM`) and auto-navigate to the creation flow.
+- Created `ScreenshotHelper` to query `MediaStore` for recent screenshot files.
+- Added "Extract Screenshot" button to `StickersLibraryScreen` allowing one-tap extraction from the latest device screenshot.
+
+## Phase 8: Segmentation Approach Research & Library Evaluation
+- Conducted evaluation comparing Google ML Kit Subject Segmentation vs. U2NetP TFLite across a 20-image test dataset.
+- Re-verified U2NetP license directly from upstream source repository (`xuebinqin/U-2-Net`): **Apache License 2.0**.
+- Published detailed trade-off report in `docs/segmentation-research.md` recommending ML Kit for primary extraction with manual eraser fallback for de-Googled ROMs.
+
+## Phase 7: Sticker Organization — Categories & Favourites
+- Updated `StickersViewModel` to reactively filter stickers across "All", "Favourites", and dynamic custom categories using `flatMapLatest`.
+- Added scrollable `ScrollableTabRow` to `StickersLibraryScreen` featuring first-class Favourites tab and dynamic Category tabs.
+- Added Category creation dialog (`AddCategoryDialog`).
+- Added favouriting star gesture and a long-press context menu (`StickerContextMenuDialog`) for assigning categories or deleting stickers directly from the library grid.
+
 ## Phase 6: Sticker Editing Suite
 - Added `updateStickerData` to `StickerRepository` and `StickerRepositoryImpl` to support overwriting sticker files on disk and updating DB entities without re-inserting.
 - Created `FilterScreen.kt` using `android.graphics.ColorMatrix` for real-time Brightness, Contrast, and Saturation adjustments.
