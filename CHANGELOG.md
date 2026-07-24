@@ -2,7 +2,7 @@
 
 All notable changes to this project during its initial 37-phase development lifecycle will be documented in this file.
 
-## [1.0.0] - Initial Release
+## [v0.1.0-alpha] - Initial Release
 
 ### Foundation (Phases 1-4)
 - **Added:** Scaffolding and multi-module Gradle structure (`app`, `sticker-core`, `keyboard-core`, `transfer`).
