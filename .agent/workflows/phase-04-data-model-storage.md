@@ -27,6 +27,14 @@ right.
    nothing above this layer should touch Room or the filesystem directly.
 5. Migration strategy and test harness set up now, even though v1 has
    nothing to migrate from yet.
+6. Encryption-at-rest for the Room database: **default is no, for v1.**
+   Android's per-app private storage is already inaccessible to other apps
+   without root, and something like SQLCipher adds real size and
+   complexity cost against the 100 MB budget for a benefit that's mostly
+   redundant with that sandboxing. This is a real tradeoff, not an
+   oversight — flag it back to Joel if there's a specific threat model in
+   mind that changes the calculus (e.g. targeting rooted-device users
+   explicitly), rather than silently adding or skipping encryption.
 
 ## Definition of done
 

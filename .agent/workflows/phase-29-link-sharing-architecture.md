@@ -30,6 +30,11 @@ avoid). See `docs/repo-reference.md` for the reference pattern.
    community-run option — and write that decision down explicitly. This is
    a real infrastructure and cost commitment, not a hidden one, and it's
    the one part of this whole app that isn't fully local-first.
+   **Recommended default if there's no strong preference already:** a
+   single small always-on instance on a cheap or free-tier VPS, since the
+   relay is deliberately tiny and stateless — this is cheap to run, easy to
+   move later, and doesn't block Phase 30 on finding a community operator
+   first. Confirm with Joel before Phase 30 builds against it either way.
 5. Note explicitly for WhatsApp specifically: this feature matters less
    there, since a received sticker can just be favourited directly in
    WhatsApp without needing a new link at all. It matters most for

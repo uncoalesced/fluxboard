@@ -17,7 +17,11 @@ the integration in Phase 10.
 ## Tasks
 
 1. Prototype both against a shared set of ~20 test images with varied
-   subjects and backgrounds.
+   subjects and backgrounds. **Don't ask which specific images to use —
+   self-source or generate a reasonable spread (roughly 5 people, 5 pets,
+   5 single objects, 5 busy/complex backgrounds) and just document what
+   was used**, so the comparison is reproducible later even though the
+   exact image choice isn't a decision that needs Joel's input.
 2. Measure: latency, output quality (edge cleanliness, fine-detail/hair
    handling), on-device size impact.
 3. Re-confirm U2NetP's current license terms directly (don't just trust

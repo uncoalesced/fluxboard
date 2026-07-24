@@ -24,10 +24,14 @@ it, not a guess. Get this decision right before Phase 19 starts building.
    for the scope of adaptation being considered here (don't assume the
    license from the repo-reference doc is still accurate — re-check).
 3. Source or build a base word-frequency corpus for the initial dictionary
-   (English at minimum for v1). FlorisBoard's own `dictionary-tools`
-   pipeline for this is Python — that's fine to use as-is, since it's
-   offline preprocessing that produces a static binary asset for the APK,
-   not code that runs on-device (see the language note in `AGENTS.md`).
+   (English at minimum for v1 — see the language-scope note in Phase 17).
+   **Don't ask which corpus to use — pick a clearly-licensed public source
+   (e.g. a frequency list derived from an open corpus or dictionary
+   project) and document exactly which one and its license**, rather than
+   stalling on the choice. FlorisBoard's own `dictionary-tools` pipeline
+   for this is Python — that's fine to use as-is, since it's offline
+   preprocessing that produces a static binary asset for the APK, not code
+   that runs on-device (see the language note in `AGENTS.md`).
 4. Document FlorisBoard's own known pitfall: their first NLP attempt was
    pure Kotlin/JVM and hit real performance and memory problems before
    being reworked. Understand what changed and why, so it isn't repeated.
