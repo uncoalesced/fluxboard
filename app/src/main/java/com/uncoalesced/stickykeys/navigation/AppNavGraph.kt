@@ -1,3 +1,4 @@
+// Engineered by uncoalesced
 package com.uncoalesced.stickykeys.navigation
 
 import androidx.compose.foundation.layout.padding
@@ -18,7 +19,7 @@ import com.uncoalesced.stickykeys.ui.screens.AppSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.StickersLibraryScreen
 import com.uncoalesced.stickykeys.ui.screens.StyleSheetScreen
-import com.uncoalesced.stickykeys.ui.screens.TransferShareScreen
+import com.uncoalesced.stickykeys.ui.screens.DevicePairingScreen
 
 import androidx.compose.runtime.LaunchedEffect
 
@@ -87,9 +88,41 @@ fun AppNavGraph(
                     }
                 ) 
             }
-            composable("keyboard") { KeyboardSettingsScreen() }
-            composable("transfer") { TransferShareScreen() }
-            composable("settings") { AppSettingsScreen() }
+            composable("keyboard") { 
+                KeyboardSettingsScreen(
+                    onNavigateToThemeEditor = { navController.navigate("theme_editor") },
+                    onNavigateToLayoutEditor = { navController.navigate("layout_editor") }
+                ) 
+            }
+            
+            composable("theme_editor") {
+                com.uncoalesced.stickykeys.ui.screens.ThemeEditorScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            
+            composable("layout_editor") {
+                com.uncoalesced.stickykeys.ui.screens.LayoutEditorScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            
+            composable("transfer") { 
+                DevicePairingScreen(
+                    onBack = { navController.popBackStack() }
+                ) 
+            }
+            composable("settings") { 
+                AppSettingsScreen(
+                    onNavigateToManageCategories = { navController.navigate("manage_categories") }
+                ) 
+            }
+            
+            composable("manage_categories") {
+                com.uncoalesced.stickykeys.ui.screens.ManageCategoriesScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
 
             // Video Trim & Convert Flow
             composable("trim_video/{uri}") { backStackEntry ->
