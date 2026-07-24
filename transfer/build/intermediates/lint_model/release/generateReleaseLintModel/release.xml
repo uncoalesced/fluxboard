@@ -26,6 +26,6 @@
       type="MAIN"
       applicationId="com.uncoalesced.stickykeys.transfer"
       generatedSourceFolders="build\generated\ap_generated_sources\release\out"
-      desugaredMethodsFiles="C:\Users\Joel Anthony\scoop\persist\gradle\.gradle\caches\9.5.0\transforms\00a0e36fe00f13b9c34e4199bec9eb80\transformed\D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="C:\Users\Joel Anthony\scoop\apps\gradle\current\.gradle\caches\9.5.0\transforms\0fb68021509111e1c63fcc39bb8d7249\transformed\D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>

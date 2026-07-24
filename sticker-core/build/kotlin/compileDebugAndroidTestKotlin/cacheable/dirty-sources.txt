@@ -1,1 +1,0 @@
-E:\sticky-keys\sticker-core\src\androidTest\java\com\uncoalesced\stickykeys\stickercore\StickerRepositoryTest.kt

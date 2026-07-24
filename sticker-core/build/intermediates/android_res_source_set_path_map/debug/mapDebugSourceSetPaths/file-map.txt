@@ -6,4 +6,4 @@ com.uncoalesced.stickykeys.stickercore.sticker-core-debug-4 E:\sticky-keys\stick
 com.uncoalesced.stickykeys.stickercore.sticker-core-debug-5 E:\sticky-keys\sticker-core\build\intermediates\packaged_res\debug\packageDebugResources
 com.uncoalesced.stickykeys.stickercore.sticker-core-debug-6 E:\sticky-keys\sticker-core\src\debug\res
 com.uncoalesced.stickykeys.stickercore.sticker-core-main-7 E:\sticky-keys\sticker-core\src\main\res
-gradleHome-0 C:\Users\Joel Anthony\scoop\persist\gradle\.gradle
+gradleHome-0 C:\Users\Joel Anthony\scoop\apps\gradle\current\.gradle

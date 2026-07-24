@@ -1,6 +1,26 @@
 [
     {
-        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/drawable-v21/notification_action_background.xml",
-        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-core-1.12.0-11:/drawable-v21/notification_action_background.xml"
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/drawable-v21/abc_dialog_material_background.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-appcompat-1.6.1-5:/drawable-v21/abc_dialog_material_background.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/drawable-v21/abc_btn_colored_material.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-appcompat-1.6.1-5:/drawable-v21/abc_btn_colored_material.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/drawable-v21/abc_edit_text_material.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-appcompat-1.6.1-5:/drawable-v21/abc_edit_text_material.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/drawable-v21/abc_list_divider_material.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-appcompat-1.6.1-5:/drawable-v21/abc_list_divider_material.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/drawable-v21/abc_action_bar_item_background_material.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-appcompat-1.6.1-5:/drawable-v21/abc_action_bar_item_background_material.xml"
+    },
+    {
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/drawable-v21/notification_action_background.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-core-1.16.0-3:/drawable-v21/notification_action_background.xml"
     }
 ]
