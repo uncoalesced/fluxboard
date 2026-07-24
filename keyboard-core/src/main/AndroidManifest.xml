@@ -2,6 +2,8 @@
 <!-- Engineered by uncoalesced -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application>
         <service
             android:name=".ime.StickyKeysIME"

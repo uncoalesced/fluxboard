@@ -1,0 +1,21 @@
+{
+  "id": "preset_default_dark",
+  "name": "Default Dark",
+  "isLight": false,
+  "typeScale": "MEDIUM",
+  "colors": {
+    "primary": "#FF818CF8",
+    "primaryVariant": "#FF6366F1",
+    "secondary": "#FF5EEAD4",
+    "background": "#FF020617",
+    "surface": "#FF0F172A",
+    "surfaceVariant": "#FF1E293B",
+    "error": "#FFDC2626",
+    "onPrimary": "#FF0F172A",
+    "onSecondary": "#FF0F172A",
+    "onBackground": "#FFF8FAFC",
+    "onSurface": "#FFF8FAFC",
+    "onSurfaceVariant": "#FFE2E8F0",
+    "onError": "#FFFFFFFF"
+  }
+}

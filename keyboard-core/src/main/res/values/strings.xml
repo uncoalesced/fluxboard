@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<resources>
+    <string name="text_back">Back</string>
+    <string name="text_clear_all">Clear All</string>
+    <string name="text_del">Del</string>
+    <string name="text_favourites">Favourites</string>
+</resources>
