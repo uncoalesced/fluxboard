@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.video
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -39,6 +42,8 @@ fun VideoConvertScreen(
     
     var selectedQuality by remember { mutableStateOf(ConversionQuality.HIGH) }
     var isConverting by remember { mutableStateOf(false) }
+    
+    val targetFormat by viewModel.appPreferences.defaultExportFormat.collectAsState()
 
     LaunchedEffect(isConverting) {
         if (!isConverting) return@LaunchedEffect
@@ -46,13 +51,14 @@ fun VideoConvertScreen(
         withContext(Dispatchers.IO) {
             try {
                 val videoUri = Uri.parse(videoUriString)
-                val converter = AndroidAnimatedStickerConverter()
+                val converter = viewModel.converter
 
                 val animResult = converter.convertVideoToAnimatedSticker(
                     context = context,
                     videoUri = videoUri,
                     startMs = startMs,
                     endMs = endMs,
+                    targetFormat = targetFormat,
                     quality = selectedQuality,
                     onProgress = { p -> progress = p }
                 )
@@ -84,7 +90,7 @@ fun VideoConvertScreen(
                     categoryId = null,
                     isFavourite = false,
                     createdAt = System.currentTimeMillis(),
-                    mimeType = "image/gif",
+                    mimeType = targetFormat,
                     file = File(""),
                     thumbnailFile = File("")
                 )
@@ -110,9 +116,9 @@ fun VideoConvertScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md)
             ) {
-                Text("Conversion Error", style = StickyKeysTheme.typography.titleMedium, color = StickyKeysTheme.colors.error)
+                Text(stringResource(R.string.text_conversion_error), style = StickyKeysTheme.typography.titleMedium, color = StickyKeysTheme.colors.error)
                 Text(errorText!!, style = StickyKeysTheme.typography.bodyMedium)
-                Button(onClick = onCancel) { Text("Back") }
+                Button(onClick = onCancel) { Text(stringResource(R.string.text_back)) }
             }
         } else if (isConverting) {
             Column(
@@ -120,7 +126,7 @@ fun VideoConvertScreen(
                 verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md),
                 modifier = Modifier.padding(StickyKeysTheme.spacing.lg)
             ) {
-                Text("Creating GIF...", style = StickyKeysTheme.typography.titleMedium)
+                Text(stringResource(R.string.text_creating_gif), style = StickyKeysTheme.typography.titleMedium)
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier.fillMaxWidth()
@@ -134,7 +140,7 @@ fun VideoConvertScreen(
                 verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md),
                 modifier = Modifier.padding(StickyKeysTheme.spacing.lg)
             ) {
-                Text("Select Output Quality", style = StickyKeysTheme.typography.titleMedium)
+                Text(stringResource(R.string.text_select_output_quality), style = StickyKeysTheme.typography.titleMedium)
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ConversionQuality.values().forEach { quality ->
@@ -155,10 +161,10 @@ fun VideoConvertScreen(
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     TextButton(onClick = onCancel) {
-                        Text("Cancel", color = StickyKeysTheme.colors.error)
+                        Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error)
                     }
                     Button(onClick = { isConverting = true }) {
-                        Text("Convert to GIF")
+                        Text(stringResource(R.string.text_convert_to_gif))
                     }
                 }
             }

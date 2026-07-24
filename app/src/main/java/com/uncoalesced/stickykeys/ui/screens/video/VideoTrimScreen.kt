@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.video
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -107,15 +110,15 @@ fun VideoTrimScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Trim Video (Max 10s)") },
+                title = { Text(stringResource(R.string.text_trim_video_max_10s)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 },
                 actions = {
                     TextButton(onClick = {
                         onTrimComplete(videoUriString, startMs, endMs)
                     }) {
-                        Text("Next", color = StickyKeysTheme.colors.primary)
+                        Text(stringResource(R.string.text_next), color = StickyKeysTheme.colors.primary)
                     }
                 }
             )
@@ -140,7 +143,7 @@ fun VideoTrimScreen(
                 if (currentPreviewFrame != null) {
                     Image(
                         bitmap = currentPreviewFrame!!.asImageBitmap(),
-                        contentDescription = "Trim Preview Frame",
+                        contentDescription = stringResource(R.string.desc_trim_preview_frame),
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -159,7 +162,7 @@ fun VideoTrimScreen(
                     items(keyframes) { bmp ->
                         Image(
                             bitmap = bmp.asImageBitmap(),
-                            contentDescription = "Keyframe",
+                            contentDescription = stringResource(R.string.desc_keyframe),
                             modifier = Modifier
                                 .width(60.dp)
                                 .fillMaxHeight()

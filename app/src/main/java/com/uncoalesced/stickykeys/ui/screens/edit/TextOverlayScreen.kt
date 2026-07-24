@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -77,9 +80,9 @@ fun TextOverlayScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Add Text Overlay") },
+                title = { Text(stringResource(R.string.text_add_text_overlay)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 },
                 actions = {
                     TextButton(onClick = {
@@ -107,7 +110,7 @@ fun TextOverlayScreen(
                             onApplyText(cachedUri)
                         }
                     }) {
-                        Text("Apply", color = StickyKeysTheme.colors.primary)
+                        Text(stringResource(R.string.text_apply), color = StickyKeysTheme.colors.primary)
                     }
                 }
             )
@@ -170,7 +173,7 @@ fun TextOverlayScreen(
                     OutlinedTextField(
                         value = text,
                         onValueChange = { text = it },
-                        label = { Text("Sticker Text") },
+                        label = { Text(stringResource(R.string.text_sticker_text)) },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -181,7 +184,7 @@ fun TextOverlayScreen(
                         valueRange = 20f..150f
                     )
 
-                    Text("Color", style = StickyKeysTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.text_color), style = StickyKeysTheme.typography.bodyMedium)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm)
                     ) {

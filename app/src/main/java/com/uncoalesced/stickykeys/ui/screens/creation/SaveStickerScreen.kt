@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.creation
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -54,9 +57,9 @@ fun SaveStickerScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Save Sticker") },
+                title = { Text(stringResource(R.string.text_save_sticker)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 }
             )
         }
@@ -78,7 +81,7 @@ fun SaveStickerScreen(
                 ) {
                     Image(
                         bitmap = bitmap!!.asImageBitmap(),
-                        contentDescription = "Preview",
+                        contentDescription = stringResource(R.string.desc_preview),
                         modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm)
                     )
                 }
@@ -123,7 +126,7 @@ fun SaveStickerScreen(
                     if (isSaving) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = StickyKeysTheme.colors.onPrimary)
                     } else {
-                        Text("Save to Library")
+                        Text(stringResource(R.string.text_save_to_library))
                     }
                 }
             } else {

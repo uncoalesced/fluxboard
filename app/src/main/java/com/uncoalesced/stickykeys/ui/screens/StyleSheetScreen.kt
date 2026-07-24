@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -78,13 +81,13 @@ fun StyleSheetScreen() {
                         color = StickyKeysTheme.colors.onSurface
                     )
                     
-                    Text("Title Large", style = StickyKeysTheme.typography.titleLarge, color = StickyKeysTheme.colors.onSurface)
-                    Text("Title Medium", style = StickyKeysTheme.typography.titleMedium, color = StickyKeysTheme.colors.onSurface)
-                    Text("Body Large", style = StickyKeysTheme.typography.bodyLarge, color = StickyKeysTheme.colors.onSurface)
-                    Text("Body Medium", style = StickyKeysTheme.typography.bodyMedium, color = StickyKeysTheme.colors.onSurface)
-                    Text("Label Large", style = StickyKeysTheme.typography.labelLarge, color = StickyKeysTheme.colors.onSurface)
-                    Text("Label Medium", style = StickyKeysTheme.typography.labelMedium, color = StickyKeysTheme.colors.onSurface)
-                    Text("Keyboard Key", style = StickyKeysTheme.typography.keyboardKey, color = StickyKeysTheme.colors.onSurface)
+                    Text(stringResource(R.string.text_title_large), style = StickyKeysTheme.typography.titleLarge, color = StickyKeysTheme.colors.onSurface)
+                    Text(stringResource(R.string.text_title_medium), style = StickyKeysTheme.typography.titleMedium, color = StickyKeysTheme.colors.onSurface)
+                    Text(stringResource(R.string.text_body_large), style = StickyKeysTheme.typography.bodyLarge, color = StickyKeysTheme.colors.onSurface)
+                    Text(stringResource(R.string.text_body_medium), style = StickyKeysTheme.typography.bodyMedium, color = StickyKeysTheme.colors.onSurface)
+                    Text(stringResource(R.string.text_label_large), style = StickyKeysTheme.typography.labelLarge, color = StickyKeysTheme.colors.onSurface)
+                    Text(stringResource(R.string.text_label_medium), style = StickyKeysTheme.typography.labelMedium, color = StickyKeysTheme.colors.onSurface)
+                    Text(stringResource(R.string.text_keyboard_key), style = StickyKeysTheme.typography.keyboardKey, color = StickyKeysTheme.colors.onSurface)
                 }
             }
 
