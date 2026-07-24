@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
@@ -133,9 +136,9 @@ private fun EditOverviewScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Edit Sticker") },
+                title = { Text(stringResource(R.string.text_edit_sticker)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 }
             )
         }
@@ -158,7 +161,7 @@ private fun EditOverviewScreen(
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap!!.asImageBitmap(),
-                        contentDescription = "Edited Preview",
+                        contentDescription = stringResource(R.string.desc_edited_preview),
                         modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm)
                     )
                 } else {
@@ -171,10 +174,10 @@ private fun EditOverviewScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                OutlinedButton(onClick = { onSelectTool(EditTool.Crop) }) { Text("Crop") }
-                OutlinedButton(onClick = { onSelectTool(EditTool.Erase) }) { Text("Erase") }
-                OutlinedButton(onClick = { onSelectTool(EditTool.Filter) }) { Text("Filter") }
-                OutlinedButton(onClick = { onSelectTool(EditTool.Text) }) { Text("Text") }
+                OutlinedButton(onClick = { onSelectTool(EditTool.Crop) }) { Text(stringResource(R.string.text_crop)) }
+                OutlinedButton(onClick = { onSelectTool(EditTool.Erase) }) { Text(stringResource(R.string.text_erase)) }
+                OutlinedButton(onClick = { onSelectTool(EditTool.Filter) }) { Text(stringResource(R.string.text_filter)) }
+                OutlinedButton(onClick = { onSelectTool(EditTool.Text) }) { Text(stringResource(R.string.text_text)) }
             }
 
             // Save choices
@@ -186,13 +189,13 @@ private fun EditOverviewScreen(
                     onClick = onOverwrite,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Overwrite Sticker")
+                    Text(stringResource(R.string.text_overwrite_sticker))
                 }
                 OutlinedButton(
                     onClick = onSaveAsNew,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Save as New Sticker")
+                    Text(stringResource(R.string.text_save_as_new_sticker))
                 }
             }
         }

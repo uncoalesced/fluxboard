@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.creation
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -33,11 +36,23 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import com.uncoalesced.stickykeys.stickercore.segmentation.SegmentationEngine
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+
+@HiltViewModel
+class CropViewModel @Inject constructor(
+    val engine: SegmentationEngine
+) : ViewModel()
+
 @Composable
 fun CropScreen(
     uriString: String,
     onCropComplete: (String, String) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    viewModel: CropViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -70,7 +85,7 @@ fun CropScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 CircularProgressIndicator()
                 if (isSegmenting) {
-                    Text("Segmenting Subject...", style = StickyKeysTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.text_segmenting_subject), style = StickyKeysTheme.typography.bodyMedium)
                 }
             }
         }
@@ -85,9 +100,9 @@ fun CropScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Crop Image") },
+                title = { Text(stringResource(R.string.text_crop_image)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 },
                 actions = {
                     TextButton(onClick = {
@@ -102,8 +117,7 @@ fun CropScreen(
                                 val origPath = Uri.fromFile(cacheFile).toString()
 
                                 // Run segmentation
-                                val engine = com.uncoalesced.stickykeys.stickercore.segmentation.MlKitSegmentationEngine()
-                                val segResult = engine.segmentSubject(context, bitmap!!)
+                                val segResult = viewModel.engine.segmentSubject(context, bitmap!!)
                                 val segBmp = segResult.getOrDefault(bitmap!!)
 
                                 val segCacheFile = File(context.cacheDir, "seg_${UUID.randomUUID()}.png")
@@ -118,7 +132,7 @@ fun CropScreen(
                             onCropComplete(origUri, segUri)
                         }
                     }) {
-                        Text("Next", color = StickyKeysTheme.colors.primary)
+                        Text(stringResource(R.string.text_next), color = StickyKeysTheme.colors.primary)
                     }
                 }
             )

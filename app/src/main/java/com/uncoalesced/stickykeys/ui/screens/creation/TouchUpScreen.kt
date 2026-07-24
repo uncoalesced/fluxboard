@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.creation
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -84,9 +87,9 @@ fun TouchUpScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Touch-Up Cutout") },
+                title = { Text(stringResource(R.string.text_touch_up_cutout)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 },
                 actions = {
                     TextButton(onClick = {
@@ -102,7 +105,7 @@ fun TouchUpScreen(
                             onTouchUpComplete(cachedUri)
                         }
                     }) {
-                        Text("Next", color = StickyKeysTheme.colors.primary)
+                        Text(stringResource(R.string.text_next), color = StickyKeysTheme.colors.primary)
                     }
                 }
             )
@@ -193,12 +196,12 @@ fun TouchUpScreen(
                         FilterChip(
                             selected = activeMode == TouchUpMode.Erase,
                             onClick = { activeMode = TouchUpMode.Erase },
-                            label = { Text("Erase Background") }
+                            label = { Text(stringResource(R.string.text_erase_background)) }
                         )
                         FilterChip(
                             selected = activeMode == TouchUpMode.Restore,
                             onClick = { activeMode = TouchUpMode.Restore },
-                            label = { Text("Restore Subject") }
+                            label = { Text(stringResource(R.string.text_restore_subject)) }
                         )
                     }
 

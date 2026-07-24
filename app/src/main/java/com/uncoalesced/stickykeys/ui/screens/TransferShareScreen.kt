@@ -1,4 +1,8 @@
+// Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
+
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,7 +42,7 @@ fun TransferShareScreen(
         is TransferShareUiState.Loading -> LoadingScreen()
         is TransferShareUiState.Success -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Transfer & Share")
+                Text(stringResource(R.string.text_transfer_share))
             }
         }
     }
