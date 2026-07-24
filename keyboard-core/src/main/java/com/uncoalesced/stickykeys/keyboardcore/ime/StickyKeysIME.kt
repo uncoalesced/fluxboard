@@ -32,6 +32,8 @@ import javax.inject.Inject
 
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
+import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 
 @AndroidEntryPoint
 class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner, KeyboardController {
@@ -42,6 +44,27 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
     @Inject
     lateinit var repository: StickerRepository
 
+    @Inject
+    lateinit var predictionEngine: PredictionEngine
+
+    @Inject
+    lateinit var keyboardPreferences: KeyboardPreferences
+
+    @Inject
+    lateinit var themeManager: com.uncoalesced.stickykeys.keyboardcore.theme.ThemeManager
+
+    @Inject
+    lateinit var layoutManager: com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
+
+    @Inject
+    lateinit var clipboardHistoryManager: com.uncoalesced.stickykeys.keyboardcore.clipboard.ClipboardHistoryManager
+
+    @Inject
+    lateinit var clipboardDao: com.uncoalesced.stickykeys.keyboardcore.data.local.dao.ClipboardDao
+
+    @Inject
+    lateinit var hapticsManager: com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
+
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -50,10 +73,27 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
     override val viewModelStore: ViewModelStore get() = store
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
+    private val viewModelFactory by lazy {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                if (modelClass.isAssignableFrom(StickerIMEViewModel::class.java)) {
+                    return StickerIMEViewModel(repository) as T
+                } else if (modelClass.isAssignableFrom(TypingViewModel::class.java)) {
+                    return TypingViewModel(predictionEngine, keyboardPreferences, themeManager, layoutManager, hapticsManager) as T
+                } else if (modelClass.isAssignableFrom(ClipboardIMEViewModel::class.java)) {
+                    return ClipboardIMEViewModel(clipboardDao) as T
+                }
+                throw IllegalArgumentException("Unknown ViewModel class")
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+        clipboardHistoryManager.startListening()
     }
 
     override fun onCreateInputView(): View {
@@ -62,22 +102,43 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
             setViewTreeViewModelStoreOwner(this@StickyKeysIME)
             setViewTreeSavedStateRegistryOwner(this@StickyKeysIME)
             setContent {
-                val factory = object : ViewModelProvider.Factory {
-                    @Suppress("UNCHECKED_CAST")
-                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return StickerIMEViewModel(repository) as T
-                    }
-                }
-                val viewModel = ViewModelProvider(this@StickyKeysIME, factory)[StickerIMEViewModel::class.java]
+                val stickerViewModel = ViewModelProvider(this@StickyKeysIME, viewModelFactory)[StickerIMEViewModel::class.java]
+                val typingViewModel = ViewModelProvider(this@StickyKeysIME, viewModelFactory)[TypingViewModel::class.java]
+                val clipboardViewModel = ViewModelProvider(this@StickyKeysIME, viewModelFactory)[ClipboardIMEViewModel::class.java]
+                
                 MainIMEView(
                     keyboardController = this@StickyKeysIME,
-                    stickerIMEViewModel = viewModel,
+                    typingViewModel = typingViewModel,
+                    stickerIMEViewModel = stickerViewModel,
+                    clipboardIMEViewModel = clipboardViewModel,
                     fileManager = fileManager,
                     onStickerClick = { commitStickerContent(it) }
                 )
             }
         }
         return view
+    }
+
+    override fun onStartInputView(editorInfo: EditorInfo?, restarting: Boolean) {
+        super.onStartInputView(editorInfo, restarting)
+        updateCursorCapsMode()
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        updateCursorCapsMode()
+    }
+
+    private fun updateCursorCapsMode() {
+        val ic = currentInputConnection ?: return
+        val editorInfo = currentInputEditorInfo ?: return
+        val capsMode = ic.getCursorCapsMode(editorInfo.inputType)
+        val typingViewModel = ViewModelProvider(this, viewModelFactory)[TypingViewModel::class.java]
+        typingViewModel.onCursorCapsModeChanged(capsMode != 0)
     }
 
     override fun onWindowShown() {
@@ -94,6 +155,7 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
 
     override fun onDestroy() {
         super.onDestroy()
+        clipboardHistoryManager.stopListening()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()
     }
@@ -132,6 +194,7 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
     }
 
     private fun commitStickerContent(sticker: Sticker) {
+        hapticsManager.performStickerSendHaptic()
         val file = fileManager.getStickerFile(sticker.id)
         if (!file.exists()) return
 
@@ -144,8 +207,13 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
         val editorInfo = currentInputEditorInfo ?: return
         val inputConnection = currentInputConnection ?: return
 
-        // Default to image/webp
-        val mimeType = "image/webp"
+        val mimeType = sticker.mimeType
+        val supportedMimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo)
+        val isSupported = supportedMimeTypes.any { ClipDescription.compareMimeTypes(mimeType, it) }
+        if (!isSupported) {
+            // Target app does not declare support for this MIME type
+            return
+        }
 
         val clip = ClipDescription("Sticker", arrayOf(mimeType))
         val contentInfo = InputContentInfoCompat(uri, clip, null)
