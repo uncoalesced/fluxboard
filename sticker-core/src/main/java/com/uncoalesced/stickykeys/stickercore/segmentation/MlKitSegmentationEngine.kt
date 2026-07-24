@@ -16,6 +16,11 @@ import javax.inject.Singleton
  * If Play Services is absent, [isAvailable] returns false and [segmentSubject] fails gracefully,
  * signaling the caller to trigger the manual touch-up / eraser UI.
  */
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
+
 @Singleton
 class MlKitSegmentationEngine @Inject constructor() : SegmentationEngine {
 
@@ -43,35 +48,23 @@ class MlKitSegmentationEngine @Inject constructor() : SegmentationEngine {
         }
 
         try {
-            // For MVP on-device execution without external Play Services network model download during build,
-            // we perform an automatic threshold-based center subject cutout as an initial mask result
-            // that mimics the ML Kit Subject Segmentation output.
-            val width = bitmap.width
-            val height = bitmap.height
-            val resultBmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-
-            val centerX = width / 2f
-            val centerY = height / 2f
-            val radius = minOf(width, height) * 0.42f
-
-            val pixels = IntArray(width * height)
-            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-
-            for (y in 0 until height) {
-                for (x in 0 until width) {
-                    val index = y * width + x
-                    val dx = x - centerX
-                    val dy = y - centerY
-                    val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-
-                    if (dist > radius) {
-                        pixels[index] = Color.TRANSPARENT
-                    }
-                }
+            val options = SubjectSegmenterOptions.Builder()
+                .enableForegroundConfidenceMask()
+                .enableForegroundBitmap()
+                .build()
+            val segmenter = SubjectSegmentation.getClient(options)
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
+            
+            val result = Tasks.await(segmenter.process(inputImage))
+            
+            val foregroundBitmap = result.foregroundBitmap
+            if (foregroundBitmap != null) {
+                Result.success(foregroundBitmap)
+            } else {
+                // Generate a transparent fallback if no foreground found
+                val empty = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+                Result.success(empty)
             }
-
-            resultBmp.setPixels(pixels, 0, width, 0, 0, width, height)
-            Result.success(resultBmp)
         } catch (e: Exception) {
             Result.failure(e)
         }
