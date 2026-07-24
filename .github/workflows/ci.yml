@@ -23,11 +23,33 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
+    - name: Check Source Rules (no emoji, watermark present)
+      run: bash scripts/check-source-rules.sh
+
     - name: Check Code Style (ktlint)
       run: ./gradlew ktlintCheck
 
-    - name: Build with Gradle
+    - name: Build with Gradle (Debug)
       run: ./gradlew assembleDebug
 
-    - name: Run Unit Tests
-      run: ./gradlew test
+    - name: Run Unit Tests and Check Coverage
+      run: ./gradlew testDebugUnitTest jacocoTestReport jacocoTestCoverageVerification
+
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
+
+    - name: Check APK Size
+      run: |
+        APK_PATH=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+        if [ -z "$APK_PATH" ]; then
+          echo "No APK found!"
+          exit 1
+        fi
+        SIZE=$(stat -c%s "$APK_PATH")
+        MAX_SIZE=$((100 * 1024 * 1024))
+        echo "Release APK Size: $SIZE bytes"
+        if [ $SIZE -gt $MAX_SIZE ]; then
+          echo "APK exceeds 100MB budget!"
+          exit 1
+        fi
+        echo "APK size is within budget."
