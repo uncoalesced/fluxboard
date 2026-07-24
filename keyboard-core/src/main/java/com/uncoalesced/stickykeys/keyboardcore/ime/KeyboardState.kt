@@ -6,5 +6,5 @@ enum class KeyboardMode {
 }
 
 enum class AppMode {
-    TYPING, STICKERS
+    TYPING, STICKERS, CLIPBOARD
 }
