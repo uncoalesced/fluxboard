@@ -1,0 +1,12 @@
+StickyKeys is an open-source Android keyboard that brings an iOS-level sticker and emoji experience to your device. 
+
+Built with privacy as its absolute core principle, StickyKeys operates entirely on-device with zero telemetry, zero analytics, and zero tracking.
+
+Key Features:
+- **Instant Sticker Creation**: Create stickers from your photos using on-device ML segmentation. No cloud processing.
+- **GIF/WebP Conversion**: Seamlessly import and trim videos, converting them into optimized animated stickers.
+- **Intelligent Keyboard**: A fully customizable typing experience with a self-learning predictive text engine that never leaves your phone.
+- **Persistent Clipboard**: Keep track of your copied text history safely and locally.
+- **LAN Sharing**: Securely migrate your stickers and dictionary to another device over your local network using ephemeral P2P links.
+
+StickyKeys respects your data and requires no internet permission for core features.
