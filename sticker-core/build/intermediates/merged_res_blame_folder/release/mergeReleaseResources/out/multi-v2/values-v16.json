@@ -1,31 +1,33 @@
 {
     "logs": [
         {
-            "outputFile": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/values-v16/values-v16.xml",
+            "outputFile": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/values-v16/values-v16.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\d024be1b882993f60e0b62893d7341e8\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\apps\\gradle\\current\\.gradle\\caches\\9.5.0\\transforms\\1d1f8aabc51ad4033cf321f28da62440\\transformed\\appcompat-1.6.1\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
                         "startOffsets": "55",
-                        "endColumns": "65",
-                        "endOffsets": "116"
+                        "endLines": "5",
+                        "endColumns": "12",
+                        "endOffsets": "223"
                     }
                 }
             ]
         },
         {
-            "outputFile": "com.uncoalesced.stickykeys.stickercore.sticker-core-mergeReleaseResources-15:/values-v16/values-v16.xml",
+            "outputFile": "com.uncoalesced.stickykeys.stickercore.sticker-core-mergeReleaseResources-27:/values-v16/values-v16.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Joel Anthony\\scoop\\persist\\gradle\\.gradle\\caches\\9.5.0\\transforms\\d024be1b882993f60e0b62893d7341e8\\transformed\\core-1.12.0\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\Joel Anthony\\scoop\\apps\\gradle\\current\\.gradle\\caches\\9.5.0\\transforms\\1d1f8aabc51ad4033cf321f28da62440\\transformed\\appcompat-1.6.1\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
                         "startOffsets": "55",
-                        "endColumns": "65",
-                        "endOffsets": "116"
+                        "endLines": "5",
+                        "endColumns": "12",
+                        "endOffsets": "223"
                     }
                 }
             ]

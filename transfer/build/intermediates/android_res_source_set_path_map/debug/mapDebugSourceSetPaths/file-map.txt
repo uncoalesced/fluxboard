@@ -6,4 +6,4 @@ com.uncoalesced.stickykeys.transfer-debug-4 E:\sticky-keys\transfer\build\interm
 com.uncoalesced.stickykeys.transfer-debug-5 E:\sticky-keys\transfer\build\intermediates\packaged_res\debug\packageDebugResources
 com.uncoalesced.stickykeys.transfer-debug-6 E:\sticky-keys\transfer\src\debug\res
 com.uncoalesced.stickykeys.transfer-main-7 E:\sticky-keys\transfer\src\main\res
-gradleHome-0 C:\Users\Joel Anthony\scoop\persist\gradle\.gradle
+gradleHome-0 C:\Users\Joel Anthony\scoop\apps\gradle\current\.gradle
