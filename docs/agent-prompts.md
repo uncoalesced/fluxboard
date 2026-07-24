@@ -50,18 +50,39 @@ spec document from these, not a code diff.
 ## Prompt 0 — Orientation (run first, either person)
 
 ```
-Read AGENTS.md, both files in .agent/rules/, and docs/repo-reference.md in
+Read AGENTS.md, every file in .agent/rules/, and docs/repo-reference.md in
 full. Then summarize back: the tech stack, the hard constraints (size
-budget, privacy, language rules, the version-verification rule), and the
-full phase list in order with owners. Flag anything that looks
-contradictory, outdated, or unclear before phase 1 starts — including
-anything in docs/repo-reference.md that seems like it might have changed
-since it was written.
+budget, privacy, language rules, the version-verification rule, the
+substantive-completion rule), the collaboration workflow, and the full
+phase list in order with owners. Flag anything that looks contradictory,
+outdated, or unclear before phase 1 starts — including anything in
+docs/repo-reference.md that seems like it might have changed since it was
+written.
 ```
 
 *Why:* confirms the agent has actually ingested the project context
 before writing anything, and gives it an explicit opening to flag stale
 information in the repo-reference doc itself, not just in code it writes.
+
+## Prompt 0b — Collaboration workflow & authors (run once, either person)
+
+```
+Read .agent/rules/collaboration-workflow.md and confirm you understand
+the handoff: Joel and Rahul trade a single shared Git branch back and
+forth — whoever's turn it is pulls first, works through some number of
+phases, then commits and pushes before handing off. This is not a
+parallel feature-branch model, so don't create long-lived branches per
+person.
+
+Also: confirm AUTHORS.md at the repo root lists both uncoalesced and
+ZapCannonYT, and update the LICENSE file's copyright line to cover both
+authors if it currently only names uncoalesced.
+```
+
+*Why:* the workflow rule auto-loads every session going forward, but this
+confirms it's actually understood right now, and gets the one concrete
+file change (the LICENSE copyright line) done explicitly rather than left
+implicit.
 
 ---
 
@@ -69,7 +90,7 @@ information in the repo-reference doc itself, not just in code it writes.
 
 **Prompt 1 — Phase 1: Project Scaffolding & Repository Setup (Joel)**
 ```
-/phase-01-project-scaffolding
+/phase-01-project-scaffolding 
 
 Settled already, do not re-ask about these:
 - License: MIT, already in the repo, copyright "uncoalesced". Keep it —
@@ -98,7 +119,7 @@ the agent to raise mid-run.
 
 **Prompt 2 — Phase 2: Architecture Foundation (Joel)**
 ```
-/phase-02-architecture-foundation
+/phase-02-architecture-foundation 
 
 Use current stable versions of Hilt, the Compose BOM, and Navigation
 Compose — verify each rather than assuming a remembered number, per the
@@ -110,7 +131,7 @@ else in the phase file is already concrete. Depends on Prompt 1.
 
 **Prompt 3 — Phase 3: Design System & Theming Tokens (Rahul)**
 ```
-/phase-03-design-system-tokens
+/phase-03-design-system-tokens 
 
 This is a genuine design decision, not a technical one — propose a
 palette and type scale rather than asking me to specify exact colors
@@ -124,7 +145,7 @@ get sign-off after. Depends on Prompt 2.
 
 **Prompt 4 — Phase 4: Local Data Model, Room Schema & File Storage (Joel)**
 ```
-/phase-04-data-model-storage
+/phase-04-data-model-storage 
 
 Settled: no encryption-at-rest on the Room database for v1 — Android's
 per-app private storage already isolates it from other apps, and
@@ -141,14 +162,14 @@ phase. Depends on Prompt 2.
 
 **Prompt 5 — Phase 5: Manual Sticker Creation Flow (Joel)**
 ```
-/phase-05-manual-sticker-creation
+/phase-05-manual-sticker-creation 
 ```
 *Why:* nothing ambiguous here — the workflow file is already concrete.
 Depends on Prompt 4.
 
 **Prompt 6 — Phase 6: Sticker Editing Suite (Joel)**
 ```
-/phase-06-sticker-editing-suite
+/phase-06-sticker-editing-suite 
 
 If the non-destructive-history-vs-overwrite decision isn't obvious once
 you're in it, default to the simpler explicit overwrite choice for v1
@@ -161,7 +182,7 @@ harder option by default. Depends on Prompt 5.
 
 **Prompt 7 — Phase 7: Sticker Organization: Categories & Favourites (Rahul)**
 ```
-/phase-07-sticker-organization
+/phase-07-sticker-organization 
 ```
 *Why:* straightforward UI over the Phase 4 data layer, nothing to
 pre-answer. Depends on Prompt 4.
@@ -172,7 +193,7 @@ pre-answer. Depends on Prompt 4.
 
 **Prompt 8 — Phase 8: Segmentation Approach Research & Library Evaluation (R) (Rahul)**
 ```
-/phase-08-segmentation-research
+/phase-08-segmentation-research 
 
 Self-source the ~20 test images (roughly 5 people, 5 pets, 5 objects, 5
 busy backgrounds) rather than asking which images to use — document what
@@ -185,7 +206,7 @@ note. Can run any time.
 
 **Prompt 9 — Phase 9: Screenshot & Share-Intent Capture Pipeline (Joel)**
 ```
-/phase-09-capture-pipeline
+/phase-09-capture-pipeline 
 
 If background screenshot detection turns out to need a permission or
 API level that conflicts with the min-SDK-26 target, fall back to the
@@ -199,7 +220,7 @@ Depends on Prompt 4.
 
 **Prompt 10 — Phase 10: On-Device Segmentation Integration & Touch-Up UI (Joel)**
 ```
-/phase-10-segmentation-integration
+/phase-10-segmentation-integration 
 
 Implement whatever Phase 8 recommended. If that choice depends on Google
 Play Services, say so explicitly in your output — that's a rule from
@@ -214,7 +235,7 @@ Prompts 8 and 9.
 
 **Prompt 11 — Phase 11: Gallery/Photo Picker Import Flow (Rahul)**
 ```
-/phase-11-gallery-import
+/phase-11-gallery-import 
 ```
 *Why:* standard platform picker integration, nothing to pre-answer.
 Depends on Prompts 5 and 10.
@@ -225,7 +246,7 @@ Depends on Prompts 5 and 10.
 
 **Prompt 12 — Phase 12: Video Import & Trim UI (Rahul)**
 ```
-/phase-12-video-import-trim
+/phase-12-video-import-trim 
 
 Default the maximum trim length to 10 seconds unless Phase 15's research
 (once it exists) says a specific target platform needs something
@@ -237,7 +258,7 @@ undefined. Depends on Prompt 2.
 
 **Prompt 13 — Phase 13: Video-to-GIF / Animated WebP Conversion Pipeline (Joel)**
 ```
-/phase-13-video-to-gif-pipeline
+/phase-13-video-to-gif-pipeline 
 
 Do not introduce FFmpeg or any FFmpeg wrapper — use MediaCodec/
 MediaMetadataRetriever for frame extraction and gif.kt (verify its
@@ -251,7 +272,7 @@ of the one chosen deliberately. Depends on Prompt 12.
 
 **Prompt 14 — Phase 14: GIF/WebP Size Optimization Pass (Joel)**
 ```
-/phase-14-gif-size-optimization
+/phase-14-gif-size-optimization 
 
 Wait for Phase 15's compatibility table before treating any specific
 file-size number as a hard target — optimize for general smallness now
@@ -263,7 +284,7 @@ just a note in the workflow file. Depends on Prompts 13 and 15.
 
 **Prompt 15 — Phase 15: Sticker/GIF Platform-Compatibility Research (R) (Rahul)**
 ```
-/phase-15-platform-compatibility-research
+/phase-15-platform-compatibility-research 
 
 Verify WhatsApp's requirements directly against the current
 WhatsApp/stickers repo rather than trusting docs/repo-reference.md's
@@ -280,7 +301,7 @@ spec instead of a software version. Can run any time.
 
 **Prompt 16 — Phase 16: Minimal Sticker-Only IME Shell (Joel)**
 ```
-/phase-16-minimal-sticker-ime
+/phase-16-minimal-sticker-ime 
 
 This has to be a real InputMethodService using the Commit Content API —
 that's the only Android-sanctioned way to send an image into another
@@ -293,7 +314,7 @@ and 7.
 
 **Prompt 17 — Phase 17: Full Typing Keyboard Core (Joel)**
 ```
-/phase-17-full-keyboard-core
+/phase-17-full-keyboard-core 
 
 Language scope for v1: English/Latin only. Additional layouts (Hindi,
 Kannada, or others) are a real, reasonable ask given where this project
@@ -309,7 +330,7 @@ on Prompt 16.
 
 **Prompt 18 — Phase 18: Predictive Text Engine Research & Dictionary Pipeline (R) (Rahul)**
 ```
-/phase-18-predictive-text-research
+/phase-18-predictive-text-research 
 
 Re-verify FlorisBoard's current Apache-2.0 terms directly rather than
 trusting docs/repo-reference.md's note on it. For the base corpus, pick
@@ -326,7 +347,7 @@ alongside Prompt 17.
 
 **Prompt 19 — Phase 19: Predictive Text Engine Implementation (Joel)**
 ```
-/phase-19-predictive-text-implementation
+/phase-19-predictive-text-implementation 
 
 Target the accuracy level of a solid classic predictive keyboard
 (n-gram plus per-user personalization) — not a from-scratch neural
@@ -341,7 +362,7 @@ and 18.
 
 **Prompt 20 — Phase 20: Auto-Capitalize & Auto-Correct Logic + Toggles (Joel)**
 ```
-/phase-20-autocap-autocorrect
+/phase-20-autocap-autocorrect 
 
 The one-tap undo on a bad autocorrect is not optional polish — treat it
 as part of the feature, not a follow-up task.
@@ -351,7 +372,7 @@ separate from the core correction logic. Depends on Prompt 19.
 
 **Prompt 21 — Phase 21: Keyboard Theming Engine (Joel)**
 ```
-/phase-21-keyboard-theming-engine
+/phase-21-keyboard-theming-engine 
 
 Use the tokens Phase 3 already produced rather than defining a second,
 parallel set of color/type values for the keyboard specifically.
@@ -361,19 +382,19 @@ instead of reusing Phase 3's output. Depends on Prompts 3 and 17.
 
 **Prompt 22 — Phase 22: Keyboard Layout Customization Engine (Joel)**
 ```
-/phase-22-keyboard-layout-customization
+/phase-22-keyboard-layout-customization 
 ```
 *Why:* concrete already, nothing to pre-answer. Depends on Prompt 17.
 
 **Prompt 23 — Phase 23: Keyboard Image/Background Customization (Joel)**
 ```
-/phase-23-keyboard-image-customization
+/phase-23-keyboard-image-customization 
 ```
 *Why:* concrete already, nothing to pre-answer. Depends on Prompt 21.
 
 **Prompt 24 — Phase 24: Clipboard History Manager (Joel)**
 ```
-/phase-24-clipboard-history-manager
+/phase-24-clipboard-history-manager 
 
 History is cleared only by an explicit user action — never by time,
 count, or any other automatic eviction, even as a "reasonable default."
@@ -389,7 +410,7 @@ and 17.
 
 **Prompt 25 — Phase 25: Haptics & Vibration Feedback (Rahul)**
 ```
-/phase-25-haptics-vibration
+/phase-25-haptics-vibration 
 
 Use VibrationEffect.createOneShot with amplitude control (API 26+,
 matching this project's min SDK) rather than pulling in a third-party
@@ -401,7 +422,7 @@ and 17.
 
 **Prompt 26 — Phase 26: Keyboard & App Settings UI (Rahul)**
 ```
-/phase-26-settings-ui
+/phase-26-settings-ui 
 
 This is UI wiring over ViewModels and repositories that already exist
 from Phases 20-25 — don't introduce new business logic here. Clearing
@@ -418,7 +439,7 @@ Phases 20-25.
 
 **Prompt 27 — Phase 27: Device Pairing & Trust Establishment for Migration (Joel)**
 ```
-/phase-27-device-pairing
+/phase-27-device-pairing 
 
 Verify zxing-android-embedded's current maintenance status before
 committing to it — it was in maintenance mode as of the repo-reference
@@ -430,7 +451,7 @@ maintenance status, not just a version number. Depends on Prompt 4.
 
 **Prompt 28 — Phase 28: LAN Device-to-Device Migration Transfer (Joel)**
 ```
-/phase-28-lan-migration-transfer
+/phase-28-lan-migration-transfer 
 
 Clipboard history (Phase 24) only transfers if the user explicitly opts
 in for that specific migration — never bundle it into the default
@@ -443,7 +464,7 @@ restating directly. Depends on Prompt 27.
 
 **Prompt 29 — Phase 29: Ephemeral Link-Sharing Architecture (Joel)**
 ```
-/phase-29-link-sharing-architecture
+/phase-29-link-sharing-architecture 
 
 This phase produces a spec/design document, not code — don't start
 implementing the relay yet. On the hosting decision: if there's no
@@ -459,7 +480,7 @@ Prompts 27/28.
 
 **Prompt 30 — Phase 30: Ephemeral Link-Sharing Implementation & Received-Sticker Import (Joel)**
 ```
-/phase-30-link-sharing-implementation
+/phase-30-link-sharing-implementation 
 
 Only proceed once Phase 29's spec has been explicitly reviewed and
 approved — if that approval hasn't happened yet, stop and say so rather
@@ -476,7 +497,7 @@ reviewed, not just written.
 
 **Prompt 31 — Phase 31: Privacy & Permissions Audit (R) (Rahul)**
 ```
-/phase-31-privacy-audit
+/phase-31-privacy-audit 
 
 Do an actual network traffic capture during normal use, not just a
 dependency-docs review — confirm empirically that the only outbound call
@@ -489,7 +510,7 @@ and 30.
 
 **Prompt 32 — Phase 32: App Size Budget Tracking & Optimization (Joel)**
 ```
-/phase-32-size-budget
+/phase-32-size-budget 
 
 Measure the actual current size of whichever segmentation model and
 dictionary data ended up bundled — don't reuse the estimates from
@@ -501,14 +522,14 @@ they were measured facts. Depends on Prompts 10 and 19.
 
 **Prompt 33 — Phase 33: Accessibility & Localization Pass (Rahul)**
 ```
-/phase-33-accessibility-localization
+/phase-33-accessibility-localization 
 ```
 *Why:* concrete already, nothing to pre-answer. Depends on Prompts 21,
 23, and 26.
 
 **Prompt 34 — Phase 34: Unit Testing Strategy for Core Logic (Joel)**
 ```
-/phase-34-unit-testing-strategy
+/phase-34-unit-testing-strategy 
 
 Backfill tests for anything from Phases 1-30 that skipped the
 per-phase testing convention in .agent/rules/code-conventions.md — check
@@ -520,7 +541,7 @@ phases followed the testing rule. Depends on Prompts 10, 13, 19, and 24.
 
 **Prompt 35 — Phase 35: UI/Instrumented Testing for Sticker & Keyboard Flows (R) (Rahul)**
 ```
-/phase-35-ui-instrumented-testing
+/phase-35-ui-instrumented-testing 
 
 Where full instrumentation genuinely isn't practical, a documented
 manual test script is an acceptable substitute — don't leave a journey
@@ -532,7 +553,7 @@ Prompt 34.
 
 **Prompt 36 — Phase 36: F-Droid / Open-Source Distribution Packaging (R) (Rahul)**
 ```
-/phase-36-fdroid-packaging
+/phase-36-fdroid-packaging 
 
 Re-check every bundled dependency's license against F-Droid's current
 inclusion criteria directly — don't rely solely on
@@ -545,7 +566,7 @@ silent assumption. Depends on Prompt 32.
 
 **Prompt 37 — Phase 37: Documentation Pass (R) (Rahul)**
 ```
-/phase-37-documentation
+/phase-37-documentation 
 
 Write the architecture doc as a living summary of what was actually
 built across all 37 phases — not a restatement of this planning
@@ -554,3 +575,101 @@ document, which describes what was intended before anything existed.
 *Why:* keeps the final documentation honest about what shipped, rather
 than a copy of the plan that may have diverged from reality by now.
 Depends on Prompt 36 — run this last.
+
+---
+
+## Remediation Prompts — Phases 1-17 Audit Findings
+
+A static audit against the actual code turned up two fabricated
+implementations behind plausible-looking names, plus rule violations and
+zero test coverage. Full findings aren't reproduced here — these are the
+fix prompts that came out of it, grouped by what they touch. Run 0 first,
+always. Then D, then A, then B, then C; E can run any time after 0.
+
+**Fix 0 — Clean tree, then confirm the build, before touching anything**
+```
+First: commit the currently modified/untracked rule and doc files
+(AUTHORS.md, CLAUDE.md, the updated .agent/rules/ files) as one clean
+commit — they're intentional, already-reviewed changes, not leftover
+mess, so commit rather than stash them. This satisfies the collaboration
+rule's "start from a clean tree" requirement.
+
+Then run a full Gradle build (./gradlew build) and report the exact
+result — errors, warnings, whether it actually compiles. Don't fix
+anything yet, even if something obviously wrong turns up. Just report
+and stop.
+```
+
+**Fix D — Rule-compliance sweep + authorship reconciliation (run after 0, before A/B)**
+```
+Remove every emoji from the codebase (found so far:
+StickersLibraryScreen.kt:386/397, TypingKeyboardView.kt:76 — check for
+more), and add the missing "// Engineered by uncoalesced" watermark to
+MainActivity.kt and AppNavGraph.kt. Confirm no other file is missing
+either.
+
+Also: fix the MIME-type bug in StickyKeysIME.kt — it hardcodes
+"image/webp" for every sticker regardless of actual format. Use the
+sticker's real MIME type, and check
+EditorInfoCompat.getContentMimeTypes() on the target field before
+committing. This doesn't need the WebP encoder to exist yet — it's a
+correctness fix for whatever format is actually being sent today.
+
+Also: the README's license line and the LICENSE file's copyright line
+are both out of sync with AUTHORS.md. README should read "MIT — see
+AUTHORS.md for the credited project authors", not "(c) uncoalesced"
+alone; LICENSE's copyright line should name both uncoalesced and
+ZapCannonYT. Fix both as part of this same commit — zero-risk text
+changes, not "fixing" in the sense we're being careful about elsewhere.
+
+Commit this as one "fix: rule-compliance sweep" commit.
+```
+
+**Fix A — Real segmentation + DI**
+```
+MlKitSegmentationEngine.kt does not use ML Kit — it crops a hardcoded
+center circle regardless of subject position. Replace it with a real
+implementation of whichever approach docs/segmentation-research.md
+actually recommends (add the real dependency to
+sticker-core/build.gradle.kts if it's missing). Bind it through Hilt
+(@Binds) instead of constructing it directly in
+StickersLibraryScreen.kt's ViewModel, so Phase 10's "swappable behind an
+interface" goal is actually true. Plan the approach first and show it
+before editing. Once done, show the actual dependency declaration and
+re-check Phase 10's DoD against real output — not just that the code
+compiles.
+```
+
+**Fix B — Animated WebP encoding**
+```
+AnimatedStickerConverter and its Android implementation only emit GIF —
+add the animated WebP encode path Phase 13's DoD requires alongside it
+(the MIME-type bug that used to be bundled with this is already fixed
+in Fix D). Bind AndroidAnimatedStickerConverter through Hilt rather than
+constructing it directly in VideoConvertScreen.kt. Verify the output
+file is a genuinely valid animated WebP before calling this done, not
+just that a file with the right extension gets written.
+```
+
+**Fix C — Backfill tests (only after A and B land)**
+```
+Write the tests that were skipped: an instrumented test for Phase 4's
+repository (insert/query/delete end-to-end), and unit tests for the
+corrected segmentation and GIF/WebP pipelines, per
+code-conventions.md's per-phase testing rule. Don't write tests against
+the old circle-crop or GIF-only behavior — they'd validate the wrong
+thing.
+```
+
+**Fix E — Remaining functional gaps**
+```
+Implement the actual screenshot content-observer for Phase 9 (task #1)
+rather than relying only on the manual "Extract Screenshot" fallback
+button, and fix caps-lock (Phase 17) so double-tapping shift latches
+KeyboardMode.LETTERS_CAPS_LOCK instead of leaving it unreachable.
+```
+
+Commit after each lettered fix, not all at once at the end — the
+collaboration rule exists so a pull shows incremental, reviewable
+progress, not one giant diff.
+```
