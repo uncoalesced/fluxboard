@@ -1,3 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Engineered by uncoalesced -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- LAN migration sockets (Phase 27/28) and the link-sharing relay
+         (Phase 29/30) require network access. Declared here so the module
+         is self-describing; merged into the app manifest at build time. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+</manifest>
