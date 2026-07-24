@@ -1,3 +1,4 @@
+// Engineered by uncoalesced
 package com.uncoalesced.stickykeys
 
 import android.app.Application
