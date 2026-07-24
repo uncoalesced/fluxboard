@@ -1,7 +1,4 @@
-# StickerKeyboard
-
-*(working title — rename this header, the badges, and the applicationId
-once an actual name is picked; nothing below depends on the name itself)*
+# FluxBoard
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84.svg)
@@ -117,6 +114,19 @@ feature:
 | Build | Android Gradle Plugin 9.x, JDK 17+ |
 | Size budget | Under 100 MB installed, tracked in CI |
 
+### Brand palette
+
+The confirmed design tokens (see Phase 3 for the full breakdown and
+contrast-checked usage):
+
+| Hex | Color | Role |
+|---|---|---|
+| `#E7E247` | Yellow | Primary accent |
+| `#3D3B30` | Dark brown/ink | Dark neutral |
+| `#4D5061` | Slate | Secondary neutral |
+| `#5C80BC` | Blue | Secondary accent |
+| `#E9EDDE` | Cream | Light neutral |
+
 ### Module structure
 
 ```mermaid
@@ -153,62 +163,65 @@ lives in [`docs/repo-reference.md`](docs/repo-reference.md).
 | # | Phase | Owner | Status |
 |---|---|---|---|
 | **Foundation** | | | |
-| 1 | Project Scaffolding & Repository Setup | Joel | In progress |
-| 2 | Architecture Foundation | Joel | Planned |
-| 3 | Design System & Theming Tokens | Rahul | Planned |
-| 4 | Local Data Model, Room Schema & File Storage | Joel | Planned |
+| 1 | Project Scaffolding & Repository Setup | Joel | Done |
+| 2 | Architecture Foundation | Joel | Done |
+| 3 | Design System & Theming Tokens | Rahul | Done |
+| 4 | Local Data Model, Room Schema & File Storage | Joel | Test rewritten against real API — compile-check pending |
 | **Sticker Core** | | | |
-| 5 | Manual Sticker Creation Flow | Joel | Planned |
-| 6 | Sticker Editing Suite | Joel | Planned |
-| 7 | Sticker Organization: Categories & Favourites | Rahul | Planned |
+| 5 | Manual Sticker Creation Flow | Joel | Done |
+| 6 | Sticker Editing Suite | Joel | Needs a documented decision (overwrite vs. history) |
+| 7 | Sticker Organization: Categories & Favourites | Rahul | Done |
 | **Extraction** | | | |
-| 8 | Segmentation Approach Research & Library Evaluation | Rahul | Planned |
-| 9 | Screenshot & Share-Intent Capture Pipeline | Joel | Planned |
-| 10 | On-Device Segmentation Integration & Touch-Up UI | Joel | Planned |
-| 11 | Gallery/Photo Picker Import Flow | Rahul | Planned |
+| 8 | Segmentation Approach Research & Library Evaluation | Rahul | Done |
+| 9 | Screenshot & Share-Intent Capture Pipeline | Joel | Done — observer wired and filter fixed |
+| 10 | On-Device Segmentation Integration & Touch-Up UI | Joel | Done — real ML Kit confirmed, Hilt-bound |
+| 11 | Gallery/Photo Picker Import Flow | Rahul | Done |
 | **Video & GIF** | | | |
-| 12 | Video Import & Trim UI | Rahul | Planned |
-| 13 | Video-to-GIF / Animated WebP Conversion Pipeline | Joel | Planned |
-| 14 | GIF/WebP Size Optimization Pass | Joel | Planned |
-| 15 | Sticker/GIF Platform-Compatibility Research | Rahul | Planned |
+| 12 | Video Import & Trim UI | Rahul | Done |
+| 13 | Video-to-GIF / Animated WebP Conversion Pipeline | Joel | Real animated WebP encoder wired — compile-check pending |
+| 14 | GIF/WebP Size Optimization Pass | Joel | Blocked on Phase 13 |
+| 15 | Sticker/GIF Platform-Compatibility Research | Rahul | Done |
 | **Keyboard (flagship)** | | | |
-| 16 | Minimal Sticker-Only IME Shell | Joel | Planned |
-| 17 | Full Typing Keyboard Core | Joel | Planned |
-| 18 | Predictive Text Engine Research & Dictionary Pipeline | Rahul | Planned |
-| 19 | Predictive Text Engine Implementation | Joel | Planned |
-| 20 | Auto-Capitalize & Auto-Correct Logic + Toggles | Joel | Planned |
-| 21 | Keyboard Theming Engine | Joel | Planned |
-| 22 | Keyboard Layout Customization Engine | Joel | Planned |
-| 23 | Keyboard Image/Background Customization | Joel | Planned |
-| 24 | Clipboard History Manager | Joel | Planned |
-| 25 | Haptics & Vibration Feedback | Rahul | Planned |
-| 26 | Keyboard & App Settings UI | Rahul | Planned |
+| 16 | Minimal Sticker-Only IME Shell | Joel | Done |
+| 17 | Full Typing Keyboard Core | Joel | Done — caps-lock and MIME fix confirmed |
+| 18 | Predictive Text Engine Research & Dictionary Pipeline | Joel | Done — pipeline doc written, dictionary provenance flagged as unresolved |
+| 19 | Predictive Text Engine Implementation | Joel | Done — log leak removed, two-strike learning rule added |
+| 20 | Auto-Capitalize & Auto-Correct Logic + Toggles | Joel | Done — real dictionary-veto bug found and fixed, test re-enabled |
+| 21 | Keyboard Theming Engine | Joel | Done |
+| 22 | Keyboard Layout Customization Engine | Joel | Done, but letters-only — symbols use the legacy layout |
+| 23 | Keyboard Image/Background Customization | Joel | Done |
+| 24 | Clipboard History Manager | Joel | Done — a main-thread DB crash on delete found and fixed |
+| 25 | Haptics & Vibration Feedback | Joel | Done |
+| 26 | Keyboard & App Settings UI | Joel | Done |
 | **Cross-device** | | | |
-| 27 | Device Pairing & Trust Establishment for Migration | Joel | Planned |
-| 28 | LAN Device-to-Device Migration Transfer | Joel | Planned |
-| 29 | Ephemeral Link-Sharing Architecture | Joel | Planned |
-| 30 | Ephemeral Link-Sharing Implementation & Received-Sticker Import | Joel | Planned |
+| 27 | Device Pairing & Trust Establishment for Migration | Joel | Claimed done — never audited |
+| 28 | LAN Device-to-Device Migration Transfer | Joel | Claimed done — never audited |
+| 29 | Ephemeral Link-Sharing Architecture | Joel | Claimed done — never audited |
+| 30 | Ephemeral Link-Sharing Implementation & Received-Sticker Import | Joel | Claimed done — never audited |
 | **Quality, Size & Release** | | | |
-| 31 | Privacy & Permissions Audit | Rahul | Planned |
-| 32 | App Size Budget Tracking & Optimization | Joel | Planned |
-| 33 | Accessibility & Localization Pass | Rahul | Planned |
-| 34 | Unit Testing Strategy for Core Logic | Joel | Planned |
-| 35 | UI/Instrumented Testing for Sticker & Keyboard Flows | Rahul | Planned |
-| 36 | F-Droid / Open-Source Distribution Packaging | Rahul | Planned |
-| 37 | Documentation Pass | Rahul | Planned |
+| 31 | Privacy & Permissions Audit | Joel | Claimed done — never audited |
+| 32 | App Size Budget Tracking & Optimization | Joel | Claimed done — never audited |
+| 33 | Accessibility & Localization Pass | Joel | Claimed done — never audited |
+| 34 | Unit Testing Strategy for Core Logic | Joel | Claimed done — never audited |
+| 35 | UI/Instrumented Testing for Sticker & Keyboard Flows | Joel | Claimed done — never audited |
+| 36 | F-Droid / Open-Source Distribution Packaging | Joel | Claimed done — never audited |
+| 37 | Documentation Pass | Rahul | Claimed done — never audited |
 
-Work is split roughly 60/40 by effort between Joel and Rahul — Joel
-carries the core engineering (architecture, pipelines, the keyboard's
-internals, transfer/sharing); Rahul carries research, lighter
-implementation, testing, and packaging. See
+Work was originally split roughly 60/40 by effort between Joel and Rahul.
+As of the phases-1-17 audit and fix pass, Joel is driving all remaining
+phases through Antigravity himself (18-36); Rahul's scope is now the
+documentation phase (37) plus whatever he already contributed to the
+completed early phases. Claude Code (Opus 4.8) is used to review
+Antigravity's work, not to do the building itself. See
 [`docs/agent-prompts.md`](docs/agent-prompts.md) for the exact prompts
-used to drive each phase.
+used to drive each phase, including the post-audit remediation prompts.
 
 ## Repository Structure
 
 ```
 .
 ├── AGENTS.md                   # Project-wide context, read automatically every session
+├── CLAUDE.md                    # Bridges Claude Code to AGENTS.md + rules via @imports
 ├── .agent/
 │   ├── rules/                  # Standing constraints, auto-loaded every session
 │   │   ├── privacy-and-scope.md
@@ -222,6 +235,7 @@ used to drive each phase.
 ├── keyboard-core/                # IME, theming, predictive text, clipboard, haptics
 ├── transfer/                     # LAN migration + ephemeral link sharing
 ├── LICENSE
+├── AUTHORS.md
 └── README.md                     # This file
 ```
 
@@ -314,4 +328,5 @@ Stated plainly, so scope doesn't creep silently:
 
 ## License
 
-[MIT](LICENSE) © uncoalesced
+[MIT](LICENSE) — see [`AUTHORS.md`](AUTHORS.md) for the credited project
+authors.
