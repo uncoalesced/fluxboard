@@ -1,4 +1,5 @@
 plugins {
+    id("jacoco")
     alias(libs.plugins.android.library)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -21,6 +22,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -46,4 +52,70 @@ dependencies {
     implementation(project(":sticker-core"))
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.12.1")
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("androidx.test.ext:junit:1.1.5")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.mockk:mockk:1.13.9")
+}
+
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.withType<Test> {
+    useJUnit()
+    // Need this for robolectric to work nicely with jacoco
+    configure<JacocoTaskExtension> {
+        isIncludeNoLocationClasses = true
+        setExcludes(listOf("jdk.internal.*"))
+    }
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+
+    val fileFilter = mutableSetOf(
+        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
+        "**/*Test*.*", "android/**/*.*", "**/*_Impl*.*", "**/Dagger*.*", "**/*Module*.*"
+    )
+    val debugTree = fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+        exclude(fileFilter)
+    }
+    val mainSrc = "${project.projectDir}/src/main/java"
+
+    sourceDirectories.setFrom(files(mainSrc))
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(fileTree(layout.buildDirectory.get()).include("jacoco/testDebugUnitTest.exec"))
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn("jacocoTestReport")
+    val fileFilter = mutableSetOf(
+        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
+        "**/*Test*.*", "android/**/*.*", "**/*_Impl*.*", "**/Dagger*.*", "**/*Module*.*"
+    )
+    val debugTree = fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+        exclude(fileFilter)
+    }
+    val mainSrc = "${project.projectDir}/src/main/java"
+
+    sourceDirectories.setFrom(files(mainSrc))
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(fileTree(layout.buildDirectory.get()).include("jacoco/testDebugUnitTest.exec"))
+
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.70.toBigDecimal()
+            }
+        }
+    }
 }
