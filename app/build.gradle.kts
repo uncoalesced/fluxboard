@@ -17,11 +17,16 @@ android {
         versionName = "v0.1.0-ALPHA"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        androidResources {
+            localeFilters += "en"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -62,7 +67,18 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+    
+    implementation("io.github.g0dkar:qrcode-kotlin-android:4.5.0")
+    implementation("io.github.g00fy2.quickie:quickie-unbundled:1.12.0")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.51.1")
+    kspAndroidTest("com.google.dagger:hilt-android-compiler:2.51.1")
 }
