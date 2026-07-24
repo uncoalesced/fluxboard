@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.keyboardcore.R
+
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -44,7 +47,7 @@ fun StickerIMEView(
     Column(modifier = Modifier.fillMaxSize()) {
         Row {
             TextButton(onClick = onBackToKeyboard) {
-                Text("Back")
+                Text(stringResource(R.string.text_back))
             }
             PrimaryScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
@@ -54,7 +57,7 @@ fun StickerIMEView(
                 Tab(
                     selected = selectedTabIndex == 0,
                     onClick = { viewModel.selectTab(0) },
-                    text = { Text("Favourites") }
+                    text = { Text(stringResource(R.string.text_favourites)) }
                 )
                 categories.forEachIndexed { index, category ->
                     val tabIndex = index + 1
