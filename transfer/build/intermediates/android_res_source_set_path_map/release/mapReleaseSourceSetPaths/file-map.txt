@@ -6,4 +6,4 @@ com.uncoalesced.stickykeys.transfer-release-4 E:\sticky-keys\transfer\build\inte
 com.uncoalesced.stickykeys.transfer-release-5 E:\sticky-keys\transfer\build\intermediates\packaged_res\release\packageReleaseResources
 com.uncoalesced.stickykeys.transfer-main-6 E:\sticky-keys\transfer\src\main\res
 com.uncoalesced.stickykeys.transfer-release-7 E:\sticky-keys\transfer\src\release\res
-gradleHome-0 C:\Users\Joel Anthony\scoop\persist\gradle\.gradle
+gradleHome-0 C:\Users\Joel Anthony\scoop\apps\gradle\current\.gradle

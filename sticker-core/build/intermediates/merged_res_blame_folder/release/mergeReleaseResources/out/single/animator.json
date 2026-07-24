@@ -1,26 +1,26 @@
 [
     {
-        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/animator/fragment_close_enter.xml",
-        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-7:/animator/fragment_close_enter.xml"
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/animator/fragment_fade_exit.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-20:/animator/fragment_fade_exit.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/animator/fragment_open_enter.xml",
-        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-7:/animator/fragment_open_enter.xml"
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/animator/fragment_close_enter.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-20:/animator/fragment_close_enter.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/animator/fragment_fade_exit.xml",
-        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-7:/animator/fragment_fade_exit.xml"
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/animator/fragment_fade_enter.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-20:/animator/fragment_fade_enter.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/animator/fragment_open_exit.xml",
-        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-7:/animator/fragment_open_exit.xml"
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/animator/fragment_close_exit.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-20:/animator/fragment_close_exit.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/animator/fragment_close_exit.xml",
-        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-7:/animator/fragment_close_exit.xml"
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/animator/fragment_open_enter.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-20:/animator/fragment_open_enter.xml"
     },
     {
-        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-17:/animator/fragment_fade_enter.xml",
-        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-7:/animator/fragment_fade_enter.xml"
+        "merged": "com.uncoalesced.stickykeys.stickercore.sticker-core-release-29:/animator/fragment_open_exit.xml",
+        "source": "com.uncoalesced.stickykeys.stickercore.sticker-core-fragment-1.5.1-20:/animator/fragment_open_exit.xml"
     }
 ]
