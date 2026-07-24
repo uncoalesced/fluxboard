@@ -1,0 +1,21 @@
+{
+  "id": "preset_amoled_dark",
+  "name": "AMOLED Dark",
+  "isLight": false,
+  "typeScale": "MEDIUM",
+  "colors": {
+    "primary": "#FF818CF8",
+    "primaryVariant": "#FF6366F1",
+    "secondary": "#FF5EEAD4",
+    "background": "#FF000000",
+    "surface": "#FF0A0A0A",
+    "surfaceVariant": "#FF141414",
+    "error": "#FFDC2626",
+    "onPrimary": "#FF000000",
+    "onSecondary": "#FF000000",
+    "onBackground": "#FFFFFFFF",
+    "onSurface": "#FFFFFFFF",
+    "onSurfaceVariant": "#FFE2E8F0",
+    "onError": "#FFFFFFFF"
+  }
+}

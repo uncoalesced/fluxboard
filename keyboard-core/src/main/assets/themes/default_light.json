@@ -1,0 +1,21 @@
+{
+  "id": "preset_default_light",
+  "name": "Default Light",
+  "isLight": true,
+  "typeScale": "MEDIUM",
+  "colors": {
+    "primary": "#FF6366F1",
+    "primaryVariant": "#FF4F46E5",
+    "secondary": "#FF2DD4BF",
+    "background": "#FFF8FAFC",
+    "surface": "#FFFFFFFF",
+    "surfaceVariant": "#FFF1F5F9",
+    "error": "#FFEF4444",
+    "onPrimary": "#FFFFFFFF",
+    "onSecondary": "#FF0F172A",
+    "onBackground": "#FF0F172A",
+    "onSurface": "#FF0F172A",
+    "onSurfaceVariant": "#FF1E293B",
+    "onError": "#FFFFFFFF"
+  }
+}

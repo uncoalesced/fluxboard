@@ -1,0 +1,47 @@
+{
+  "id": "preset_qwerty",
+  "name": "QWERTY",
+  "rows": [
+    [
+      {"id": "key_q", "output": "q", "weight": 1.0},
+      {"id": "key_w", "output": "w", "weight": 1.0},
+      {"id": "key_e", "output": "e", "weight": 1.0},
+      {"id": "key_r", "output": "r", "weight": 1.0},
+      {"id": "key_t", "output": "t", "weight": 1.0},
+      {"id": "key_y", "output": "y", "weight": 1.0},
+      {"id": "key_u", "output": "u", "weight": 1.0},
+      {"id": "key_i", "output": "i", "weight": 1.0},
+      {"id": "key_o", "output": "o", "weight": 1.0},
+      {"id": "key_p", "output": "p", "weight": 1.0}
+    ],
+    [
+      {"id": "key_a", "output": "a", "weight": 1.0},
+      {"id": "key_s", "output": "s", "weight": 1.0},
+      {"id": "key_d", "output": "d", "weight": 1.0},
+      {"id": "key_f", "output": "f", "weight": 1.0},
+      {"id": "key_g", "output": "g", "weight": 1.0},
+      {"id": "key_h", "output": "h", "weight": 1.0},
+      {"id": "key_j", "output": "j", "weight": 1.0},
+      {"id": "key_k", "output": "k", "weight": 1.0},
+      {"id": "key_l", "output": "l", "weight": 1.0}
+    ],
+    [
+      {"id": "key_shift", "output": "SHIFT", "displayLabel": "\u21e7", "weight": 1.5},
+      {"id": "key_z", "output": "z", "weight": 1.0},
+      {"id": "key_x", "output": "x", "weight": 1.0},
+      {"id": "key_c", "output": "c", "weight": 1.0},
+      {"id": "key_v", "output": "v", "weight": 1.0},
+      {"id": "key_b", "output": "b", "weight": 1.0},
+      {"id": "key_n", "output": "n", "weight": 1.0},
+      {"id": "key_m", "output": "m", "weight": 1.0},
+      {"id": "key_del", "output": "DEL", "displayLabel": "\u232b", "weight": 1.5}
+    ],
+    [
+      {"id": "key_symbols", "output": "SYMBOLS", "displayLabel": "?123", "weight": 1.5},
+      {"id": "key_stickers", "output": "STICKERS", "displayLabel": "\u263a", "weight": 1.5},
+      {"id": "key_space", "output": "SPACE", "displayLabel": " ", "weight": 4.0},
+      {"id": "key_period", "output": ".", "weight": 1.0},
+      {"id": "key_enter", "output": "ENTER", "displayLabel": "\u23ce", "weight": 1.5}
+    ]
+  ]
+}
