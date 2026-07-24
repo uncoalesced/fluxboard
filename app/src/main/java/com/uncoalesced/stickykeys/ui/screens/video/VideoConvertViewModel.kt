@@ -6,7 +6,11 @@ import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepositor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
+import com.uncoalesced.stickykeys.stickercore.animation.AnimatedStickerConverter
+
 @HiltViewModel
 class VideoConvertViewModel @Inject constructor(
-    val repository: StickerRepository
+    val repository: StickerRepository,
+    val converter: AnimatedStickerConverter,
+    val appPreferences: com.uncoalesced.stickykeys.data.local.AppPreferences
 ) : ViewModel()

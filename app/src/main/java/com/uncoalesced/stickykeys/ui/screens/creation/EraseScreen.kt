@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.creation
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -66,9 +69,9 @@ fun EraseScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Erase Background") },
+                title = { Text(stringResource(R.string.text_erase_background)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 },
                 actions = {
                     TextButton(onClick = {
@@ -102,7 +105,7 @@ fun EraseScreen(
                             onEraseComplete(cachedUri)
                         }
                     }) {
-                        Text("Next", color = StickyKeysTheme.colors.primary)
+                        Text(stringResource(R.string.text_next), color = StickyKeysTheme.colors.primary)
                     }
                 }
             )

@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -101,9 +104,9 @@ fun FilterScreen(
         topBar = {
             @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
-                title = { Text("Adjust Filters") },
+                title = { Text(stringResource(R.string.text_adjust_filters)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text("Cancel", color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
                 },
                 actions = {
                     TextButton(onClick = {
@@ -125,7 +128,7 @@ fun FilterScreen(
                             onApplyFilter(cachedUri)
                         }
                     }) {
-                        Text("Apply", color = StickyKeysTheme.colors.primary)
+                        Text(stringResource(R.string.text_apply), color = StickyKeysTheme.colors.primary)
                     }
                 }
             )
@@ -147,7 +150,7 @@ fun FilterScreen(
             ) {
                 Image(
                     bitmap = originalBitmap!!.asImageBitmap(),
-                    contentDescription = "Filter Preview",
+                    contentDescription = stringResource(R.string.desc_filter_preview),
                     colorFilter = ColorFilter.colorMatrix(composeColorMatrix),
                     modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm)
                 )

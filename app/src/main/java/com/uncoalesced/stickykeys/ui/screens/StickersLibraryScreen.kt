@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
+
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,6 +41,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
+import com.uncoalesced.stickykeys.stickercore.segmentation.SegmentationEngine
 
 sealed interface TabFilter {
     data object All : TabFilter
@@ -56,7 +60,8 @@ sealed interface StickersUiState {
 
 @HiltViewModel
 class StickersViewModel @Inject constructor(
-    private val repository: StickerRepository
+    private val repository: StickerRepository,
+    private val engine: SegmentationEngine
 ) : ViewModel() {
 
     private val _selectedTab = MutableStateFlow<TabFilter>(TabFilter.All)
@@ -94,7 +99,7 @@ class StickersViewModel @Inject constructor(
         if (uriStrings.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             _isBatchImporting.value = true
-            val engine = com.uncoalesced.stickykeys.stickercore.segmentation.MlKitSegmentationEngine()
+
             uriStrings.forEach { uriStr ->
                 try {
                     val uri = Uri.parse(uriStr)
@@ -238,7 +243,7 @@ fun StickersLibraryScreen(
                             containerColor = StickyKeysTheme.colors.surfaceVariant,
                             contentColor = StickyKeysTheme.colors.onBackground
                         ) {
-                            Text("Import Video")
+                            Text(stringResource(R.string.text_import_video))
                         }
 
                         ExtendedFloatingActionButton(
@@ -251,7 +256,7 @@ fun StickersLibraryScreen(
                             containerColor = StickyKeysTheme.colors.secondary,
                             contentColor = StickyKeysTheme.colors.onSecondary
                         ) {
-                            Text("Extract Screenshot")
+                            Text(stringResource(R.string.text_extract_screenshot))
                         }
 
                         FloatingActionButton(
@@ -265,7 +270,7 @@ fun StickersLibraryScreen(
                             containerColor = StickyKeysTheme.colors.primary,
                             contentColor = StickyKeysTheme.colors.onPrimary
                         ) {
-                            Text("+")
+                            Text(stringResource(R.string.text_))
                         }
                     }
                 }
@@ -288,12 +293,12 @@ fun StickersLibraryScreen(
                         Tab(
                             selected = current.currentTab is TabFilter.All,
                             onClick = { viewModel.selectTab(TabFilter.All) },
-                            text = { Text("All") }
+                            text = { Text(stringResource(R.string.text_all)) }
                         )
                         Tab(
                             selected = current.currentTab is TabFilter.Favourites,
                             onClick = { viewModel.selectTab(TabFilter.Favourites) },
-                            text = { Text("★ Favourites") }
+                            text = { Text(stringResource(R.string.text_favourites)) }
                         )
                         current.categories.forEach { category ->
                             Tab(
@@ -303,7 +308,7 @@ fun StickersLibraryScreen(
                             )
                         }
                         IconButton(onClick = { showAddCategoryDialog = true }) {
-                            Text("+", style = StickyKeysTheme.typography.titleMedium)
+                            Text(stringResource(R.string.text_), style = StickyKeysTheme.typography.titleMedium)
                         }
                     }
 
@@ -374,7 +379,7 @@ fun StickersLibraryScreen(
                 AlertDialog(
                     onDismissRequest = { pendingImportUris = emptyList() },
                     title = { Text("Import ${pendingImportUris.size} Images") },
-                    text = { Text("Choose how to process your selected photos:") },
+                    text = { Text(stringResource(R.string.text_choose_how_to_process_your_selected_photos)) },
                     confirmButton = {
                         Button(
                             onClick = {
@@ -383,7 +388,7 @@ fun StickersLibraryScreen(
                                 viewModel.batchImportStickers(uris, context)
                             }
                         ) {
-                            Text("⚡ Auto-Segment (Batch)")
+                            Text(stringResource(R.string.text_auto_segment_batch))
                         }
                     },
                     dismissButton = {
@@ -394,7 +399,7 @@ fun StickersLibraryScreen(
                                 onImagePicked(firstUri)
                             }
                         ) {
-                            Text("✏️ Custom Edit")
+                            Text(stringResource(R.string.text_custom_edit))
                         }
                     }
                 )
@@ -403,14 +408,14 @@ fun StickersLibraryScreen(
             if (isBatchImporting) {
                 AlertDialog(
                     onDismissRequest = {},
-                    title = { Text("Batch Importing...") },
+                    title = { Text(stringResource(R.string.text_batch_importing)) },
                     text = {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CircularProgressIndicator()
-                            Text("Segmenting & saving stickers...")
+                            Text(stringResource(R.string.text_segmenting_saving_stickers))
                         }
                     },
                     confirmButton = {}
@@ -447,7 +452,7 @@ private fun StickerGridItem(
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Sticker",
+                    contentDescription = stringResource(R.string.desc_sticker),
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(StickyKeysTheme.spacing.xs)
@@ -483,20 +488,20 @@ private fun AddCategoryDialog(
     var text by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Category") },
+        title = { Text(stringResource(R.string.text_new_category)) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                label = { Text("Category Name") },
+                label = { Text(stringResource(R.string.text_category_name)) },
                 singleLine = true
             )
         },
         confirmButton = {
-            TextButton(onClick = { onAddCategory(text) }) { Text("Add") }
+            TextButton(onClick = { onAddCategory(text) }) { Text(stringResource(R.string.text_add)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.text_cancel)) }
         }
     )
 }
@@ -511,10 +516,10 @@ private fun StickerContextMenuDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Sticker Options") },
+        title = { Text(stringResource(R.string.text_sticker_options)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.xs)) {
-                Text("Assign Category:", style = StickyKeysTheme.typography.bodyMedium)
+                Text(stringResource(R.string.text_assign_category), style = StickyKeysTheme.typography.bodyMedium)
                 TextButton(onClick = { onAssignCategory(null) }) {
                     Text(if (sticker.categoryId == null) "• None (Unassigned)" else "None (Unassigned)")
                 }
@@ -525,12 +530,12 @@ private fun StickerContextMenuDialog(
                 }
                 HorizontalDivider()
                 TextButton(onClick = onDeleteSticker) {
-                    Text("Delete Sticker", color = StickyKeysTheme.colors.error)
+                    Text(stringResource(R.string.text_delete_sticker), color = StickyKeysTheme.colors.error)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.text_close)) }
         }
     )
 }
