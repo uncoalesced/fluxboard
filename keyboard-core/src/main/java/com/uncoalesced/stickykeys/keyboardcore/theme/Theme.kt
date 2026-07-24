@@ -50,9 +50,10 @@ object StickyKeysTheme {
 fun StickyKeysTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     typeScale: TypeScale = TypeScale.MEDIUM,
+    customColors: StickyKeysColors? = null,
     content: @Composable () -> Unit
 ) {
-    val colors = if (darkTheme) {
+    val colors = customColors ?: if (darkTheme) {
         darkStickyKeysColors()
     } else {
         lightStickyKeysColors()
