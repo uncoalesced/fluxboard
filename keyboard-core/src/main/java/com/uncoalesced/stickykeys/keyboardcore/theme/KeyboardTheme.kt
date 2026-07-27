@@ -12,7 +12,7 @@ data class KeyboardTheme(
     val colors: StickyKeysColors,
     val typeScale: TypeScale,
     val backgroundImagePath: String? = null,
-    val imageOverlayOpacity: Float = 0.4f
+    val imageOverlayOpacity: Float = 0.4f,
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
@@ -48,34 +48,44 @@ data class KeyboardTheme(
         fun fromJson(jsonStr: String): KeyboardTheme {
             val json = JSONObject(jsonStr)
             val colorsJson = json.getJSONObject("colors")
-            
+
             val isLight = json.getBoolean("isLight")
-            
-            val colors = StickyKeysColors(
-                primary = hexToColor(colorsJson.getString("primary")),
-                primaryVariant = hexToColor(colorsJson.getString("primaryVariant")),
-                secondary = hexToColor(colorsJson.getString("secondary")),
-                background = hexToColor(colorsJson.getString("background")),
-                surface = hexToColor(colorsJson.getString("surface")),
-                surfaceVariant = hexToColor(colorsJson.getString("surfaceVariant")),
-                error = hexToColor(colorsJson.getString("error")),
-                onPrimary = hexToColor(colorsJson.getString("onPrimary")),
-                onSecondary = hexToColor(colorsJson.getString("onSecondary")),
-                onBackground = hexToColor(colorsJson.getString("onBackground")),
-                onSurface = hexToColor(colorsJson.getString("onSurface")),
-                onSurfaceVariant = hexToColor(colorsJson.getString("onSurfaceVariant")),
-                onError = hexToColor(colorsJson.getString("onError")),
-                isLight = isLight
-            )
+
+            val colors =
+                StickyKeysColors(
+                    primary = hexToColor(colorsJson.getString("primary")),
+                    primaryVariant = hexToColor(colorsJson.getString("primaryVariant")),
+                    secondary = hexToColor(colorsJson.getString("secondary")),
+                    background = hexToColor(colorsJson.getString("background")),
+                    surface = hexToColor(colorsJson.getString("surface")),
+                    surfaceVariant = hexToColor(colorsJson.getString("surfaceVariant")),
+                    error = hexToColor(colorsJson.getString("error")),
+                    onPrimary = hexToColor(colorsJson.getString("onPrimary")),
+                    onSecondary = hexToColor(colorsJson.getString("onSecondary")),
+                    onBackground = hexToColor(colorsJson.getString("onBackground")),
+                    onSurface = hexToColor(colorsJson.getString("onSurface")),
+                    onSurfaceVariant = hexToColor(colorsJson.getString("onSurfaceVariant")),
+                    onError = hexToColor(colorsJson.getString("onError")),
+                    isLight = isLight,
+                )
 
             val typeScaleStr = json.optString("typeScale", "MEDIUM")
-            val typeScale = try {
-                TypeScale.valueOf(typeScaleStr)
-            } catch (e: Exception) {
-                TypeScale.MEDIUM
-            }
+            val typeScale =
+                try {
+                    TypeScale.valueOf(typeScaleStr)
+                } catch (e: Exception) {
+                    TypeScale.MEDIUM
+                }
 
-            val backgroundImagePath = if (json.has("backgroundImagePath")) json.getString("backgroundImagePath") else null
+            val backgroundImagePath =
+                if (json.has(
+                        "backgroundImagePath",
+                    )
+                ) {
+                    json.getString("backgroundImagePath")
+                } else {
+                    null
+                }
             val imageOverlayOpacity = json.optDouble("imageOverlayOpacity", 0.4).toFloat()
 
             return KeyboardTheme(
@@ -85,16 +95,13 @@ data class KeyboardTheme(
                 colors = colors,
                 typeScale = typeScale,
                 backgroundImagePath = backgroundImagePath,
-                imageOverlayOpacity = imageOverlayOpacity
+                imageOverlayOpacity = imageOverlayOpacity,
             )
         }
 
-        private fun colorToHex(color: Color): String {
-            return String.format("#%08X", (0xFFFFFFFF and color.toArgb().toLong()))
-        }
+        private fun colorToHex(color: Color): String =
+            String.format("#%08X", (0xFFFFFFFF and color.toArgb().toLong()))
 
-        private fun hexToColor(hex: String): Color {
-            return Color(android.graphics.Color.parseColor(hex))
-        }
+        private fun hexToColor(hex: String): Color = Color(android.graphics.Color.parseColor(hex))
     }
 }
