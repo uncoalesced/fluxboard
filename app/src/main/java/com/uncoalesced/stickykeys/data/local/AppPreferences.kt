@@ -11,28 +11,37 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AppPreferences @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
-    private val prefs: SharedPreferences = context.getSharedPreferences(
-        "app_preferences",
-        Context.MODE_PRIVATE
-    )
+class AppPreferences
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+    ) {
+        private val prefs: SharedPreferences =
+            context.getSharedPreferences(
+                "app_preferences",
+                Context.MODE_PRIVATE,
+            )
 
-    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        when (key) {
-            "default_export_format" -> _defaultExportFormat.value = prefs.getString("default_export_format", "image/webp") ?: "image/webp"
+        private val listener =
+            SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                when (key) {
+                    "default_export_format" ->
+                        _defaultExportFormat.value =
+                            prefs.getString("default_export_format", "image/webp") ?: "image/webp"
+                }
+            }
+
+        private val _defaultExportFormat =
+            MutableStateFlow(
+                prefs.getString("default_export_format", "image/webp") ?: "image/webp",
+            )
+        val defaultExportFormat: StateFlow<String> = _defaultExportFormat.asStateFlow()
+
+        init {
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+        }
+
+        fun setDefaultExportFormat(format: String) {
+            prefs.edit().putString("default_export_format", format).apply()
         }
     }
-
-    private val _defaultExportFormat = MutableStateFlow(prefs.getString("default_export_format", "image/webp") ?: "image/webp")
-    val defaultExportFormat: StateFlow<String> = _defaultExportFormat.asStateFlow()
-
-    init {
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-    }
-
-    fun setDefaultExportFormat(format: String) {
-        prefs.edit().putString("default_export_format", format).apply()
-    }
-}
