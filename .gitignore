@@ -50,3 +50,13 @@ Thumbs.db
 .agents/
 AGENTS.md
 CLAUDE.md
+# Python (dictionary-tools/ build pipeline)
+__pycache__/
+*.pyc
+
+AGENTS.md
+ARCHITECTURE.md
+AUTHORS.md
+CLAUDE.md
+build/
+*/build/
