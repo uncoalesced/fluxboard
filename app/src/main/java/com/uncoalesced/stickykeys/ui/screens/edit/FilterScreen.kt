@@ -1,9 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
-import androidx.compose.ui.res.stringResource
-import com.uncoalesced.stickykeys.R
-
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
@@ -20,10 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix as ComposeColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,19 +28,20 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import androidx.compose.ui.graphics.ColorMatrix as ComposeColorMatrix
 
 @Composable
 fun FilterScreen(
     uriString: String,
     onApplyFilter: (String) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     var brightness by remember { mutableFloatStateOf(0f) } // -100 to 100
-    var contrast by remember { mutableFloatStateOf(1f) }   // 0 to 2
+    var contrast by remember { mutableFloatStateOf(1f) } // 0 to 2
     var saturation by remember { mutableFloatStateOf(1f) } // 0 to 2
 
     LaunchedEffect(uriString) {
@@ -66,39 +64,74 @@ fun FilterScreen(
     }
 
     // Build Compose ColorMatrix for real-time rendering
-    val composeColorMatrix = remember(brightness, contrast, saturation) {
-        val cm = ColorMatrix()
-        // Saturation
-        val satCm = ColorMatrix()
-        satCm.setSaturation(saturation)
-        cm.postConcat(satCm)
+    val composeColorMatrix =
+        remember(brightness, contrast, saturation) {
+            val cm = ColorMatrix()
+            // Saturation
+            val satCm = ColorMatrix()
+            satCm.setSaturation(saturation)
+            cm.postConcat(satCm)
 
-        // Contrast
-        val scale = contrast
-        val translate = (-0.5f * scale + 0.5f) * 255f
-        val conCm = ColorMatrix(
-            floatArrayOf(
-                scale, 0f, 0f, 0f, translate,
-                0f, scale, 0f, 0f, translate,
-                0f, 0f, scale, 0f, translate,
-                0f, 0f, 0f, 1f, 0f
-            )
-        )
-        cm.postConcat(conCm)
+            // Contrast
+            val scale = contrast
+            val translate = (-0.5f * scale + 0.5f) * 255f
+            val conCm =
+                ColorMatrix(
+                    floatArrayOf(
+                        scale,
+                        0f,
+                        0f,
+                        0f,
+                        translate,
+                        0f,
+                        scale,
+                        0f,
+                        0f,
+                        translate,
+                        0f,
+                        0f,
+                        scale,
+                        0f,
+                        translate,
+                        0f,
+                        0f,
+                        0f,
+                        1f,
+                        0f,
+                    ),
+                )
+            cm.postConcat(conCm)
 
-        // Brightness
-        val brightCm = ColorMatrix(
-            floatArrayOf(
-                1f, 0f, 0f, 0f, brightness,
-                0f, 1f, 0f, 0f, brightness,
-                0f, 0f, 1f, 0f, brightness,
-                0f, 0f, 0f, 1f, 0f
-            )
-        )
-        cm.postConcat(brightCm)
+            // Brightness
+            val brightCm =
+                ColorMatrix(
+                    floatArrayOf(
+                        1f,
+                        0f,
+                        0f,
+                        0f,
+                        brightness,
+                        0f,
+                        1f,
+                        0f,
+                        0f,
+                        brightness,
+                        0f,
+                        0f,
+                        1f,
+                        0f,
+                        brightness,
+                        0f,
+                        0f,
+                        0f,
+                        1f,
+                        0f,
+                    ),
+                )
+            cm.postConcat(brightCm)
 
-        ComposeColorMatrix(cm.array)
-    }
+            ComposeColorMatrix(cm.array)
+        }
 
     Scaffold(
         topBar = {
@@ -106,53 +139,71 @@ fun FilterScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.text_adjust_filters)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) {
+                        Text(
+                            stringResource(R.string.text_cancel),
+                            color = StickyKeysTheme.colors.error,
+                        )
+                    }
                 },
                 actions = {
                     TextButton(onClick = {
                         coroutineScope.launch {
-                            val cachedUri = withContext(Dispatchers.IO) {
-                                val bmp = originalBitmap!!
-                                val resultBmp = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
-                                val canvas = Canvas(resultBmp)
-                                val paint = Paint()
-                                paint.colorFilter = ColorMatrixColorFilter(composeColorMatrix.values)
-                                canvas.drawBitmap(bmp, 0f, 0f, paint)
+                            val cachedUri =
+                                withContext(Dispatchers.IO) {
+                                    val bmp = originalBitmap!!
+                                    val resultBmp =
+                                        Bitmap.createBitmap(
+                                            bmp.width,
+                                            bmp.height,
+                                            Bitmap.Config.ARGB_8888,
+                                        )
+                                    val canvas = Canvas(resultBmp)
+                                    val paint = Paint()
+                                    paint.colorFilter =
+                                        ColorMatrixColorFilter(composeColorMatrix.values)
+                                    canvas.drawBitmap(bmp, 0f, 0f, paint)
 
-                                val cacheFile = File(context.cacheDir, "filter_${UUID.randomUUID()}.png")
-                                FileOutputStream(cacheFile).use { out ->
-                                    resultBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                    val cacheFile =
+                                        File(context.cacheDir, "filter_${UUID.randomUUID()}.png")
+                                    FileOutputStream(cacheFile).use { out ->
+                                        resultBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                    }
+                                    Uri.fromFile(cacheFile).toString()
                                 }
-                                Uri.fromFile(cacheFile).toString()
-                            }
                             onApplyFilter(cachedUri)
                         }
                     }) {
-                        Text(stringResource(R.string.text_apply), color = StickyKeysTheme.colors.primary)
+                        Text(
+                            stringResource(R.string.text_apply),
+                            color = StickyKeysTheme.colors.primary,
+                        )
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(StickyKeysTheme.spacing.md),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(StickyKeysTheme.spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(Color.Black, StickyKeysTheme.shapes.medium),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color.Black, StickyKeysTheme.shapes.medium),
+                contentAlignment = Alignment.Center,
             ) {
                 Image(
                     bitmap = originalBitmap!!.asImageBitmap(),
                     contentDescription = stringResource(R.string.desc_filter_preview),
                     colorFilter = ColorFilter.colorMatrix(composeColorMatrix),
-                    modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm)
+                    modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm),
                 )
             }
 
@@ -161,31 +212,43 @@ fun FilterScreen(
             // Sliders Controls
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = StickyKeysTheme.colors.surfaceVariant)
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = StickyKeysTheme.colors.surfaceVariant,
+                    ),
             ) {
                 Column(
                     modifier = Modifier.padding(StickyKeysTheme.spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
                 ) {
-                    Text("Brightness (${brightness.toInt()})", style = StickyKeysTheme.typography.bodyMedium)
+                    Text(
+                        "Brightness (${brightness.toInt()})",
+                        style = StickyKeysTheme.typography.bodyMedium,
+                    )
                     Slider(
                         value = brightness,
                         onValueChange = { brightness = it },
-                        valueRange = -100f..100f
+                        valueRange = -100f..100f,
                     )
 
-                    Text("Contrast (${String.format("%.2f", contrast)})", style = StickyKeysTheme.typography.bodyMedium)
+                    Text(
+                        "Contrast (${String.format("%.2f", contrast)})",
+                        style = StickyKeysTheme.typography.bodyMedium,
+                    )
                     Slider(
                         value = contrast,
                         onValueChange = { contrast = it },
-                        valueRange = 0f..2f
+                        valueRange = 0f..2f,
                     )
 
-                    Text("Saturation (${String.format("%.2f", saturation)})", style = StickyKeysTheme.typography.bodyMedium)
+                    Text(
+                        "Saturation (${String.format("%.2f", saturation)})",
+                        style = StickyKeysTheme.typography.bodyMedium,
+                    )
                     Slider(
                         value = saturation,
                         onValueChange = { saturation = it },
-                        valueRange = 0f..2f
+                        valueRange = 0f..2f,
                     )
                 }
             }
