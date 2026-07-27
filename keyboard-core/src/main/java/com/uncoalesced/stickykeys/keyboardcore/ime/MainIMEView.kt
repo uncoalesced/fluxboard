@@ -19,33 +19,43 @@ fun MainIMEView(
     stickerIMEViewModel: StickerIMEViewModel,
     clipboardIMEViewModel: ClipboardIMEViewModel,
     fileManager: StickerFileManager,
-    onStickerClick: (Sticker) -> Unit
+    onStickerClick: (Sticker) -> Unit,
 ) {
     var currentAppMode by remember { mutableStateOf(AppMode.TYPING) }
     val activeTheme by typingViewModel.activeTheme.collectAsState()
 
     // Intercept switchMode requests
-    val interceptingController = object : KeyboardController {
-        override fun commitText(text: String) = keyboardController.commitText(text)
-        override fun sendDelete() = keyboardController.sendDelete()
-        override fun sendEnter() = keyboardController.sendEnter()
-        override fun handleEditorAction() = keyboardController.handleEditorAction()
-        override fun switchMode(mode: AppMode) {
-            currentAppMode = mode
-            keyboardController.switchMode(mode)
+    val interceptingController =
+        object : KeyboardController {
+            override fun commitText(text: String) = keyboardController.commitText(text)
+
+            override fun replaceTextBeforeCursor(
+                charCount: Int,
+                replacement: String,
+            ) = keyboardController.replaceTextBeforeCursor(charCount, replacement)
+
+            override fun sendDelete() = keyboardController.sendDelete()
+
+            override fun sendEnter() = keyboardController.sendEnter()
+
+            override fun handleEditorAction() = keyboardController.handleEditorAction()
+
+            override fun switchMode(mode: AppMode) {
+                currentAppMode = mode
+                keyboardController.switchMode(mode)
+            }
         }
-    }
 
     StickyKeysTheme(
         darkTheme = activeTheme?.isLight?.not() ?: true,
         typeScale = activeTheme?.typeScale ?: TypeScale.MEDIUM,
-        customColors = activeTheme?.colors
+        customColors = activeTheme?.colors,
     ) {
         when (currentAppMode) {
             AppMode.TYPING -> {
                 TypingKeyboardView(
                     keyboardController = interceptingController,
-                    typingViewModel = typingViewModel
+                    typingViewModel = typingViewModel,
                 )
             }
             AppMode.STICKERS -> {
@@ -59,7 +69,7 @@ fun MainIMEView(
                     },
                     onBackToKeyboard = {
                         interceptingController.switchMode(AppMode.TYPING)
-                    }
+                    },
                 )
             }
             AppMode.CLIPBOARD -> {
@@ -71,7 +81,7 @@ fun MainIMEView(
                     },
                     onBackToKeyboard = {
                         interceptingController.switchMode(AppMode.TYPING)
-                    }
+                    },
                 )
             }
         }
