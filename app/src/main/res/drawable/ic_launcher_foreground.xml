@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- FluxBoard mark: a keyboard slab with a flux slash through it. Drawn inside
+     the 72dp adaptive-icon safe zone (centred 108dp canvas). Uses currentColor
+     via fillColor so the same vector serves the monochrome themed-icon layer. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- keyboard body -->
+    <path
+        android:fillColor="#E9EDDE"
+        android:pathData="M24,40 L84,40 A6,6 0 0 1 90,46 L90,74 A6,6 0 0 1 84,80 L24,80 A6,6 0 0 1 18,74 L18,46 A6,6 0 0 1 24,40 Z" />
+
+    <!-- key row 1 -->
+    <path
+        android:fillColor="#3D3B30"
+        android:pathData="M26,48 L34,48 L34,56 L26,56 Z M38,48 L46,48 L46,56 L38,56 Z M50,48 L58,48 L58,56 L50,56 Z M62,48 L70,48 L70,56 L62,56 Z M74,48 L82,48 L82,56 L74,56 Z" />
+
+    <!-- space bar -->
+    <path
+        android:fillColor="#3D3B30"
+        android:pathData="M38,62 L70,62 L70,72 L38,72 Z" />
+
+    <!-- flux slash: the accent stroke -->
+    <path
+        android:fillColor="#5C80BC"
+        android:pathData="M62,20 L44,52 L56,52 L46,88 L70,50 L57,50 Z" />
+</vector>

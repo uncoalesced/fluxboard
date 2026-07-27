@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- Themed-icon layer (Android 13+). Single flat silhouette, no colour: the
+     launcher tints it to the user's wallpaper palette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108"
+    android:tint="#FFFFFF">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,40 L84,40 A6,6 0 0 1 90,46 L90,74 A6,6 0 0 1 84,80 L24,80 A6,6 0 0 1 18,74 L18,46 A6,6 0 0 1 24,40 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,20 L44,52 L56,52 L46,88 L70,50 L57,50 Z" />
+</vector>
