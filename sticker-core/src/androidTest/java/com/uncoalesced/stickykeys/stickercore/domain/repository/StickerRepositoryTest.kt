@@ -27,7 +27,6 @@ import java.io.File
  */
 @RunWith(AndroidJUnit4::class)
 class StickerRepositoryTest {
-
     private lateinit var context: Context
     private lateinit var database: StickyKeysDatabase
     private lateinit var fileManager: StickerFileManager
@@ -36,16 +35,19 @@ class StickerRepositoryTest {
     @Before
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
-        database = Room.inMemoryDatabaseBuilder(context, StickyKeysDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+        database =
+            Room
+                .inMemoryDatabaseBuilder(context, StickyKeysDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
         fileManager = StickerFileManager(context)
-        repository = StickerRepositoryImpl(
-            database.stickerDao(),
-            database.packDao(),
-            database.categoryDao(),
-            fileManager
-        )
+        repository =
+            StickerRepositoryImpl(
+                database.stickerDao(),
+                database.packDao(),
+                database.categoryDao(),
+                fileManager,
+            )
     }
 
     @After
@@ -59,9 +61,9 @@ class StickerRepositoryTest {
     private fun newSticker(
         id: String,
         categoryId: String? = null,
-        isFavourite: Boolean = false
-    ): Sticker {
-        return Sticker(
+        isFavourite: Boolean = false,
+    ): Sticker =
+        Sticker(
             id = id,
             packId = null,
             categoryId = categoryId,
@@ -69,60 +71,70 @@ class StickerRepositoryTest {
             createdAt = System.currentTimeMillis(),
             mimeType = "image/webp",
             file = fileManager.getStickerFile(id),
-            thumbnailFile = fileManager.getThumbnailFile(id)
+            thumbnailFile = fileManager.getThumbnailFile(id),
         )
-    }
 
     @Test
-    fun insertQueryDeleteSticker_endToEnd() = runBlocking {
-        val imageBytes = byteArrayOf(1, 2, 3, 4)
-        val thumbBytes = byteArrayOf(5, 6)
+    fun insertQueryDeleteSticker_endToEnd() =
+        runBlocking {
+            val imageBytes = byteArrayOf(1, 2, 3, 4)
+            val thumbBytes = byteArrayOf(5, 6)
 
-        repository.saveSticker(newSticker("test-1"), imageBytes, thumbBytes)
+            repository.saveSticker(newSticker("test-1"), imageBytes, thumbBytes)
 
-        // DB row is queryable
-        val all = repository.getAllStickers().first()
-        assertEquals(1, all.size)
-        assertEquals("test-1", all[0].id)
+            // DB row is queryable
+            val all = repository.getAllStickers().first()
+            assertEquals(1, all.size)
+            assertEquals("test-1", all[0].id)
 
-        // Bytes actually landed on disk
-        assertTrue(all[0].file.exists())
-        assertTrue(all[0].thumbnailFile.exists())
-        assertEquals(imageBytes.toList(), all[0].file.readBytes().toList())
+            // Bytes actually landed on disk
+            assertTrue(all[0].file.exists())
+            assertTrue(all[0].thumbnailFile.exists())
+            assertEquals(imageBytes.toList(), all[0].file.readBytes().toList())
 
-        // Delete removes both the row and the files
-        repository.deleteSticker("test-1")
-        assertTrue(repository.getAllStickers().first().isEmpty())
-        assertFalse(fileManager.getStickerFile("test-1").exists())
-        assertFalse(fileManager.getThumbnailFile("test-1").exists())
-    }
-
-    @Test
-    fun favouritesQueryableIndependently() = runBlocking {
-        repository.saveSticker(newSticker("fav-1", isFavourite = true), byteArrayOf(1), byteArrayOf(1))
-        repository.saveSticker(newSticker("plain-1"), byteArrayOf(2), byteArrayOf(2))
-
-        val favourites = repository.getFavouriteStickers().first()
-        assertEquals(listOf("fav-1"), favourites.map { it.id })
-
-        // Toggling updates the favourites query without touching the other sticker
-        repository.toggleFavourite("plain-1")
-        val favouritesAfter = repository.getFavouriteStickers().first()
-        assertEquals(setOf("fav-1", "plain-1"), favouritesAfter.map { it.id }.toSet())
-    }
+            // Delete removes both the row and the files
+            repository.deleteSticker("test-1")
+            assertTrue(repository.getAllStickers().first().isEmpty())
+            assertFalse(fileManager.getStickerFile("test-1").exists())
+            assertFalse(fileManager.getThumbnailFile("test-1").exists())
+        }
 
     @Test
-    fun categoriesQueryableIndependentlyOfPacks() = runBlocking {
-        val category = Category(id = "cat-1", name = "Memes", sortOrder = 0)
-        repository.saveCategory(category)
+    fun favouritesQueryableIndependently() =
+        runBlocking {
+            repository.saveSticker(
+                newSticker("fav-1", isFavourite = true),
+                byteArrayOf(1),
+                byteArrayOf(1),
+            )
+            repository.saveSticker(newSticker("plain-1"), byteArrayOf(2), byteArrayOf(2))
 
-        repository.saveSticker(newSticker("in-cat", categoryId = "cat-1"), byteArrayOf(1), byteArrayOf(1))
-        repository.saveSticker(newSticker("no-cat"), byteArrayOf(2), byteArrayOf(2))
+            val favourites = repository.getFavouriteStickers().first()
+            assertEquals(listOf("fav-1"), favourites.map { it.id })
 
-        val inCategory = repository.getStickersByCategory("cat-1").first()
-        assertEquals(listOf("in-cat"), inCategory.map { it.id })
+            // Toggling updates the favourites query without touching the other sticker
+            repository.toggleFavourite("plain-1")
+            val favouritesAfter = repository.getFavouriteStickers().first()
+            assertEquals(setOf("fav-1", "plain-1"), favouritesAfter.map { it.id }.toSet())
+        }
 
-        // Neither sticker belongs to any pack; category query worked regardless
-        assertEquals(1, repository.getAllCategories().first().size)
-    }
+    @Test
+    fun categoriesQueryableIndependentlyOfPacks() =
+        runBlocking {
+            val category = Category(id = "cat-1", name = "Memes", sortOrder = 0)
+            repository.saveCategory(category)
+
+            repository.saveSticker(
+                newSticker("in-cat", categoryId = "cat-1"),
+                byteArrayOf(1),
+                byteArrayOf(1),
+            )
+            repository.saveSticker(newSticker("no-cat"), byteArrayOf(2), byteArrayOf(2))
+
+            val inCategory = repository.getStickersByCategory("cat-1").first()
+            assertEquals(listOf("in-cat"), inCategory.map { it.id })
+
+            // Neither sticker belongs to any pack; category query worked regardless
+            assertEquals(1, repository.getAllCategories().first().size)
+        }
 }
