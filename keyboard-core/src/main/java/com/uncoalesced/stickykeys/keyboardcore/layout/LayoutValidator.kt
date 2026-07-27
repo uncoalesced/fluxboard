@@ -4,16 +4,26 @@ package com.uncoalesced.stickykeys.keyboardcore.layout
 /** Result of validating a keyboard layout configuration. */
 sealed interface LayoutValidationResult {
     data object Valid : LayoutValidationResult
-    data class Invalid(val reasons: List<String>) : LayoutValidationResult
+
+    data class Invalid(
+        val reasons: List<String>,
+    ) : LayoutValidationResult
 }
 
 /** Validates a KeyboardLayoutConfig against structural and usability rules. */
 object LayoutValidator {
-
     private const val MAX_ROWS = 5
     private const val MAX_KEYS_PER_ROW = 14
 
-    private val requiredOutputs = listOf("SPACE", "DEL", "ENTER")
+    /**
+     * Outputs a layout cannot be saved without. The bar is reachability: losing any of
+     * these makes a whole class of input unreachable with no way back from the keyboard
+     * itself. SYMBOLS is on the list because the symbol/numeric planes are only ever
+     * entered through it -- a letters-only layout that drops it soft-bricks every digit
+     * and punctuation mark. SHIFT is deliberately not on the list: without it text is
+     * still fully typeable, just always lowercase.
+     */
+    private val requiredOutputs = listOf("SPACE", "DEL", "ENTER", "SYMBOLS")
 
     fun validate(config: KeyboardLayoutConfig): LayoutValidationResult {
         val errors = mutableListOf<String>()
