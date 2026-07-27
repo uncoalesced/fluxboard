@@ -7,7 +7,8 @@
     <application>
         <service
             android:name=".ime.StickyKeysIME"
-            android:label="Sticky Keys"
+            android:label="FluxBoard"
+            android:icon="@drawable/ic_keyboard_flux"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
             <intent-filter>
