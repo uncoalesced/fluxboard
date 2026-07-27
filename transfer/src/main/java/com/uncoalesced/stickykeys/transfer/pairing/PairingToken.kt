@@ -7,7 +7,7 @@ data class PairingToken(
     val publicKeyBase64: String,
     val ip: String,
     val port: Int,
-    val timestamp: Long
+    val timestamp: Long,
 ) {
     fun toJsonString(): String {
         val json = JSONObject()
@@ -19,18 +19,17 @@ data class PairingToken(
     }
 
     companion object {
-        fun fromJsonString(jsonString: String): PairingToken? {
-            return try {
+        fun fromJsonString(jsonString: String): PairingToken? =
+            try {
                 val json = JSONObject(jsonString)
                 PairingToken(
                     publicKeyBase64 = json.getString("pk"),
                     ip = json.getString("ip"),
                     port = json.getInt("port"),
-                    timestamp = json.getLong("ts")
+                    timestamp = json.getLong("ts"),
                 )
             } catch (e: Exception) {
                 null
             }
-        }
     }
 }
