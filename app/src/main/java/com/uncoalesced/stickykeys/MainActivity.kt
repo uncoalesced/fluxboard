@@ -18,7 +18,6 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
     private var sharedImageUri by mutableStateOf<String?>(null)
     private var screenshotObserver: ScreenshotObserver? = null
 
