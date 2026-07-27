@@ -1,9 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.video
 
-import androidx.compose.ui.res.stringResource
-import com.uncoalesced.stickykeys.R
-
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -19,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,7 +30,7 @@ private const val MAX_TRIM_DURATION_MS = 10_000L // 10 seconds ceiling
 fun VideoTrimScreen(
     videoUriString: String,
     onTrimComplete: (videoUriString: String, startMs: Long, endMs: Long) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
     val videoUri = remember(videoUriString) { Uri.parse(videoUriString) }
@@ -47,7 +46,10 @@ fun VideoTrimScreen(
             val retriever = MediaMetadataRetriever()
             try {
                 retriever.setDataSource(context, videoUri)
-                val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val durationStr =
+                    retriever.extractMetadata(
+                        MediaMetadataRetriever.METADATA_KEY_DURATION,
+                    )
                 val duration = durationStr?.toLongOrNull() ?: 5000L
                 totalDurationMs = duration
 
@@ -59,7 +61,11 @@ fun VideoTrimScreen(
                 val stepUs = (duration * 1000L) / 5
                 for (i in 0 until 5) {
                     val frameTimeUs = i * stepUs
-                    val bmp = retriever.getFrameAtTime(frameTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    val bmp =
+                        retriever.getFrameAtTime(
+                            frameTimeUs,
+                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        )
                     if (bmp != null) {
                         frameList.add(Bitmap.createScaledBitmap(bmp, 120, 120, true))
                     }
@@ -67,7 +73,11 @@ fun VideoTrimScreen(
                 keyframes = frameList
 
                 // Initial preview frame
-                val firstFrame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val firstFrame =
+                    retriever.getFrameAtTime(
+                        0,
+                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    )
                 currentPreviewFrame = firstFrame
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -84,7 +94,11 @@ fun VideoTrimScreen(
             try {
                 retriever.setDataSource(context, videoUri)
                 val frameUs = (rangeValues.start * 1000f).toLong()
-                val frame = retriever.getFrameAtTime(frameUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val frame =
+                    retriever.getFrameAtTime(
+                        frameUs,
+                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    )
                 if (frame != null) {
                     currentPreviewFrame = frame
                 }
@@ -112,39 +126,49 @@ fun VideoTrimScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.text_trim_video_max_10s)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) {
+                        Text(
+                            stringResource(R.string.text_cancel),
+                            color = StickyKeysTheme.colors.error,
+                        )
+                    }
                 },
                 actions = {
                     TextButton(onClick = {
                         onTrimComplete(videoUriString, startMs, endMs)
                     }) {
-                        Text(stringResource(R.string.text_next), color = StickyKeysTheme.colors.primary)
+                        Text(
+                            stringResource(R.string.text_next),
+                            color = StickyKeysTheme.colors.primary,
+                        )
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.Black)
-                .padding(StickyKeysTheme.spacing.md),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(Color.Black)
+                    .padding(StickyKeysTheme.spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md)
+            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md),
         ) {
             // Live Frame Preview
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
             ) {
                 if (currentPreviewFrame != null) {
                     Image(
                         bitmap = currentPreviewFrame!!.asImageBitmap(),
                         contentDescription = stringResource(R.string.desc_trim_preview_frame),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 } else {
                     CircularProgressIndicator()
@@ -154,18 +178,20 @@ fun VideoTrimScreen(
             // Keyframe strip preview
             if (keyframes.isNotEmpty()) {
                 LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(60.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     items(keyframes) { bmp ->
                         Image(
                             bitmap = bmp.asImageBitmap(),
                             contentDescription = stringResource(R.string.desc_keyframe),
-                            modifier = Modifier
-                                .width(60.dp)
-                                .fillMaxHeight()
+                            modifier =
+                                Modifier
+                                    .width(60.dp)
+                                    .fillMaxHeight(),
                         )
                     }
                 }
@@ -174,22 +200,29 @@ fun VideoTrimScreen(
             // Duration Details
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     "Start: ${startMs / 1000f}s",
                     style = StickyKeysTheme.typography.bodyMedium,
-                    color = Color.White
+                    color = Color.White,
                 )
                 Text(
                     "Length: ${selectedDurationMs / 1000f}s / 10s max",
                     style = StickyKeysTheme.typography.bodyMedium,
-                    color = if (selectedDurationMs > MAX_TRIM_DURATION_MS) StickyKeysTheme.colors.error else Color.LightGray
+                    color =
+                        if (selectedDurationMs >
+                            MAX_TRIM_DURATION_MS
+                        ) {
+                            StickyKeysTheme.colors.error
+                        } else {
+                            Color.LightGray
+                        },
                 )
                 Text(
                     "End: ${endMs / 1000f}s",
                     style = StickyKeysTheme.typography.bodyMedium,
-                    color = Color.White
+                    color = Color.White,
                 )
             }
 
@@ -210,7 +243,7 @@ fun VideoTrimScreen(
                     rangeValues = start..end
                 },
                 valueRange = 0f..totalDurationMs.toFloat(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
