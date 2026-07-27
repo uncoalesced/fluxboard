@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Engineered by uncoalesced -->
 <resources>
-    <style name="Theme.StickyKeys" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Dark by default: the pre-Compose window uses the Ink base so a new user
+         never sees a light flash before Compose draws the dark theme. -->
+    <style name="Theme.StickyKeys" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF3D3B30</item>
+        <item name="android:statusBarColor">#FF3D3B30</item>
+        <item name="android:navigationBarColor">#FF3D3B30</item>
+    </style>
 </resources>
