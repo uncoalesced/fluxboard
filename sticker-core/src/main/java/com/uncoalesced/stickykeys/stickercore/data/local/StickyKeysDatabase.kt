@@ -13,10 +13,12 @@ import com.uncoalesced.stickykeys.stickercore.data.local.entity.StickerEntity
 @Database(
     entities = [StickerEntity::class, PackEntity::class, CategoryEntity::class],
     version = 1,
-    exportSchema = true
+    exportSchema = true,
 )
 abstract class StickyKeysDatabase : RoomDatabase() {
     abstract fun stickerDao(): StickerDao
+
     abstract fun packDao(): PackDao
+
     abstract fun categoryDao(): CategoryDao
 }
