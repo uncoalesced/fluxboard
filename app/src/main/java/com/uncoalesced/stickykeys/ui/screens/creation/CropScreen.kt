@@ -1,9 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.creation
 
-import androidx.compose.ui.res.stringResource
-import com.uncoalesced.stickykeys.R
-
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -21,13 +18,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -36,23 +34,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import com.uncoalesced.stickykeys.stickercore.segmentation.SegmentationEngine
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
-
-@HiltViewModel
-class CropViewModel @Inject constructor(
-    val engine: SegmentationEngine
-) : ViewModel()
-
 @Composable
 fun CropScreen(
     uriString: String,
-    onCropComplete: (String, String) -> Unit,
+    onCropComplete: (String) -> Unit,
     onCancel: () -> Unit,
-    viewModel: CropViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -63,16 +49,17 @@ fun CropScreen(
         withContext(Dispatchers.IO) {
             try {
                 val uri = Uri.parse(uriString)
-                val bmp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                        decoder.isMutableRequired = true
+                val bmp =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        val source = ImageDecoder.createSource(context.contentResolver, uri)
+                        ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                            decoder.isMutableRequired = true
+                        }
+                    } else {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                     }
-                } else {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }
                 bitmap = bmp
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -82,10 +69,16 @@ fun CropScreen(
 
     if (bitmap == null || isSegmenting) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 CircularProgressIndicator()
                 if (isSegmenting) {
-                    Text(stringResource(R.string.text_segmenting_subject), style = StickyKeysTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.text_segmenting_subject),
+                        style = StickyKeysTheme.typography.bodyMedium,
+                    )
                 }
             }
         }
@@ -102,55 +95,56 @@ fun CropScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.text_crop_image)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) {
+                        Text(
+                            stringResource(R.string.text_cancel),
+                            color = StickyKeysTheme.colors.error,
+                        )
+                    }
                 },
                 actions = {
                     TextButton(onClick = {
                         if (isSegmenting) return@TextButton
                         isSegmenting = true
                         coroutineScope.launch {
-                            val (origUri, segUri) = withContext(Dispatchers.IO) {
-                                val cacheFile = File(context.cacheDir, "crop_${UUID.randomUUID()}.png")
-                                FileOutputStream(cacheFile).use { out ->
-                                    bitmap!!.compress(Bitmap.CompressFormat.PNG, 100, out)
+                            // v1 has no automatic segmentation: save the crop and hand
+                            // straight to the manual eraser.
+                            val croppedUri =
+                                withContext(Dispatchers.IO) {
+                                    val cacheFile =
+                                        File(context.cacheDir, "crop_${UUID.randomUUID()}.png")
+                                    FileOutputStream(cacheFile).use { out ->
+                                        bitmap!!.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                    }
+                                    Uri.fromFile(cacheFile).toString()
                                 }
-                                val origPath = Uri.fromFile(cacheFile).toString()
-
-                                // Run segmentation
-                                val segResult = viewModel.engine.segmentSubject(context, bitmap!!)
-                                val segBmp = segResult.getOrDefault(bitmap!!)
-
-                                val segCacheFile = File(context.cacheDir, "seg_${UUID.randomUUID()}.png")
-                                FileOutputStream(segCacheFile).use { out ->
-                                    segBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                }
-                                val segPath = Uri.fromFile(segCacheFile).toString()
-
-                                Pair(origPath, segPath)
-                            }
                             isSegmenting = false
-                            onCropComplete(origUri, segUri)
+                            onCropComplete(croppedUri)
                         }
                     }) {
-                        Text(stringResource(R.string.text_next), color = StickyKeysTheme.colors.primary)
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.Black)
-                .onSizeChanged { containerSize = it }
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(0.5f, 5f)
-                        offset += pan
+                        Text(
+                            stringResource(R.string.text_next),
+                            color = StickyKeysTheme.colors.primary,
+                        )
                     }
                 },
-            contentAlignment = Alignment.Center
+            )
+        },
+    ) { paddingValues ->
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(Color.Black)
+                    .onSizeChanged { containerSize = it }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(0.5f, 5f)
+                            offset += pan
+                        }
+                    },
+            contentAlignment = Alignment.Center,
         ) {
             val imgBitmap = bitmap!!.asImageBitmap()
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -168,19 +162,22 @@ fun CropScreen(
                 }
 
                 // Draw overlay mask
-                val path = Path().apply {
-                    addRect(Rect(0f, 0f, size.width, size.height))
-                    addRect(Rect(cropOffset, Size(cropSize, cropSize)))
-                    fillType = PathFillType.EvenOdd
-                }
+                val path =
+                    Path().apply {
+                        addRect(Rect(0f, 0f, size.width, size.height))
+                        addRect(Rect(cropOffset, Size(cropSize, cropSize)))
+                        fillType = PathFillType.EvenOdd
+                    }
                 drawPath(path, Color.Black.copy(alpha = 0.6f))
-                
+
                 // Draw crop box border
                 drawRect(
                     color = Color.White,
                     topLeft = cropOffset,
                     size = Size(cropSize, cropSize),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                    style =
+                        androidx.compose.ui.graphics.drawscope
+                            .Stroke(width = 2.dp.toPx()),
                 )
             }
         }
