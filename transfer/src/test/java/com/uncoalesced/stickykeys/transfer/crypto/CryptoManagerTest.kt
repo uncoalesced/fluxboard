@@ -1,7 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.transfer.crypto
 
-import android.os.Build
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
@@ -13,7 +12,6 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 class CryptoManagerTest {
-
     @Test
     fun `ephemeral key pair generates a valid base64 public key`() {
         val cryptoManager = CryptoManager()
