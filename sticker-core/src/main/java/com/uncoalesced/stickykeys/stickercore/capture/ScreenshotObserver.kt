@@ -21,29 +21,34 @@ import kotlinx.coroutines.flow.asSharedFlow
  * remains the fallback path.
  */
 class ScreenshotObserver(
-    private val context: Context
+    private val context: Context,
 ) {
     private val _screenshots = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
     val screenshots = _screenshots.asSharedFlow()
 
-    private val contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-        override fun onChange(selfChange: Boolean, uri: Uri?) {
-            super.onChange(selfChange, uri)
-            uri?.let {
-                if (isScreenshot(it)) {
-                    _screenshots.tryEmit(it)
+    private val contentObserver =
+        object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(
+                selfChange: Boolean,
+                uri: Uri?,
+            ) {
+                super.onChange(selfChange, uri)
+                uri?.let {
+                    if (isScreenshot(it)) {
+                        _screenshots.tryEmit(it)
+                    }
                 }
             }
         }
-    }
 
     private fun isScreenshot(uri: Uri): Boolean {
-        val projection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            arrayOf(MediaStore.Images.Media.RELATIVE_PATH, MediaStore.Images.Media.DISPLAY_NAME)
-        } else {
-            @Suppress("DEPRECATION")
-            arrayOf(MediaStore.Images.Media.DATA, MediaStore.Images.Media.DISPLAY_NAME)
-        }
+        val projection =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                arrayOf(MediaStore.Images.Media.RELATIVE_PATH, MediaStore.Images.Media.DISPLAY_NAME)
+            } else {
+                @Suppress("DEPRECATION")
+                arrayOf(MediaStore.Images.Media.DATA, MediaStore.Images.Media.DISPLAY_NAME)
+            }
         return try {
             context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
                 if (!cursor.moveToFirst()) return false
@@ -62,7 +67,7 @@ class ScreenshotObserver(
         context.contentResolver.registerContentObserver(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             true,
-            contentObserver
+            contentObserver,
         )
     }
 
