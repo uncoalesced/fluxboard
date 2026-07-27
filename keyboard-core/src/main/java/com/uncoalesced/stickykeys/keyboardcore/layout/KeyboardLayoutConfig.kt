@@ -12,7 +12,7 @@ data class KeyDefinition(
     val id: String,
     val output: String,
     val displayLabel: String? = null,
-    val weight: Float = 1.0f
+    val weight: Float = 1.0f,
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
@@ -26,14 +26,21 @@ data class KeyDefinition(
     }
 
     companion object {
-        fun fromJson(json: JSONObject): KeyDefinition {
-            return KeyDefinition(
+        fun fromJson(json: JSONObject): KeyDefinition =
+            KeyDefinition(
                 id = json.getString("id"),
                 output = json.getString("output"),
-                displayLabel = if (json.has("displayLabel")) json.getString("displayLabel") else null,
-                weight = json.optDouble("weight", 1.0).toFloat()
+                displayLabel =
+                    if (json.has(
+                            "displayLabel",
+                        )
+                    ) {
+                        json.getString("displayLabel")
+                    } else {
+                        null
+                    },
+                weight = json.optDouble("weight", 1.0).toFloat(),
             )
-        }
     }
 }
 
@@ -44,7 +51,7 @@ data class KeyDefinition(
 data class KeyboardLayoutConfig(
     val id: String,
     val name: String,
-    val rows: List<List<KeyDefinition>>
+    val rows: List<List<KeyDefinition>>,
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
@@ -78,7 +85,7 @@ data class KeyboardLayoutConfig(
             return KeyboardLayoutConfig(
                 id = json.getString("id"),
                 name = json.getString("name"),
-                rows = rows
+                rows = rows,
             )
         }
 
@@ -86,24 +93,27 @@ data class KeyboardLayoutConfig(
         fun fromLegacyLayout(
             id: String,
             name: String,
-            legacyRows: List<List<String>>
+            legacyRows: List<List<String>>,
         ): KeyboardLayoutConfig {
-            val rows = legacyRows.map { row ->
-                row.map { label ->
-                    val weight = when (label) {
-                        "SPACE" -> 4f
-                        "ENTER", "SHIFT", "DEL", "SYMBOLS", "ABC",
-                        "STICKERS", "SYMBOLS_SHIFT" -> 1.5f
-                        else -> 1f
+            val rows =
+                legacyRows.map { row ->
+                    row.map { label ->
+                        val weight =
+                            when (label) {
+                                "SPACE" -> 4f
+                                "ENTER", "SHIFT", "DEL", "SYMBOLS", "ABC",
+                                "STICKERS", "SYMBOLS_SHIFT",
+                                -> 1.5f
+                                else -> 1f
+                            }
+                        KeyDefinition(
+                            id = "key_${label.lowercase().replace(" ", "_")}",
+                            output = label,
+                            displayLabel = null,
+                            weight = weight,
+                        )
                     }
-                    KeyDefinition(
-                        id = "key_${label.lowercase().replace(" ", "_")}",
-                        output = label,
-                        displayLabel = null,
-                        weight = weight
-                    )
                 }
-            }
             return KeyboardLayoutConfig(id = id, name = name, rows = rows)
         }
     }
