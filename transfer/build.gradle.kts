@@ -41,8 +41,12 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    implementation("io.github.g0dkar:qrcode-kotlin-android:4.5.0") // Note: using 4.5.0 as it's safe for Android Compose
-    implementation("io.github.g00fy2.quickie:quickie-unbundled:1.12.0")
+    // 4.5.0 chosen as a version known safe for Android Compose
+    implementation("io.github.g0dkar:qrcode-kotlin-android:4.5.0")
+    // ZXing for QR scanning. Both quickie variants (bundled and unbundled) resolve
+    // to play-services-mlkit-barcode-scanning and therefore to datatransport;
+    // zxing-android-embedded is Apache-2.0 and Play-Services-free.
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     implementation(libs.hilt.android)
@@ -54,7 +58,6 @@ dependencies {
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("androidx.test.ext:junit:1.2.1")
 }
-
 
 jacoco {
     toolVersion = "0.8.12"
@@ -76,34 +79,58 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         html.required.set(true)
     }
 
-    val fileFilter = mutableSetOf(
-        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
-        "**/*Test*.*", "android/**/*.*", "**/*_Impl*.*", "**/Dagger*.*", "**/*Module*.*"
-    )
-    val debugTree = fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
-        exclude(fileFilter)
-    }
+    val fileFilter =
+        mutableSetOf(
+            "**/R.class",
+            "**/R$*.class",
+            "**/BuildConfig.*",
+            "**/Manifest*.*",
+            "**/*Test*.*",
+            "android/**/*.*",
+            "**/*_Impl*.*",
+            "**/Dagger*.*",
+            "**/*Module*.*",
+        )
+    val debugTree =
+        fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+            exclude(fileFilter)
+        }
     val mainSrc = "${project.projectDir}/src/main/java"
 
     sourceDirectories.setFrom(files(mainSrc))
     classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(fileTree(layout.buildDirectory.get()).include("jacoco/testDebugUnitTest.exec"))
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.get())
+            .include("jacoco/testDebugUnitTest.exec"),
+    )
 }
 
 tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     dependsOn("jacocoTestReport")
-    val fileFilter = mutableSetOf(
-        "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*",
-        "**/*Test*.*", "android/**/*.*", "**/*_Impl*.*", "**/Dagger*.*", "**/*Module*.*"
-    )
-    val debugTree = fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
-        exclude(fileFilter)
-    }
+    val fileFilter =
+        mutableSetOf(
+            "**/R.class",
+            "**/R$*.class",
+            "**/BuildConfig.*",
+            "**/Manifest*.*",
+            "**/*Test*.*",
+            "android/**/*.*",
+            "**/*_Impl*.*",
+            "**/Dagger*.*",
+            "**/*Module*.*",
+        )
+    val debugTree =
+        fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+            exclude(fileFilter)
+        }
     val mainSrc = "${project.projectDir}/src/main/java"
 
     sourceDirectories.setFrom(files(mainSrc))
     classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(fileTree(layout.buildDirectory.get()).include("jacoco/testDebugUnitTest.exec"))
+    executionData.setFrom(
+        fileTree(layout.buildDirectory.get())
+            .include("jacoco/testDebugUnitTest.exec"),
+    )
 
     violationRules {
         rule {
