@@ -11,18 +11,18 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class KeyboardThemeImageTest {
-
     @Test
     fun `keyboard theme json round trip with image background properties`() {
-        val theme = KeyboardTheme(
-            id = "custom_image_theme",
-            name = "Image Theme",
-            isLight = false,
-            colors = darkStickyKeysColors(),
-            typeScale = TypeScale.MEDIUM,
-            backgroundImagePath = "/data/user/0/com.uncoalesced.stickykeys/files/theme_backgrounds/custom_image_theme.png",
-            imageOverlayOpacity = 0.55f
-        )
+        val theme =
+            KeyboardTheme(
+                id = "custom_image_theme",
+                name = "Image Theme",
+                isLight = false,
+                colors = darkStickyKeysColors(),
+                typeScale = TypeScale.MEDIUM,
+                backgroundImagePath = "/data/user/0/com.uncoalesced.stickykeys/files/theme_backgrounds/custom_image_theme.png",
+                imageOverlayOpacity = 0.55f,
+            )
 
         val jsonString = theme.toJson().toString(2)
         val restored = KeyboardTheme.fromJson(jsonString)
@@ -36,13 +36,14 @@ class KeyboardThemeImageTest {
 
     @Test
     fun `keyboard theme json round trip without image background defaults`() {
-        val theme = KeyboardTheme(
-            id = "default_theme",
-            name = "Default Theme",
-            isLight = true,
-            colors = lightStickyKeysColors(),
-            typeScale = TypeScale.SMALL
-        )
+        val theme =
+            KeyboardTheme(
+                id = "default_theme",
+                name = "Default Theme",
+                isLight = true,
+                colors = lightStickyKeysColors(),
+                typeScale = TypeScale.SMALL,
+            )
 
         val jsonString = theme.toJson().toString(2)
         val restored = KeyboardTheme.fromJson(jsonString)
