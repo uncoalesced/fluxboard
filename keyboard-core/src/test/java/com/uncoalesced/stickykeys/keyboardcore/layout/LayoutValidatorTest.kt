@@ -8,29 +8,29 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 class LayoutValidatorTest {
-
-    private fun buildValidLayout(): KeyboardLayoutConfig {
-        return KeyboardLayoutConfig(
+    private fun buildValidLayout(): KeyboardLayoutConfig =
+        KeyboardLayoutConfig(
             id = "test",
             name = "Test",
-            rows = listOf(
+            rows =
                 listOf(
-                    KeyDefinition("k1", "q"),
-                    KeyDefinition("k2", "w"),
-                    KeyDefinition("k3", "e")
+                    listOf(
+                        KeyDefinition("k1", "q"),
+                        KeyDefinition("k2", "w"),
+                        KeyDefinition("k3", "e"),
+                    ),
+                    listOf(
+                        KeyDefinition("k4", "SHIFT", weight = 1.5f),
+                        KeyDefinition("k5", "a"),
+                        KeyDefinition("k6", "DEL", weight = 1.5f),
+                    ),
+                    listOf(
+                        KeyDefinition("k7", "SPACE", weight = 4f),
+                        KeyDefinition("k8", "ENTER", weight = 1.5f),
+                        KeyDefinition("k9", "SYMBOLS", weight = 1.5f),
+                    ),
                 ),
-                listOf(
-                    KeyDefinition("k4", "SHIFT", weight = 1.5f),
-                    KeyDefinition("k5", "a"),
-                    KeyDefinition("k6", "DEL", weight = 1.5f)
-                ),
-                listOf(
-                    KeyDefinition("k7", "SPACE", weight = 4f),
-                    KeyDefinition("k8", "ENTER", weight = 1.5f)
-                )
-            )
         )
-    }
 
     @Test
     fun `valid layout passes validation`() {
@@ -40,11 +40,15 @@ class LayoutValidatorTest {
 
     @Test
     fun `missing SPACE key fails`() {
-        val layout = buildValidLayout().let { config ->
-            config.copy(rows = config.rows.map { row ->
-                row.filter { it.output != "SPACE" }
-            })
-        }
+        val layout =
+            buildValidLayout().let { config ->
+                config.copy(
+                    rows =
+                        config.rows.map { row ->
+                            row.filter { it.output != "SPACE" }
+                        },
+                )
+            }
         val result = LayoutValidator.validate(layout)
         assertTrue(result is LayoutValidationResult.Invalid)
         val errors = (result as LayoutValidationResult.Invalid).reasons
@@ -53,11 +57,15 @@ class LayoutValidatorTest {
 
     @Test
     fun `missing DEL key fails`() {
-        val layout = buildValidLayout().let { config ->
-            config.copy(rows = config.rows.map { row ->
-                row.filter { it.output != "DEL" }
-            })
-        }
+        val layout =
+            buildValidLayout().let { config ->
+                config.copy(
+                    rows =
+                        config.rows.map { row ->
+                            row.filter { it.output != "DEL" }
+                        },
+                )
+            }
         val result = LayoutValidator.validate(layout)
         assertTrue(result is LayoutValidationResult.Invalid)
         val errors = (result as LayoutValidationResult.Invalid).reasons
@@ -66,15 +74,45 @@ class LayoutValidatorTest {
 
     @Test
     fun `missing ENTER key fails`() {
-        val layout = buildValidLayout().let { config ->
-            config.copy(rows = config.rows.map { row ->
-                row.filter { it.output != "ENTER" }
-            })
-        }
+        val layout =
+            buildValidLayout().let { config ->
+                config.copy(
+                    rows =
+                        config.rows.map { row ->
+                            row.filter { it.output != "ENTER" }
+                        },
+                )
+            }
         val result = LayoutValidator.validate(layout)
         assertTrue(result is LayoutValidationResult.Invalid)
         val errors = (result as LayoutValidationResult.Invalid).reasons
         assertTrue(errors.any { "ENTER" in it })
+    }
+
+    @Test
+    fun `missing SYMBOLS key fails`() {
+        // Without a SYMBOLS key the symbol and numeric planes are unreachable: the layout
+        // would save happily and leave the user with no digits or punctuation.
+        val layout =
+            buildValidLayout().let { config ->
+                config.copy(
+                    rows =
+                        config.rows.map { row ->
+                            row.filter { it.output != "SYMBOLS" }
+                        },
+                )
+            }
+        val result = LayoutValidator.validate(layout)
+        assertTrue(result is LayoutValidationResult.Invalid)
+        val errors = (result as LayoutValidationResult.Invalid).reasons
+        assertTrue(errors.any { "SYMBOLS" in it })
+    }
+
+    @Test
+    fun `the shipped default layout passes validation`() {
+        // Guards against the required-key list drifting past what the built-in layout has.
+        val result = LayoutValidator.validate(LayoutManager.buildDefaultLayout())
+        assertTrue(result is LayoutValidationResult.Valid)
     }
 
     @Test
@@ -122,21 +160,23 @@ class LayoutValidatorTest {
 
     @Test
     fun `duplicate IDs fail`() {
-        val layout = KeyboardLayoutConfig(
-            id = "test",
-            name = "Dup",
-            rows = listOf(
-                listOf(
-                    KeyDefinition("same_id", "q"),
-                    KeyDefinition("same_id", "w")
-                ),
-                listOf(
-                    KeyDefinition("k1", "SPACE", weight = 4f),
-                    KeyDefinition("k2", "DEL", weight = 1.5f),
-                    KeyDefinition("k3", "ENTER", weight = 1.5f)
-                )
+        val layout =
+            KeyboardLayoutConfig(
+                id = "test",
+                name = "Dup",
+                rows =
+                    listOf(
+                        listOf(
+                            KeyDefinition("same_id", "q"),
+                            KeyDefinition("same_id", "w"),
+                        ),
+                        listOf(
+                            KeyDefinition("k1", "SPACE", weight = 4f),
+                            KeyDefinition("k2", "DEL", weight = 1.5f),
+                            KeyDefinition("k3", "ENTER", weight = 1.5f),
+                        ),
+                    ),
             )
-        )
         val result = LayoutValidator.validate(layout)
         assertTrue(result is LayoutValidationResult.Invalid)
         val errors = (result as LayoutValidationResult.Invalid).reasons
@@ -147,24 +187,25 @@ class LayoutValidatorTest {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class KeyboardLayoutConfigTest {
-
     @Test
     fun `json round trip preserves data`() {
-        val original = KeyboardLayoutConfig(
-            id = "test_layout",
-            name = "Test Layout",
-            rows = listOf(
-                listOf(
-                    KeyDefinition("k1", "q", null, 1.0f),
-                    KeyDefinition("k2", "w", null, 1.0f)
-                ),
-                listOf(
-                    KeyDefinition("k3", "SPACE", "___", 4.0f),
-                    KeyDefinition("k4", "DEL", null, 1.5f),
-                    KeyDefinition("k5", "ENTER", null, 1.5f)
-                )
+        val original =
+            KeyboardLayoutConfig(
+                id = "test_layout",
+                name = "Test Layout",
+                rows =
+                    listOf(
+                        listOf(
+                            KeyDefinition("k1", "q", null, 1.0f),
+                            KeyDefinition("k2", "w", null, 1.0f),
+                        ),
+                        listOf(
+                            KeyDefinition("k3", "SPACE", "___", 4.0f),
+                            KeyDefinition("k4", "DEL", null, 1.5f),
+                            KeyDefinition("k5", "ENTER", null, 1.5f),
+                        ),
+                    ),
             )
-        )
 
         val json = original.toJson().toString(2)
         val restored = KeyboardLayoutConfig.fromJson(json)
@@ -186,11 +227,12 @@ class KeyboardLayoutConfigTest {
 
     @Test
     fun `fromLegacyLayout converts correctly`() {
-        val legacy = listOf(
-            listOf("q", "w", "e"),
-            listOf("SHIFT", "a", "DEL"),
-            listOf("SYMBOLS", "SPACE", "ENTER")
-        )
+        val legacy =
+            listOf(
+                listOf("q", "w", "e"),
+                listOf("SHIFT", "a", "DEL"),
+                listOf("SYMBOLS", "SPACE", "ENTER"),
+            )
 
         val config = KeyboardLayoutConfig.fromLegacyLayout("test", "Test", legacy)
 
