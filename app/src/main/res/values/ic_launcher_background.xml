@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<resources>
+    <!-- Ink, the brand dark-mode base (Phase 3 palette). -->
+    <color name="ic_launcher_background">#3D3B30</color>
+</resources>
