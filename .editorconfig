@@ -11,3 +11,7 @@ trim_trailing_whitespace = true
 [*.{kt,kts}]
 max_line_length = 100
 insert_final_newline = true
+
+# @Composable functions are PascalCase by Compose convention, which the standard
+# function-naming rule would otherwise flag on every screen and component.
+ktlint_function_naming_ignore_when_annotated_with = Composable
