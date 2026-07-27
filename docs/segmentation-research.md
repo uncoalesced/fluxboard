@@ -8,12 +8,12 @@
 
 ## 1. Executive Summary
 
-This document evaluates the two primary on-device image segmentation candidates for StickyKeys:
+This document evaluates the two primary on-device image segmentation candidates for FluxBoard:
 1. **Google ML Kit Subject Segmentation API** (Unbundled Play Services ML model)
 2. **U2NetP TFLite** (Lightweight open-source salient object detection model)
 
 ### Recommendation
-For v1 of StickyKeys, we recommend **Google ML Kit Subject Segmentation API** as the primary segmentation pipeline, with the manual eraser tool (built in Phase 5) acting as the non-Play Services fallback. 
+For v1 of FluxBoard, we recommend **Google ML Kit Subject Segmentation API** as the primary segmentation pipeline, with the manual eraser tool (built in Phase 5) acting as the non-Play Services fallback. 
 
 If full de-Googled offline parity is mandated in a future release, **U2NetP** can be bundled as an optional build flavor or dynamic feature module without violating our 100 MB app size budget.
 
@@ -59,7 +59,7 @@ A benchmark dataset of 20 images across 4 distinct categories was used for compa
 
 ### Play Services Dependency vs. De-Googled Support
 - **ML Kit Subject Segmentation** delivers significantly cleaner edge cutouts (especially for hair and pet fur) while costing **0 MB of our 100 MB APK budget**.
-- However, as outlined in `AGENTS.md`, StickyKeys prioritizes privacy and compatibility with de-Googled OS environments (e.g., GrapheneOS, LineageOS without GApps).
+- However, as outlined in `AGENTS.md`, FluxBoard prioritizes privacy and compatibility with de-Googled OS environments (e.g., GrapheneOS, LineageOS without GApps).
 - When ML Kit is unavailable (Play Services missing or disabled), the API throws an `MlKitException.UNAVAILABLE`.
 
 ### Proposed Phase 10 Strategy
