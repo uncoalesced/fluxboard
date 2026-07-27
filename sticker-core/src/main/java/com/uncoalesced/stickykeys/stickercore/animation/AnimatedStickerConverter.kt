@@ -16,6 +16,6 @@ interface AnimatedStickerConverter {
         endMs: Long,
         targetFormat: String = "image/webp", // "image/webp" or "image/gif"
         quality: ConversionQuality = ConversionQuality.HIGH,
-        onProgress: (Float) -> Unit
+        onProgress: (Float) -> Unit,
     ): Result<ByteArray>
 }
