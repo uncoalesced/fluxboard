@@ -11,18 +11,18 @@ data class Sticker(
     val createdAt: Long,
     val mimeType: String,
     val file: File,
-    val thumbnailFile: File
+    val thumbnailFile: File,
 )
 
 data class Pack(
     val id: String,
     val name: String,
     val author: String,
-    val createdAt: Long
+    val createdAt: Long,
 )
 
 data class Category(
     val id: String,
     val name: String,
-    val sortOrder: Int
+    val sortOrder: Int,
 )
