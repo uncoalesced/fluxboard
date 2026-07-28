@@ -5,7 +5,9 @@ import android.content.ClipDescription
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.FileProvider
 import androidx.core.view.inputmethod.EditorInfoCompat
@@ -24,20 +26,21 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
 import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
-import android.view.KeyEvent
-import android.view.inputmethod.EditorInfo
-import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
-import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
-
 @AndroidEntryPoint
-class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner, KeyboardController {
-
+class StickyKeysIME :
+    InputMethodService(),
+    LifecycleOwner,
+    ViewModelStoreOwner,
+    SavedStateRegistryOwner,
+    KeyboardController {
     @Inject
     lateinit var fileManager: StickerFileManager
 
@@ -57,13 +60,17 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
     lateinit var layoutManager: com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
 
     @Inject
-    lateinit var clipboardHistoryManager: com.uncoalesced.stickykeys.keyboardcore.clipboard.ClipboardHistoryManager
+    lateinit var clipboardHistoryManager:
+        com.uncoalesced.stickykeys.keyboardcore.clipboard.ClipboardHistoryManager
 
     @Inject
     lateinit var clipboardDao: com.uncoalesced.stickykeys.keyboardcore.data.local.dao.ClipboardDao
 
     @Inject
     lateinit var hapticsManager: com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
+
+    @Inject
+    lateinit var incognitoState: IncognitoState
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
@@ -80,7 +87,14 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
                 if (modelClass.isAssignableFrom(StickerIMEViewModel::class.java)) {
                     return StickerIMEViewModel(repository) as T
                 } else if (modelClass.isAssignableFrom(TypingViewModel::class.java)) {
-                    return TypingViewModel(predictionEngine, keyboardPreferences, themeManager, layoutManager, hapticsManager) as T
+                    return TypingViewModel(
+                        predictionEngine,
+                        keyboardPreferences,
+                        themeManager,
+                        layoutManager,
+                        hapticsManager,
+                        incognitoState,
+                    ) as T
                 } else if (modelClass.isAssignableFrom(ClipboardIMEViewModel::class.java)) {
                     return ClipboardIMEViewModel(clipboardDao) as T
                 }
@@ -97,48 +111,112 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
     }
 
     override fun onCreateInputView(): View {
-        val view = ComposeView(this).apply {
-            setViewTreeLifecycleOwner(this@StickyKeysIME)
-            setViewTreeViewModelStoreOwner(this@StickyKeysIME)
-            setViewTreeSavedStateRegistryOwner(this@StickyKeysIME)
-            setContent {
-                val stickerViewModel = ViewModelProvider(this@StickyKeysIME, viewModelFactory)[StickerIMEViewModel::class.java]
-                val typingViewModel = ViewModelProvider(this@StickyKeysIME, viewModelFactory)[TypingViewModel::class.java]
-                val clipboardViewModel = ViewModelProvider(this@StickyKeysIME, viewModelFactory)[ClipboardIMEViewModel::class.java]
-                
-                MainIMEView(
-                    keyboardController = this@StickyKeysIME,
-                    typingViewModel = typingViewModel,
-                    stickerIMEViewModel = stickerViewModel,
-                    clipboardIMEViewModel = clipboardViewModel,
-                    fileManager = fileManager,
-                    onStickerClick = { commitStickerContent(it) }
-                )
+        val view =
+            ComposeView(this).apply {
+                setViewTreeLifecycleOwner(this@StickyKeysIME)
+                setViewTreeViewModelStoreOwner(this@StickyKeysIME)
+                setViewTreeSavedStateRegistryOwner(this@StickyKeysIME)
+                setContent {
+                    val stickerViewModel =
+                        ViewModelProvider(
+                            this@StickyKeysIME,
+                            viewModelFactory,
+                        )[StickerIMEViewModel::class.java]
+                    val typingViewModel =
+                        ViewModelProvider(
+                            this@StickyKeysIME,
+                            viewModelFactory,
+                        )[TypingViewModel::class.java]
+                    val clipboardViewModel =
+                        ViewModelProvider(
+                            this@StickyKeysIME,
+                            viewModelFactory,
+                        )[ClipboardIMEViewModel::class.java]
+
+                    MainIMEView(
+                        keyboardController = this@StickyKeysIME,
+                        typingViewModel = typingViewModel,
+                        stickerIMEViewModel = stickerViewModel,
+                        clipboardIMEViewModel = clipboardViewModel,
+                        fileManager = fileManager,
+                        onStickerClick = { commitStickerContent(it) },
+                    )
+                }
             }
-        }
         return view
     }
 
-    override fun onStartInputView(editorInfo: EditorInfo?, restarting: Boolean) {
+    /**
+     * Never take over the window with the extracted-text editor.
+     *
+     * The default implementation switches to fullscreen whenever the window is short --
+     * which is exactly what landscape and split-screen produce. In that mode the IME
+     * covers the host app entirely and substitutes its own text field, so in a split-screen
+     * pair the user loses sight of the app they are typing into. Refusing fullscreen keeps
+     * the keyboard docked to its own strip in every window configuration.
+     */
+    override fun onEvaluateFullscreenMode(): Boolean = false
+
+    override fun onStartInputView(
+        editorInfo: EditorInfo?,
+        restarting: Boolean,
+    ) {
         super.onStartInputView(editorInfo, restarting)
-        updateCursorCapsMode()
+        updateIncognito(editorInfo)
+        // Seed capitalization from the field's declared initial state. Deliberately
+        // NOT InputConnection.getCursorCapsMode(): that is a synchronous IPC into the
+        // host app's UI thread, and calling it per keystroke freezes this keyboard
+        // whenever the host is busy. LatinIME and FlorisBoard seed-and-track for the
+        // same reason. From here on the state is tracked locally in TypingViewModel.
+        val info = editorInfo ?: currentInputEditorInfo
+        typingViewModel().onInputStarted(initialCapsMode = info?.initialCapsMode ?: 0)
+    }
+
+    private fun typingViewModel(): TypingViewModel =
+        ViewModelProvider(this, viewModelFactory)[TypingViewModel::class.java]
+
+    /**
+     * Phase 38: the editor asking not to be learned from is the only trigger for
+     * incognito. Deliberately no app/package heuristics -- IME_FLAG_NO_PERSONALIZED_LEARNING
+     * is the sanctioned mechanism and the flag alone drives this.
+     */
+    private fun updateIncognito(editorInfo: EditorInfo?) {
+        val info = editorInfo ?: currentInputEditorInfo
+        val noLearning =
+            info != null &&
+                (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
+        incognitoState.set(noLearning)
+    }
+
+    override fun onFinishInputView(finishingInput: Boolean) {
+        super.onFinishInputView(finishingInput)
+        // Scope incognito to the field actually being edited: once this input
+        // session ends the flag must not linger over unrelated clipboard copies.
+        incognitoState.set(false)
+    }
+
+    override fun onFinishInput() {
+        super.onFinishInput()
+        incognitoState.set(false)
     }
 
     override fun onUpdateSelection(
-        oldSelStart: Int, oldSelEnd: Int,
-        newSelStart: Int, newSelEnd: Int,
-        candidatesStart: Int, candidatesEnd: Int
+        oldSelStart: Int,
+        oldSelEnd: Int,
+        newSelStart: Int,
+        newSelEnd: Int,
+        candidatesStart: Int,
+        candidatesEnd: Int,
     ) {
-        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        updateCursorCapsMode()
-    }
-
-    private fun updateCursorCapsMode() {
-        val ic = currentInputConnection ?: return
-        val editorInfo = currentInputEditorInfo ?: return
-        val capsMode = ic.getCursorCapsMode(editorInfo.inputType)
-        val typingViewModel = ViewModelProvider(this, viewModelFactory)[TypingViewModel::class.java]
-        typingViewModel.onCursorCapsModeChanged(capsMode != 0)
+        super.onUpdateSelection(
+            oldSelStart,
+            oldSelEnd,
+            newSelStart,
+            newSelEnd,
+            candidatesStart,
+            candidatesEnd,
+        )
+        // No getCursorCapsMode() call here on purpose -- see onStartInputView.
     }
 
     override fun onWindowShown() {
@@ -149,6 +227,8 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
 
     override fun onWindowHidden() {
         super.onWindowHidden()
+        // Keyboard no longer shown -> not on an incognito field any more.
+        incognitoState.set(false)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
     }
@@ -164,6 +244,23 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
         currentInputConnection?.commitText(text, 1)
     }
 
+    override fun replaceTextBeforeCursor(
+        charCount: Int,
+        replacement: String,
+    ) {
+        val ic = currentInputConnection ?: return
+        // beginBatchEdit keeps the host editor from rendering the intermediate state.
+        ic.beginBatchEdit()
+        try {
+            if (charCount > 0) {
+                ic.deleteSurroundingText(charCount, 0)
+            }
+            ic.commitText(replacement, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
+    }
+
     override fun sendDelete() {
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
@@ -172,8 +269,12 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
     override fun sendEnter() {
         val editorInfo = currentInputEditorInfo ?: return
         if (editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0) {
-            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+            currentInputConnection?.sendKeyEvent(
+                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER),
+            )
+            currentInputConnection?.sendKeyEvent(
+                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER),
+            )
         } else {
             handleEditorAction()
         }
@@ -184,8 +285,12 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
         if (actionId != null && actionId != EditorInfo.IME_ACTION_NONE) {
             currentInputConnection?.performEditorAction(actionId)
         } else {
-            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-            currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+            currentInputConnection?.sendKeyEvent(
+                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER),
+            )
+            currentInputConnection?.sendKeyEvent(
+                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER),
+            )
         }
     }
 
@@ -198,11 +303,12 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
         val file = fileManager.getStickerFile(sticker.id)
         if (!file.exists()) return
 
-        val uri = FileProvider.getUriForFile(
-            this,
-            "com.uncoalesced.stickykeys.fileprovider",
-            file
-        )
+        val uri =
+            FileProvider.getUriForFile(
+                this,
+                "com.uncoalesced.stickykeys.fileprovider",
+                file,
+            )
 
         val editorInfo = currentInputEditorInfo ?: return
         val inputConnection = currentInputConnection ?: return
@@ -230,7 +336,7 @@ class StickyKeysIME : InputMethodService(), LifecycleOwner, ViewModelStoreOwner,
             editorInfo,
             contentInfo,
             flags,
-            null
+            null,
         )
     }
 }

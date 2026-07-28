@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseline version="1.0">
+    <file name="src/main/java/com/uncoalesced/stickykeys/app/LinkReceiverActivity.kt">
+        <error line="8" column="1" source="standard:no-wildcard-imports" />
+        <error line="9" column="1" source="standard:no-wildcard-imports" />
+        <error line="10" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/DevicePairingScreen.kt">
+        <error line="13" column="1" source="standard:no-wildcard-imports" />
+        <error line="16" column="1" source="standard:no-wildcard-imports" />
+        <error line="17" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/KeyboardSettingsScreen.kt">
+        <error line="361" column="101" source="standard:max-line-length" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/LayoutEditorScreen.kt">
+        <error line="7" column="1" source="standard:no-wildcard-imports" />
+        <error line="9" column="1" source="standard:no-wildcard-imports" />
+        <error line="10" column="1" source="standard:no-wildcard-imports" />
+        <error line="262" column="101" source="standard:max-line-length" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/ManageCategoriesScreen.kt">
+        <error line="4" column="1" source="standard:no-wildcard-imports" />
+        <error line="10" column="1" source="standard:no-wildcard-imports" />
+        <error line="11" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/StickersLibraryScreen.kt">
+        <error line="12" column="1" source="standard:no-wildcard-imports" />
+        <error line="16" column="1" source="standard:no-wildcard-imports" />
+        <error line="17" column="1" source="standard:no-wildcard-imports" />
+        <error line="42" column="1" source="standard:no-wildcard-imports" />
+        <error line="132" column="101" source="standard:max-line-length" />
+        <error line="349" column="101" source="standard:max-line-length" />
+        <error line="369" column="101" source="standard:max-line-length" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/StyleSheetScreen.kt">
+        <error line="5" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/ThemeEditorScreen.kt">
+        <error line="11" column="1" source="standard:no-wildcard-imports" />
+        <error line="14" column="1" source="standard:no-wildcard-imports" />
+        <error line="15" column="1" source="standard:no-wildcard-imports" />
+        <error line="358" column="101" source="standard:max-line-length" />
+        <error line="371" column="101" source="standard:max-line-length" />
+        <error line="380" column="101" source="standard:max-line-length" />
+        <error line="381" column="101" source="standard:max-line-length" />
+        <error line="411" column="101" source="standard:max-line-length" />
+        <error line="420" column="101" source="standard:max-line-length" />
+        <error line="436" column="101" source="standard:max-line-length" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/creation/CropScreen.kt">
+        <error line="12" column="1" source="standard:no-wildcard-imports" />
+        <error line="13" column="1" source="standard:no-wildcard-imports" />
+        <error line="14" column="1" source="standard:no-wildcard-imports" />
+        <error line="20" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/creation/EraseScreen.kt">
+        <error line="10" column="1" source="standard:no-wildcard-imports" />
+        <error line="11" column="1" source="standard:no-wildcard-imports" />
+        <error line="12" column="1" source="standard:no-wildcard-imports" />
+        <error line="16" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/creation/SaveStickerScreen.kt">
+        <error line="9" column="1" source="standard:no-wildcard-imports" />
+        <error line="10" column="1" source="standard:no-wildcard-imports" />
+        <error line="11" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/creation/TouchUpScreen.kt">
+        <error line="10" column="1" source="standard:no-wildcard-imports" />
+        <error line="11" column="1" source="standard:no-wildcard-imports" />
+        <error line="12" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/edit/EditStickerScreen.kt">
+        <error line="8" column="1" source="standard:no-wildcard-imports" />
+        <error line="9" column="1" source="standard:no-wildcard-imports" />
+        <error line="10" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/edit/FilterScreen.kt">
+        <error line="13" column="1" source="standard:no-wildcard-imports" />
+        <error line="14" column="1" source="standard:no-wildcard-imports" />
+        <error line="15" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/edit/TextOverlayScreen.kt">
+        <error line="11" column="1" source="standard:no-wildcard-imports" />
+        <error line="12" column="1" source="standard:no-wildcard-imports" />
+        <error line="13" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/video/VideoConvertScreen.kt">
+        <error line="4" column="1" source="standard:no-wildcard-imports" />
+        <error line="5" column="1" source="standard:no-wildcard-imports" />
+        <error line="6" column="1" source="standard:no-wildcard-imports" />
+    </file>
+    <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/video/VideoTrimScreen.kt">
+        <error line="9" column="1" source="standard:no-wildcard-imports" />
+        <error line="12" column="1" source="standard:no-wildcard-imports" />
+        <error line="13" column="1" source="standard:no-wildcard-imports" />
+    </file>
+</baseline>

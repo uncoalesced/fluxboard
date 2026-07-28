@@ -11,5 +11,5 @@ data class StickerEntity(
     val categoryId: String?,
     val isFavourite: Boolean,
     val createdAt: Long,
-    val mimeType: String
+    val mimeType: String,
 )

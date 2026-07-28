@@ -40,9 +40,16 @@ android {
 
     buildFeatures {
         compose = true
+        // VERSION_NAME is shown in the settings brand header.
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.11"
+    }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -65,14 +72,27 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    // Icons.Default.Delete + Icons.AutoMirrored.Filled.ArrowBack (version from Compose BOM)
+    implementation("androidx.compose.material:material-icons-core")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
-    
+
     implementation("io.github.g0dkar:qrcode-kotlin-android:4.5.0")
-    implementation("io.github.g00fy2.quickie:quickie-unbundled:1.12.0")
+    // ZXing for QR scanning (Apache-2.0, no Play Services) -- see docs/repo-reference.md.
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.12.1")
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("androidx.test.ext:junit:1.1.5")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("io.mockk:mockk:1.13.9")
+    // Accessibility assertions run against the real Compose semantics tree.
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
