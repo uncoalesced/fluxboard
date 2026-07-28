@@ -3,10 +3,11 @@ package com.uncoalesced.stickykeys.transfer.migration
 
 import com.uncoalesced.stickykeys.transfer.pairing.NetworkDiscoveryManager
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
@@ -18,7 +19,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
 class LinkSharingManagerTest {
-
     private lateinit var networkDiscoveryManager: NetworkDiscoveryManager
     private lateinit var relayClient: RelayClient
     private lateinit var manager: LinkSharingManager
@@ -44,7 +44,7 @@ class LinkSharingManagerTest {
 
             assertTrue(context.url.startsWith("https://stickykeys.app/s#"))
             val fragment = context.url.substringAfterLast("#")
-            val parts = fragment.split("_")
+            val parts = fragment.split(LinkSharingManager.DELIMITER)
             assertEquals(4, parts.size)
             assertEquals(context.sessionId, parts[0])
             assertEquals("192.168.1.10", parts[2])
@@ -64,7 +64,8 @@ class LinkSharingManagerTest {
             // Create a link with a dead IP to force fallback
             val fakeKey = "testkey_12345678" // Needs to be some valid base64url length
             val encodedKey = Base64.UrlSafe.encode(fakeKey.toByteArray())
-            val url = "https://stickykeys.app/s#dummy-session_${encodedKey}_192.0.2.0_9999"
+            val d = LinkSharingManager.DELIMITER
+            val url = "https://stickykeys.app/s#dummy-session$d$encodedKey${d}192.0.2.0${d}9999"
 
             val receiveContext = manager.connectToLink(url)
 
@@ -76,13 +77,36 @@ class LinkSharingManagerTest {
     }
 
     @Test
+    fun `connectToLink handles a key whose base64url contains underscores and dashes`() {
+        runBlocking {
+            val dummyIn = ByteArrayInputStream(ByteArray(0))
+            val dummyOut = ByteArrayOutputStream()
+            `when`(relayClient.connectAndJoin("dummy-session")).thenReturn(Pair(dummyIn, dummyOut))
+
+            // 0xFF bytes encode to '_' in base64url; 0xFB/0xEF produce '-'.
+            // This is the exact shape that broke the old '_' delimiter split.
+            val keyBytes = ByteArray(32) { i -> if (i % 2 == 0) 0xFF.toByte() else 0xFB.toByte() }
+            val encodedKey = Base64.UrlSafe.encode(keyBytes)
+            assertTrue("fixture must contain '_'", encodedKey.contains("_"))
+            assertTrue("fixture must contain '-'", encodedKey.contains("-"))
+
+            val d = LinkSharingManager.DELIMITER
+            val url = "https://stickykeys.app/s#dummy-session$d$encodedKey${d}192.0.2.0${d}9999"
+
+            val receiveContext = manager.connectToLink(url)
+
+            assertArrayEquals(keyBytes, receiveContext.aesKey)
+        }
+    }
+
+    @Test
     fun `connectToLink throws on invalid format`() {
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking {
                 manager.connectToLink("https://stickykeys.app/s")
             }
         }
-        
+
         assertThrows(IllegalArgumentException::class.java) {
             runBlocking {
                 manager.connectToLink("https://stickykeys.app/s#justonesection")

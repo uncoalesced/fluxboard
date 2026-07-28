@@ -10,10 +10,9 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class ConverterModule {
-
     @Binds
     @Singleton
     abstract fun bindAnimatedStickerConverter(
-        converter: AndroidAnimatedStickerConverter
+        converter: AndroidAnimatedStickerConverter,
     ): AnimatedStickerConverter
 }

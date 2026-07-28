@@ -26,7 +26,6 @@ import java.util.zip.ZipOutputStream
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 class MigrationPackagerTest {
-
     private lateinit var context: Context
     private lateinit var packager: MigrationPackager
     private lateinit var dbPath: File
@@ -35,11 +34,11 @@ class MigrationPackagerTest {
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
         packager = MigrationPackager(context)
-        
+
         // Setup a dummy keyboard_database
         dbPath = context.getDatabasePath("keyboard_database")
         dbPath.parentFile?.mkdirs()
-        
+
         val db = SQLiteDatabase.openOrCreateDatabase(dbPath, null)
         db.execSQL("CREATE TABLE clipboard_entries (id INTEGER PRIMARY KEY, content TEXT)")
         db.execSQL("INSERT INTO clipboard_entries (content) VALUES ('secret password')")
@@ -58,28 +57,33 @@ class MigrationPackagerTest {
     fun `packager includes clipboard when includeClipboard is true`() {
         runBlocking {
             val zipFile = packager.packageDataToTempFile(includeClipboard = true)
-        
-        assertTrue(zipFile.exists())
-        
-        val zf = ZipFile(zipFile)
-        val entry = zf.getEntry("databases/keyboard_database")
-        assertNotNull("keyboard_database should be in ZIP", entry)
-        
-        // We can extract and read it
-        val extractedDb = File(context.cacheDir, "extracted_db")
-        zf.getInputStream(entry).use { input ->
-            extractedDb.outputStream().use { output ->
-                input.copyTo(output)
+
+            assertTrue(zipFile.exists())
+
+            val zf = ZipFile(zipFile)
+            val entry = zf.getEntry("databases/keyboard_database")
+            assertNotNull("keyboard_database should be in ZIP", entry)
+
+            // We can extract and read it
+            val extractedDb = File(context.cacheDir, "extracted_db")
+            zf.getInputStream(entry).use { input ->
+                extractedDb.outputStream().use { output ->
+                    input.copyTo(output)
+                }
             }
-        }
-        zf.close()
-        
-        val db = SQLiteDatabase.openDatabase(extractedDb.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-        val cursor = db.rawQuery("SELECT COUNT(*) FROM clipboard_entries", null)
-        cursor.moveToFirst()
-        assertEquals("Clipboard entries should remain intact", 1, cursor.getInt(0))
-        cursor.close()
-        db.close()
+            zf.close()
+
+            val db =
+                SQLiteDatabase.openDatabase(
+                    extractedDb.absolutePath,
+                    null,
+                    SQLiteDatabase.OPEN_READONLY,
+                )
+            val cursor = db.rawQuery("SELECT COUNT(*) FROM clipboard_entries", null)
+            cursor.moveToFirst()
+            assertEquals("Clipboard entries should remain intact", 1, cursor.getInt(0))
+            cursor.close()
+            db.close()
             extractedDb.delete()
         }
     }
@@ -88,25 +92,30 @@ class MigrationPackagerTest {
     fun `packager sanitizes clipboard when includeClipboard is false`() {
         runBlocking {
             val zipFile = packager.packageDataToTempFile(includeClipboard = false)
-        
-        assertTrue(zipFile.exists())
-        
-        val zf = ZipFile(zipFile)
-        val entry = zf.getEntry("databases/keyboard_database")
-        assertNotNull("keyboard_database should be in ZIP", entry)
-        
-        val extractedDb = File(context.cacheDir, "extracted_db_sanitized")
-        zf.getInputStream(entry).use { input ->
-            extractedDb.outputStream().use { output ->
-                input.copyTo(output)
+
+            assertTrue(zipFile.exists())
+
+            val zf = ZipFile(zipFile)
+            val entry = zf.getEntry("databases/keyboard_database")
+            assertNotNull("keyboard_database should be in ZIP", entry)
+
+            val extractedDb = File(context.cacheDir, "extracted_db_sanitized")
+            zf.getInputStream(entry).use { input ->
+                extractedDb.outputStream().use { output ->
+                    input.copyTo(output)
+                }
             }
-        }
-        zf.close()
-        
-        val db = SQLiteDatabase.openDatabase(extractedDb.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-        val cursor = db.rawQuery("SELECT COUNT(*) FROM clipboard_entries", null)
-        cursor.moveToFirst()
-        assertEquals("Clipboard entries should be sanitized (0)", 0, cursor.getInt(0))
+            zf.close()
+
+            val db =
+                SQLiteDatabase.openDatabase(
+                    extractedDb.absolutePath,
+                    null,
+                    SQLiteDatabase.OPEN_READONLY,
+                )
+            val cursor = db.rawQuery("SELECT COUNT(*) FROM clipboard_entries", null)
+            cursor.moveToFirst()
+            assertEquals("Clipboard entries should be sanitized (0)", 0, cursor.getInt(0))
             cursor.close()
             db.close()
             extractedDb.delete()

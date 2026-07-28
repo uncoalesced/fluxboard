@@ -14,7 +14,7 @@ data class StickyKeysSpacing(
     val md: Dp = 16.dp,
     val lg: Dp = 24.dp,
     val xl: Dp = 32.dp,
-    val xxl: Dp = 48.dp
+    val xxl: Dp = 48.dp,
 )
 
 val defaultStickyKeysSpacing = StickyKeysSpacing()

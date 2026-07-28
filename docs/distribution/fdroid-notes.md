@@ -1,30 +1,28 @@
 # F-Droid Packaging Notes
 
 ## Anti-Features Declaration
-To comply with F-Droid's inclusion criteria while retaining our core functionality, this app requires the `NonFreeDep` anti-feature declaration during its F-Droid build recipe creation. There are **two** Play-Services-delivered ML Kit dependencies, both of which trigger the flag:
 
-### 1. Subject segmentation (sticker extraction)
-**Dependency:** `com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1`
-**Used by:** `sticker-core` -- `MlKitSegmentationEngine`, the on-device automatic sticker cutout (Phase 10).
-**Reason:** Proprietary, closed-source Google library; the segmentation model is delivered by Google Play Services.
+**None required.** FluxBoard has no proprietary dependencies.
 
-### 2. Barcode/QR scanning (device pairing)
-**Dependency:** `io.github.g00fy2.quickie:quickie-unbundled:1.12.0`
-**Used by:** `transfer` / `DevicePairingScreen` -- scanning the pairing QR code (Phase 27).
-**Reason:** The `-unbundled` Quickie variant depends transitively on
-`com.google.android.gms:play-services-mlkit-barcode-scanning`, whose barcode
-model is delivered by Google Play Services. It is therefore a non-free
-dependency in the same category as the segmentation model above.
+Earlier revisions of this document declared the `NonFreeDep` anti-feature for two
+Play-Services-delivered ML Kit libraries. Both have since been removed:
 
-**De-Googled-device impact:** On devices without Play Services (GrapheneOS,
-LineageOS without gapps) neither feature works out of the box. Segmentation
-already degrades gracefully to the manual eraser. QR *generation* (sender side,
-`qrcode-kotlin`, fully open) still works; only QR *scanning* (receiver side) is
-affected -- a future option is to swap `quickie-unbundled` for `quickie-bundled`
-(bundles the model, no Play Services, larger APK -- weigh against the 100 MB
-budget) or add a manual pairing-code entry fallback.
+- `com.google.android.gms:play-services-mlkit-subject-segmentation` -- removed.
+  Automatic subject segmentation is not in v1; sticker extraction is crop plus the
+  manual eraser. It will only return behind a genuinely open on-device model.
+- `io.github.g00fy2.quickie` (barcode/QR scanning) -- removed. Both its `-bundled`
+  and `-unbundled` variants resolve to `play-services-mlkit-barcode-scanning`.
+  QR scanning now uses `com.journeyapps:zxing-android-embedded` (Apache-2.0), and
+  QR generation uses `io.github.g0dkar:qrcode-kotlin-android` (Apache-2.0).
 
-*Note for F-Droid maintainers: We are targeting repos that accept NonFreeDep apps, such as IzzyOnDroid.*
+Verified on the built artifact, not just the build files: the release merged
+manifest contains zero `com.google.*` components, and every `classes*.dex` in the
+release APK reports `datatransport=0 mlkit=0 gms=0`. See `docs/privacy-audit.md`
+section 2a for the exact commands and output.
+
+The app therefore builds and runs with no Google Play Services on the device,
+which also means it works fully on de-Googled ROMs (GrapheneOS, LineageOS without
+gapps) with no degraded feature path.
 
 ## Play Store Considerations
 If a Google Play Store listing is pursued in the future, the following additional steps are strictly required:

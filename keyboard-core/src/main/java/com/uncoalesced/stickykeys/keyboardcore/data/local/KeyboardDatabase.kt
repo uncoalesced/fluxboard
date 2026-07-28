@@ -11,12 +11,13 @@ import com.uncoalesced.stickykeys.keyboardcore.data.local.entity.PersonalWordEnt
 @Database(
     entities = [
         PersonalWordEntity::class,
-        ClipboardEntryEntity::class
+        ClipboardEntryEntity::class,
     ],
     version = 2,
-    exportSchema = false
+    exportSchema = false,
 )
 abstract class KeyboardDatabase : RoomDatabase() {
     abstract fun personalDictionaryDao(): PersonalDictionaryDao
+
     abstract fun clipboardDao(): ClipboardDao
 }

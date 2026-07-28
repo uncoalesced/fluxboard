@@ -4,18 +4,18 @@
   "isLight": true,
   "typeScale": "MEDIUM",
   "colors": {
-    "primary": "#FF6366F1",
-    "primaryVariant": "#FF4F46E5",
-    "secondary": "#FF2DD4BF",
-    "background": "#FFF8FAFC",
-    "surface": "#FFFFFFFF",
-    "surfaceVariant": "#FFF1F5F9",
+    "primary": "#FF5C80BC",
+    "primaryVariant": "#FF3F5C8C",
+    "secondary": "#FF4D5061",
+    "background": "#FFE9EDDE",
+    "surface": "#FFF3F5EC",
+    "surfaceVariant": "#FFDCE0D2",
     "error": "#FFEF4444",
     "onPrimary": "#FFFFFFFF",
-    "onSecondary": "#FF0F172A",
-    "onBackground": "#FF0F172A",
-    "onSurface": "#FF0F172A",
-    "onSurfaceVariant": "#FF1E293B",
+    "onSecondary": "#FFE9EDDE",
+    "onBackground": "#FF3D3B30",
+    "onSurface": "#FF3D3B30",
+    "onSurfaceVariant": "#FF3D3B30",
     "onError": "#FFFFFFFF"
   }
 }
