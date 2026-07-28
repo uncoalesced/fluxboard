@@ -9,5 +9,5 @@ data class PersonalWordEntity(
     @PrimaryKey
     val word: String,
     val frequency: Int,
-    val lastUsedTimestamp: Long
+    val lastUsedTimestamp: Long,
 )

@@ -7,6 +7,7 @@ import android.content.Context
 import android.os.Build
 import com.uncoalesced.stickykeys.keyboardcore.data.local.dao.ClipboardDao
 import com.uncoalesced.stickykeys.keyboardcore.data.local.entity.ClipboardEntryEntity
+import com.uncoalesced.stickykeys.keyboardcore.ime.IncognitoState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,58 +17,72 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ClipboardHistoryManager @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val clipboardDao: ClipboardDao
-) {
-    private val clipboardManager: ClipboardManager = 
-        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+class ClipboardHistoryManager
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+        private val clipboardDao: ClipboardDao,
+        private val incognitoState: IncognitoState,
+    ) {
+        private val clipboardManager: ClipboardManager =
+            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
-    private val clipChangedListener = ClipboardManager.OnPrimaryClipChangedListener {
-        handleClipboardChange()
-    }
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun startListening() {
-        clipboardManager.addPrimaryClipChangedListener(clipChangedListener)
-    }
-
-    fun stopListening() {
-        clipboardManager.removePrimaryClipChangedListener(clipChangedListener)
-    }
-
-    private fun handleClipboardChange() {
-        if (!clipboardManager.hasPrimaryClip()) return
-        val clipData = clipboardManager.primaryClip ?: return
-        val description = clipboardManager.primaryClipDescription ?: return
-
-        // Privacy rule: Respect EXTRA_IS_SENSITIVE flag
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val isSensitive = description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) ?: false
-            if (isSensitive) {
-                return // Do not persist sensitive content
+        private val clipChangedListener =
+            ClipboardManager.OnPrimaryClipChangedListener {
+                handleClipboardChange()
             }
-        } else {
-            // Check fallback for older versions if developers manually added the extra
-            val isSensitive = description.extras?.getBoolean("android.content.extra.IS_SENSITIVE") ?: false
-            if (isSensitive) {
-                return
-            }
+
+        fun startListening() {
+            clipboardManager.addPrimaryClipChangedListener(clipChangedListener)
         }
 
-        if (clipData.itemCount > 0) {
-            val item = clipData.getItemAt(0)
-            val text = item.text?.toString()
-            if (!text.isNullOrBlank()) {
-                scope.launch {
-                    val entry = ClipboardEntryEntity(
-                        text = text,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    clipboardDao.insert(entry)
+        fun stopListening() {
+            clipboardManager.removePrimaryClipChangedListener(clipChangedListener)
+        }
+
+        private fun handleClipboardChange() {
+            if (!clipboardManager.hasPrimaryClip()) return
+            val clipData = clipboardManager.primaryClip ?: return
+            val description = clipboardManager.primaryClipDescription ?: return
+
+            // Phase 38: additional layer on top of (never instead of) the
+            // EXTRA_IS_SENSITIVE check below. While the keyboard is shown on a field
+            // that asked not to be learned from, copies are not persisted either.
+            // Same shared session state that gates prediction learning and drives
+            // the on-keyboard indicator, so there is no second flag to keep in sync.
+            if (incognitoState.active.value) return
+
+            // Privacy rule: Respect EXTRA_IS_SENSITIVE flag
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val isSensitive =
+                    description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) ?: false
+                if (isSensitive) {
+                    return // Do not persist sensitive content
+                }
+            } else {
+                // Check fallback for older versions if developers manually added the extra
+                val isSensitive =
+                    description.extras?.getBoolean("android.content.extra.IS_SENSITIVE") ?: false
+                if (isSensitive) {
+                    return
+                }
+            }
+
+            if (clipData.itemCount > 0) {
+                val item = clipData.getItemAt(0)
+                val text = item.text?.toString()
+                if (!text.isNullOrBlank()) {
+                    scope.launch {
+                        val entry =
+                            ClipboardEntryEntity(
+                                text = text,
+                                timestamp = System.currentTimeMillis(),
+                            )
+                        clipboardDao.insert(entry)
+                    }
                 }
             }
         }
     }
-}

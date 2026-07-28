@@ -1,9 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
-import androidx.compose.ui.res.stringResource
-import com.uncoalesced.stickykeys.R
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,51 +13,83 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.R
+import com.uncoalesced.stickykeys.keyboardcore.theme.BrandYellow
+import com.uncoalesced.stickykeys.keyboardcore.theme.OnBrandYellow
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 
 @Composable
 fun StyleSheetScreen() {
     Scaffold(
-        containerColor = StickyKeysTheme.colors.background
+        containerColor = StickyKeysTheme.colors.background,
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(StickyKeysTheme.spacing.md),
-            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.lg)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
+                    .padding(StickyKeysTheme.spacing.md),
+            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.lg),
         ) {
             Text(
                 text = "Style Sheet",
                 style = StickyKeysTheme.typography.titleLarge,
-                color = StickyKeysTheme.colors.onBackground
+                color = StickyKeysTheme.colors.onBackground,
             )
 
             // Colors
             Card(
                 colors = CardDefaults.cardColors(containerColor = StickyKeysTheme.colors.surface),
                 shape = StickyKeysTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
                     modifier = Modifier.padding(StickyKeysTheme.spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
                 ) {
                     Text(
                         text = "Colors",
                         style = StickyKeysTheme.typography.titleMedium,
-                        color = StickyKeysTheme.colors.onSurface
+                        color = StickyKeysTheme.colors.onSurface,
                     )
-                    
-                    ColorRow("Primary", StickyKeysTheme.colors.primary, StickyKeysTheme.colors.onPrimary)
-                    ColorRow("Primary Variant", StickyKeysTheme.colors.primaryVariant, StickyKeysTheme.colors.onPrimary)
-                    ColorRow("Secondary", StickyKeysTheme.colors.secondary, StickyKeysTheme.colors.onSecondary)
-                    ColorRow("Background", StickyKeysTheme.colors.background, StickyKeysTheme.colors.onBackground)
-                    ColorRow("Surface", StickyKeysTheme.colors.surface, StickyKeysTheme.colors.onSurface)
-                    ColorRow("Surface Variant", StickyKeysTheme.colors.surfaceVariant, StickyKeysTheme.colors.onSurfaceVariant)
+
+                    ColorRow(
+                        "Primary (Blue)",
+                        StickyKeysTheme.colors.primary,
+                        StickyKeysTheme.colors.onPrimary,
+                    )
+                    ColorRow(
+                        "Primary Variant",
+                        StickyKeysTheme.colors.primaryVariant,
+                        StickyKeysTheme.colors.onPrimary,
+                    )
+                    ColorRow(
+                        "Secondary (Slate)",
+                        StickyKeysTheme.colors.secondary,
+                        StickyKeysTheme.colors.onSecondary,
+                    )
+                    ColorRow(
+                        "Background (Ink)",
+                        StickyKeysTheme.colors.background,
+                        StickyKeysTheme.colors.onBackground,
+                    )
+                    ColorRow(
+                        "Surface",
+                        StickyKeysTheme.colors.surface,
+                        StickyKeysTheme.colors.onSurface,
+                    )
+                    ColorRow(
+                        "Surface Variant",
+                        StickyKeysTheme.colors.surfaceVariant,
+                        StickyKeysTheme.colors.onSurfaceVariant,
+                    )
+                    // Highlight is intentionally not a semantic slot -- shown here so
+                    // the full brand palette renders, but used only sparingly in UI.
+                    ColorRow("Highlight (Yellow, sparing)", BrandYellow, OnBrandYellow)
                     ColorRow("Error", StickyKeysTheme.colors.error, StickyKeysTheme.colors.onError)
                 }
             }
@@ -69,25 +98,53 @@ fun StyleSheetScreen() {
             Card(
                 colors = CardDefaults.cardColors(containerColor = StickyKeysTheme.colors.surface),
                 shape = StickyKeysTheme.shapes.large,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
                     modifier = Modifier.padding(StickyKeysTheme.spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
                 ) {
                     Text(
                         text = "Typography",
                         style = StickyKeysTheme.typography.titleMedium,
-                        color = StickyKeysTheme.colors.onSurface
+                        color = StickyKeysTheme.colors.onSurface,
                     )
-                    
-                    Text(stringResource(R.string.text_title_large), style = StickyKeysTheme.typography.titleLarge, color = StickyKeysTheme.colors.onSurface)
-                    Text(stringResource(R.string.text_title_medium), style = StickyKeysTheme.typography.titleMedium, color = StickyKeysTheme.colors.onSurface)
-                    Text(stringResource(R.string.text_body_large), style = StickyKeysTheme.typography.bodyLarge, color = StickyKeysTheme.colors.onSurface)
-                    Text(stringResource(R.string.text_body_medium), style = StickyKeysTheme.typography.bodyMedium, color = StickyKeysTheme.colors.onSurface)
-                    Text(stringResource(R.string.text_label_large), style = StickyKeysTheme.typography.labelLarge, color = StickyKeysTheme.colors.onSurface)
-                    Text(stringResource(R.string.text_label_medium), style = StickyKeysTheme.typography.labelMedium, color = StickyKeysTheme.colors.onSurface)
-                    Text(stringResource(R.string.text_keyboard_key), style = StickyKeysTheme.typography.keyboardKey, color = StickyKeysTheme.colors.onSurface)
+
+                    Text(
+                        stringResource(R.string.text_title_large),
+                        style = StickyKeysTheme.typography.titleLarge,
+                        color = StickyKeysTheme.colors.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.text_title_medium),
+                        style = StickyKeysTheme.typography.titleMedium,
+                        color = StickyKeysTheme.colors.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.text_body_large),
+                        style = StickyKeysTheme.typography.bodyLarge,
+                        color = StickyKeysTheme.colors.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.text_body_medium),
+                        style = StickyKeysTheme.typography.bodyMedium,
+                        color = StickyKeysTheme.colors.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.text_label_large),
+                        style = StickyKeysTheme.typography.labelLarge,
+                        color = StickyKeysTheme.colors.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.text_label_medium),
+                        style = StickyKeysTheme.typography.labelMedium,
+                        color = StickyKeysTheme.colors.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.text_keyboard_key),
+                        style = StickyKeysTheme.typography.keyboardKey,
+                        color = StickyKeysTheme.colors.onSurface,
+                    )
                 }
             }
 
@@ -95,16 +152,16 @@ fun StyleSheetScreen() {
             Card(
                 colors = CardDefaults.cardColors(containerColor = StickyKeysTheme.colors.surface),
                 shape = StickyKeysTheme.shapes.pill,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
                     modifier = Modifier.padding(StickyKeysTheme.spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         text = "Pill Shape & Spacing LG",
                         style = StickyKeysTheme.typography.bodyMedium,
-                        color = StickyKeysTheme.colors.onSurface
+                        color = StickyKeysTheme.colors.onSurface,
                     )
                 }
             }
@@ -113,20 +170,25 @@ fun StyleSheetScreen() {
 }
 
 @Composable
-private fun ColorRow(name: String, color: Color, onColor: Color) {
+private fun ColorRow(
+    name: String,
+    color: Color,
+    onColor: Color,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .background(color, StickyKeysTheme.shapes.small)
-            .padding(horizontal = StickyKeysTheme.spacing.md),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(color, StickyKeysTheme.shapes.small)
+                .padding(horizontal = StickyKeysTheme.spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = name,
             style = StickyKeysTheme.typography.bodyLarge,
             color = onColor,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
     }
 }

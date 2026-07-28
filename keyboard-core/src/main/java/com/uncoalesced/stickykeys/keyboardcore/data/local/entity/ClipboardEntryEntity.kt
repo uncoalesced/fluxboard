@@ -9,5 +9,5 @@ data class ClipboardEntryEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val text: String,
-    val timestamp: Long
+    val timestamp: Long,
 )

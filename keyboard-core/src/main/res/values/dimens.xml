@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<resources>
+    <!-- Height the IME content aims for. Every mode uses this one value so switching
+         between typing, stickers and clipboard never resizes the window. -->
+    <dimen name="ime_panel_height">280dp</dimen>
+    <!-- The suggestion strip is always present, never conditionally absent, so the
+         window height does not change as suggestions come and go. -->
+    <dimen name="suggestion_strip_height">40dp</dimen>
+    <dimen name="ime_content_padding">4dp</dimen>
+</resources>

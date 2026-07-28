@@ -1,9 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
-import androidx.compose.ui.res.stringResource
-import com.uncoalesced.stickykeys.R
-
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
@@ -15,14 +12,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.ui.screens.creation.CropScreen
 import com.uncoalesced.stickykeys.ui.screens.creation.EraseScreen
 
 enum class EditTool {
-    Overview, Crop, Erase, Filter, Text
+    Overview,
+    Crop,
+    Erase,
+    Filter,
+    Text,
 }
 
 @Composable
@@ -30,7 +32,7 @@ fun EditStickerScreen(
     stickerId: String,
     viewModel: EditStickerViewModel = hiltViewModel(),
     onComplete: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -64,17 +66,17 @@ fun EditStickerScreen(
                         onSaveAsNew = {
                             viewModel.saveAsNewSticker(context, onComplete)
                         },
-                        onCancel = onCancel
+                        onCancel = onCancel,
                     )
                 }
                 EditTool.Crop -> {
                     CropScreen(
                         uriString = state.currentUriString,
-                        onCropComplete = { _, segmentedUri ->
-                            viewModel.updateCurrentUri(segmentedUri)
+                        onCropComplete = { croppedUri ->
+                            viewModel.updateCurrentUri(croppedUri)
                             activeTool = EditTool.Overview
                         },
-                        onCancel = { activeTool = EditTool.Overview }
+                        onCancel = { activeTool = EditTool.Overview },
                     )
                 }
                 EditTool.Erase -> {
@@ -84,7 +86,7 @@ fun EditStickerScreen(
                             viewModel.updateCurrentUri(newUri)
                             activeTool = EditTool.Overview
                         },
-                        onCancel = { activeTool = EditTool.Overview }
+                        onCancel = { activeTool = EditTool.Overview },
                     )
                 }
                 EditTool.Filter -> {
@@ -94,7 +96,7 @@ fun EditStickerScreen(
                             viewModel.updateCurrentUri(newUri)
                             activeTool = EditTool.Overview
                         },
-                        onCancel = { activeTool = EditTool.Overview }
+                        onCancel = { activeTool = EditTool.Overview },
                     )
                 }
                 EditTool.Text -> {
@@ -104,7 +106,7 @@ fun EditStickerScreen(
                             viewModel.updateCurrentUri(newUri)
                             activeTool = EditTool.Overview
                         },
-                        onCancel = { activeTool = EditTool.Overview }
+                        onCancel = { activeTool = EditTool.Overview },
                     )
                 }
             }
@@ -118,7 +120,7 @@ private fun EditOverviewScreen(
     onSelectTool: (EditTool) -> Unit,
     onOverwrite: () -> Unit,
     onSaveAsNew: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
     var bitmap by remember(currentUriString) {
@@ -128,7 +130,7 @@ private fun EditOverviewScreen(
                 BitmapFactory.decodeStream(stream)
             } catch (e: Exception) {
                 null
-            }
+            },
         )
     }
 
@@ -138,31 +140,41 @@ private fun EditOverviewScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.text_edit_sticker)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
-                }
+                    TextButton(onClick = onCancel) {
+                        Text(
+                            stringResource(R.string.text_cancel),
+                            color = StickyKeysTheme.colors.error,
+                        )
+                    }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(StickyKeysTheme.spacing.md),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(StickyKeysTheme.spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md)
+            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md),
         ) {
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(StickyKeysTheme.colors.surfaceVariant, StickyKeysTheme.shapes.medium),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(
+                            StickyKeysTheme.colors.surfaceVariant,
+                            StickyKeysTheme.shapes.medium,
+                        ),
+                contentAlignment = Alignment.Center,
             ) {
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap!!.asImageBitmap(),
                         contentDescription = stringResource(R.string.desc_edited_preview),
-                        modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm)
+                        modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm),
                     )
                 } else {
                     CircularProgressIndicator()
@@ -172,28 +184,36 @@ private fun EditOverviewScreen(
             // Tools options
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                OutlinedButton(onClick = { onSelectTool(EditTool.Crop) }) { Text(stringResource(R.string.text_crop)) }
-                OutlinedButton(onClick = { onSelectTool(EditTool.Erase) }) { Text(stringResource(R.string.text_erase)) }
-                OutlinedButton(onClick = { onSelectTool(EditTool.Filter) }) { Text(stringResource(R.string.text_filter)) }
-                OutlinedButton(onClick = { onSelectTool(EditTool.Text) }) { Text(stringResource(R.string.text_text)) }
+                OutlinedButton(onClick = {
+                    onSelectTool(EditTool.Crop)
+                }) { Text(stringResource(R.string.text_crop)) }
+                OutlinedButton(onClick = {
+                    onSelectTool(EditTool.Erase)
+                }) { Text(stringResource(R.string.text_erase)) }
+                OutlinedButton(onClick = {
+                    onSelectTool(EditTool.Filter)
+                }) { Text(stringResource(R.string.text_filter)) }
+                OutlinedButton(onClick = {
+                    onSelectTool(EditTool.Text)
+                }) { Text(stringResource(R.string.text_text)) }
             }
 
             // Save choices
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.xs)
+                verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.xs),
             ) {
                 Button(
                     onClick = onOverwrite,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.text_overwrite_sticker))
                 }
                 OutlinedButton(
                     onClick = onSaveAsNew,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.text_save_as_new_sticker))
                 }
