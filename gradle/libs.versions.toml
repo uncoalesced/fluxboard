@@ -9,7 +9,7 @@ ksp = "2.0.21-1.0.28"
 hilt = "2.60.1"
 navCompose = "2.9.8"
 room = "2.6.1"
-ktlintPlugin = "12.1.0"
+ktlintPlugin = "14.2.0"
 androidxHiltNavigationCompose = "1.2.0"
 
 [libraries]

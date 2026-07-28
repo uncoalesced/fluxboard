@@ -13,7 +13,7 @@ data class StickyKeysShapes(
     val medium: Shape = RoundedCornerShape(8.dp),
     val large: Shape = RoundedCornerShape(16.dp),
     val extraLarge: Shape = RoundedCornerShape(24.dp),
-    val pill: Shape = RoundedCornerShape(50)
+    val pill: Shape = RoundedCornerShape(50),
 )
 
 val defaultStickyKeysShapes = StickyKeysShapes()

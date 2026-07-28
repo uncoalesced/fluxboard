@@ -1,15 +1,11 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
-import androidx.compose.ui.res.stringResource
-import com.uncoalesced.stickykeys.R
-
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.net.Uri
-import androidx.compose.foundation.Canvas as ComposeCanvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -24,7 +20,9 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,12 +30,13 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import androidx.compose.foundation.Canvas as ComposeCanvas
 
 @Composable
 fun TextOverlayScreen(
     uriString: String,
     onApplyText: (String) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -46,15 +45,16 @@ fun TextOverlayScreen(
     var text by remember { mutableStateOf("Sticky!") }
     var textPosition by remember { mutableStateOf(Offset(200f, 200f)) }
     var textSize by remember { mutableFloatStateOf(60f) }
-    
+
     // Preset theme colors
-    val availableColors = listOf(
-        Color.White,
-        Color.Black,
-        StickyKeysTheme.colors.primary,
-        StickyKeysTheme.colors.secondary,
-        StickyKeysTheme.colors.error
-    )
+    val availableColors =
+        listOf(
+            Color.White,
+            Color.Black,
+            StickyKeysTheme.colors.primary,
+            StickyKeysTheme.colors.secondary,
+            StickyKeysTheme.colors.error,
+        )
     var selectedColor by remember { mutableStateOf(availableColors.first()) }
 
     LaunchedEffect(uriString) {
@@ -82,64 +82,83 @@ fun TextOverlayScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.text_add_text_overlay)) },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) { Text(stringResource(R.string.text_cancel), color = StickyKeysTheme.colors.error) }
+                    TextButton(onClick = onCancel) {
+                        Text(
+                            stringResource(R.string.text_cancel),
+                            color = StickyKeysTheme.colors.error,
+                        )
+                    }
                 },
                 actions = {
                     TextButton(onClick = {
                         coroutineScope.launch {
-                            val cachedUri = withContext(Dispatchers.IO) {
-                                val bmp = originalBitmap!!
-                                val resultBmp = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
-                                val canvas = Canvas(resultBmp)
-                                canvas.drawBitmap(bmp, 0f, 0f, null)
+                            val cachedUri =
+                                withContext(Dispatchers.IO) {
+                                    val bmp = originalBitmap!!
+                                    val resultBmp =
+                                        Bitmap.createBitmap(
+                                            bmp.width,
+                                            bmp.height,
+                                            Bitmap.Config.ARGB_8888,
+                                        )
+                                    val canvas = Canvas(resultBmp)
+                                    canvas.drawBitmap(bmp, 0f, 0f, null)
 
-                                val paint = Paint().apply {
-                                    color = selectedColor.toArgb()
-                                    textSize = textSize
-                                    isAntiAlias = true
-                                    style = Paint.Style.FILL
-                                }
-                                canvas.drawText(text, textPosition.x, textPosition.y, paint)
+                                    val paint =
+                                        Paint().apply {
+                                            color = selectedColor.toArgb()
+                                            textSize = textSize
+                                            isAntiAlias = true
+                                            style = Paint.Style.FILL
+                                        }
+                                    canvas.drawText(text, textPosition.x, textPosition.y, paint)
 
-                                val cacheFile = File(context.cacheDir, "text_${UUID.randomUUID()}.png")
-                                FileOutputStream(cacheFile).use { out ->
-                                    resultBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                    val cacheFile =
+                                        File(context.cacheDir, "text_${UUID.randomUUID()}.png")
+                                    FileOutputStream(cacheFile).use { out ->
+                                        resultBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                    }
+                                    Uri.fromFile(cacheFile).toString()
                                 }
-                                Uri.fromFile(cacheFile).toString()
-                            }
                             onApplyText(cachedUri)
                         }
                     }) {
-                        Text(stringResource(R.string.text_apply), color = StickyKeysTheme.colors.primary)
+                        Text(
+                            stringResource(R.string.text_apply),
+                            color = StickyKeysTheme.colors.primary,
+                        )
                     }
-                }
+                },
             )
-        }
+        },
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(StickyKeysTheme.spacing.md),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(StickyKeysTheme.spacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(Color.Black, StickyKeysTheme.shapes.medium),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color.Black, StickyKeysTheme.shapes.medium),
+                contentAlignment = Alignment.Center,
             ) {
                 val imgBitmap = originalBitmap!!.asImageBitmap()
                 ComposeCanvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                textPosition += dragAmount
-                            }
-                        }
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    textPosition += dragAmount
+                                }
+                            },
                 ) {
                     val scale = minOf(size.width / imgBitmap.width, size.height / imgBitmap.height)
                     val x = (size.width - imgBitmap.width * scale) / 2
@@ -155,7 +174,7 @@ fun TextOverlayScreen(
                             color = selectedColor.toArgb()
                             textSize = textSize
                             isAntiAlias = true
-                        }
+                        },
                     )
                 }
             }
@@ -164,36 +183,45 @@ fun TextOverlayScreen(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = StickyKeysTheme.colors.surfaceVariant)
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = StickyKeysTheme.colors.surfaceVariant,
+                    ),
             ) {
                 Column(
                     modifier = Modifier.padding(StickyKeysTheme.spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm)
+                    verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
                 ) {
                     OutlinedTextField(
                         value = text,
                         onValueChange = { text = it },
                         label = { Text(stringResource(R.string.text_sticker_text)) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Text("Text Size (${textSize.toInt()})", style = StickyKeysTheme.typography.bodyMedium)
+                    Text(
+                        "Text Size (${textSize.toInt()})",
+                        style = StickyKeysTheme.typography.bodyMedium,
+                    )
                     Slider(
                         value = textSize,
                         onValueChange = { textSize = it },
-                        valueRange = 20f..150f
+                        valueRange = 20f..150f,
                     )
 
-                    Text(stringResource(R.string.text_color), style = StickyKeysTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.text_color),
+                        style = StickyKeysTheme.typography.bodyMedium,
+                    )
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm)
+                        horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
                     ) {
                         availableColors.forEach { color ->
                             Button(
                                 onClick = { selectedColor = color },
                                 colors = ButtonDefaults.buttonColors(containerColor = color),
                                 modifier = Modifier.size(36.dp),
-                                contentPadding = PaddingValues(0.dp)
+                                contentPadding = PaddingValues(0.dp),
                             ) {}
                         }
                     }

@@ -11,29 +11,33 @@ import org.mockito.Mockito.mock
 import java.io.ByteArrayOutputStream
 
 class AndroidAnimatedStickerConverterTest {
-
     @Test
-    fun `converter handles missing file gracefully`() = runBlocking {
-        val converter = AndroidAnimatedStickerConverter()
-        val context = mock(Context::class.java)
-        val uri = mock(Uri::class.java)
+    fun `converter handles missing file gracefully`() =
+        runBlocking {
+            val converter = AndroidAnimatedStickerConverter()
+            val context = mock(Context::class.java)
+            val uri = mock(Uri::class.java)
 
-        val result = converter.convertVideoToAnimatedSticker(
-            context = context,
-            videoUri = uri,
-            startMs = 0,
-            endMs = 1000,
-            targetFormat = "image/gif",
-            quality = ConversionQuality.HIGH,
-            onProgress = {}
-        )
+            val result =
+                converter.convertVideoToAnimatedSticker(
+                    context = context,
+                    videoUri = uri,
+                    startMs = 0,
+                    endMs = 1000,
+                    targetFormat = "image/gif",
+                    quality = ConversionQuality.HIGH,
+                    onProgress = {},
+                )
 
-        assertTrue(result.isFailure)
-    }
+            assertTrue(result.isFailure)
+        }
 
     // --- Animated WebP structural validation ---
 
-    private fun chunk(id: String, payload: ByteArray): ByteArray {
+    private fun chunk(
+        id: String,
+        payload: ByteArray,
+    ): ByteArray {
         val out = ByteArrayOutputStream()
         out.write(id.toByteArray(Charsets.US_ASCII))
         val size = payload.size
@@ -71,12 +75,13 @@ class AndroidAnimatedStickerConverterTest {
 
     @Test
     fun `animated webp with anim flag and two frames validates`() {
-        val bytes = riffWebP(
-            chunk("VP8X", vp8xPayload(animationFlag = true)),
-            chunk("ANIM", ByteArray(6)),
-            chunk("ANMF", ByteArray(24)),
-            chunk("ANMF", ByteArray(24))
-        )
+        val bytes =
+            riffWebP(
+                chunk("VP8X", vp8xPayload(animationFlag = true)),
+                chunk("ANIM", ByteArray(6)),
+                chunk("ANMF", ByteArray(24)),
+                chunk("ANMF", ByteArray(24)),
+            )
         assertTrue(AndroidAnimatedStickerConverter.isValidAnimatedWebP(bytes))
     }
 
@@ -89,21 +94,23 @@ class AndroidAnimatedStickerConverterTest {
 
     @Test
     fun `single frame with anim flag fails validation`() {
-        val bytes = riffWebP(
-            chunk("VP8X", vp8xPayload(animationFlag = true)),
-            chunk("ANIM", ByteArray(6)),
-            chunk("ANMF", ByteArray(24))
-        )
+        val bytes =
+            riffWebP(
+                chunk("VP8X", vp8xPayload(animationFlag = true)),
+                chunk("ANIM", ByteArray(6)),
+                chunk("ANMF", ByteArray(24)),
+            )
         assertFalse(AndroidAnimatedStickerConverter.isValidAnimatedWebP(bytes))
     }
 
     @Test
     fun `frames without anim flag fail validation`() {
-        val bytes = riffWebP(
-            chunk("VP8X", vp8xPayload(animationFlag = false)),
-            chunk("ANMF", ByteArray(24)),
-            chunk("ANMF", ByteArray(24))
-        )
+        val bytes =
+            riffWebP(
+                chunk("VP8X", vp8xPayload(animationFlag = false)),
+                chunk("ANMF", ByteArray(24)),
+                chunk("ANMF", ByteArray(24)),
+            )
         assertFalse(AndroidAnimatedStickerConverter.isValidAnimatedWebP(bytes))
     }
 

@@ -18,34 +18,33 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object KeyboardDatabaseModule {
-
     @Provides
     @Singleton
-    fun provideKeyboardDatabase(@ApplicationContext context: Context): KeyboardDatabase {
-        val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `clipboard_entries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `text` TEXT NOT NULL, `timestamp` INTEGER NOT NULL)"
-                )
+    fun provideKeyboardDatabase(
+        @ApplicationContext context: Context,
+    ): KeyboardDatabase {
+        val migration1To2 =
+            object : Migration(1, 2) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `clipboard_entries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `text` TEXT NOT NULL, `timestamp` INTEGER NOT NULL)",
+                    )
+                }
             }
-        }
 
-        return Room.databaseBuilder(
-            context,
-            KeyboardDatabase::class.java,
-            "keyboard_database"
-        )
-        .addMigrations(MIGRATION_1_2)
-        .build()
+        return Room
+            .databaseBuilder(
+                context,
+                KeyboardDatabase::class.java,
+                "keyboard_database",
+            ).addMigrations(migration1To2)
+            .build()
     }
 
     @Provides
-    fun providePersonalDictionaryDao(database: KeyboardDatabase): PersonalDictionaryDao {
-        return database.personalDictionaryDao()
-    }
+    fun providePersonalDictionaryDao(database: KeyboardDatabase): PersonalDictionaryDao =
+        database.personalDictionaryDao()
 
     @Provides
-    fun provideClipboardDao(database: KeyboardDatabase): ClipboardDao {
-        return database.clipboardDao()
-    }
+    fun provideClipboardDao(database: KeyboardDatabase): ClipboardDao = database.clipboardDao()
 }

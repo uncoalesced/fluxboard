@@ -17,7 +17,10 @@ fun LoadingScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ErrorScreen(message: String, modifier: Modifier = Modifier) {
+fun ErrorScreen(
+    message: String,
+    modifier: Modifier = Modifier,
+) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(text = "Error: $message")
     }

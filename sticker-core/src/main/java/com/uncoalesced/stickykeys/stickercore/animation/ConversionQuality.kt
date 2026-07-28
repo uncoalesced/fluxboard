@@ -6,8 +6,11 @@ package com.uncoalesced.stickykeys.stickercore.animation
  * @property maxDimensionPx The maximum width or height of the output sticker in pixels.
  * @property fps The target frames per second of the output sticker.
  */
-enum class ConversionQuality(val maxDimensionPx: Int, val fps: Int) {
+enum class ConversionQuality(
+    val maxDimensionPx: Int,
+    val fps: Int,
+) {
     HIGH(maxDimensionPx = 512, fps = 15),
     MEDIUM(maxDimensionPx = 384, fps = 10),
-    LOW(maxDimensionPx = 256, fps = 8)
+    LOW(maxDimensionPx = 256, fps = 8),
 }

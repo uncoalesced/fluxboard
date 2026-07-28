@@ -9,5 +9,5 @@ data class PackEntity(
     @PrimaryKey val id: String,
     val name: String,
     val author: String,
-    val createdAt: Long
+    val createdAt: Long,
 )

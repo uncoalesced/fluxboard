@@ -1,5 +1,6 @@
 <?xml version="1.0" ?>
 <resources>
+    <string name="app_name">FluxBoard</string>
     <string name="text_close">Close</string>
     <string name="text_manage_categories">Manage Categories</string>
     <string name="text_add_rename_or_delete_your_sticker_categories">Add, rename, or delete your sticker categories</string>
@@ -23,10 +24,23 @@
     <string name="text_migration_successful">Migration Successful!</string>
     <string name="text_please_restart_the_app_to_see_all_transferred_data">Please restart the app to see all transferred data.</string>
     <string name="desc_pairing_qr_code">Pairing QR Code</string>
+    <string name="text_camera_permission_title">Camera access for pairing</string>
+    <string name="text_camera_permission_rationale">FluxBoard uses the camera only to read the pairing QR code shown on your other device. Nothing is recorded, stored, or sent anywhere.</string>
+    <string name="text_camera_permission_denied">Camera access is off, so the pairing code cannot be scanned. You can turn it on in Settings, or use this device as the sender and let the other device scan instead.</string>
+    <string name="text_continue">Continue</string>
+    <string name="text_open_settings">Open Settings</string>
+    <string name="text_not_now">Not now</string>
+    <string name="text_set_default_keyboard_title">Set FluxBoard as your default keyboard?</string>
+    <string name="text_set_default_keyboard_body">You have FluxBoard set up the way you want it. Make it the keyboard that opens everywhere by choosing it in the system picker. Android only lets you make that choice yourself, so this just opens the picker.</string>
+    <string name="text_set_default_keyboard_confirm">Open picker</string>
     <string name="text_typing_assistance">Typing Assistance</string>
     <string name="text_auto_capitalization">Auto-Capitalization</string>
     <string name="text_auto_correction">Auto-Correction</string>
     <string name="text_appearance">Appearance</string>
+    <string name="text_app_theme">App Theme</string>
+    <string name="text_theme_system">System</string>
+    <string name="text_theme_light">Light</string>
+    <string name="text_theme_dark">Dark</string>
     <string name="text_theme">Theme</string>
     <string name="text_customize_theme">Customize Theme</string>
     <string name="text_layout">Layout</string>
@@ -56,11 +70,11 @@
     <string name="text_extract_screenshot">Extract Screenshot</string>
     <string name="text_all">All</string>
     <string name="text_favourites">★ Favourites</string>
-    <string name="text_choose_how_to_process_your_selected_photos">Choose how to process your selected photos:</string>
-    <string name="text_auto_segment_batch">Auto-Segment (Batch)</string>
+    <string name="text_choose_how_to_process_your_selected_photos">Import them as they are, or edit the first one to crop and erase its background:</string>
+    <string name="text_auto_segment_batch">Batch Import</string>
     <string name="text_custom_edit">Custom Edit</string>
     <string name="text_batch_importing">Batch Importing...</string>
-    <string name="text_segmenting_saving_stickers">Segmenting &amp; saving stickers...</string>
+    <string name="text_segmenting_saving_stickers">Saving stickers...</string>
     <string name="text_new_category">New Category</string>
     <string name="text_category_name">Category Name</string>
     <string name="text_add">Add</string>
@@ -80,7 +94,7 @@
     <string name="text_remove_image">Remove Image</string>
     <string name="text_create_orange_accent_theme">Create Orange Accent Theme</string>
     <string name="text_transfer_share">Transfer &amp; Share</string>
-    <string name="text_segmenting_subject">Segmenting Subject...</string>
+    <string name="text_segmenting_subject">Preparing image...</string>
     <string name="text_crop_image">Crop Image</string>
     <string name="text_next">Next</string>
     <string name="text_erase_background">Erase Background</string>

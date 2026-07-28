@@ -23,7 +23,7 @@ single byte of it ever leaving your device.
 - [Why This Exists](#why-this-exists)
 - [Features](#features)
 - [Architecture](#architecture)
-- [Project Status & Roadmap](#project-status--roadmap)
+- [Project Status](#project-status)
 - [Repository Structure](#repository-structure)
 - [Getting Started](#getting-started)
 - [Privacy](#privacy)
@@ -83,6 +83,9 @@ feature:
 - A persistent clipboard history, cleared only by explicit user action —
   never on a timer, never automatically.
 - Haptic feedback throughout.
+- Automatic incognito mode: predictive-text learning pauses in any field
+  that signals it's privacy-sensitive (Chrome's incognito tabs, other
+  cooperating apps) — no toggle, no setting, purely automatic.
 
 ### Cross-device
 - Migrate your full library between your own devices over the same Wi-Fi
@@ -114,18 +117,9 @@ feature:
 | Build | Android Gradle Plugin 9.x, JDK 17+ |
 | Size budget | Under 100 MB installed, tracked in CI |
 
-### Brand palette
-
-The confirmed design tokens (see Phase 3 for the full breakdown and
-contrast-checked usage):
-
-| Hex | Color | Role |
-|---|---|---|
-| `#E7E247` | Yellow | Primary accent |
-| `#3D3B30` | Dark brown/ink | Dark neutral |
-| `#4D5061` | Slate | Secondary neutral |
-| `#5C80BC` | Blue | Secondary accent |
-| `#E9EDDE` | Cream | Light neutral |
+The confirmed brand palette and design tokens live in
+[`.agent/workflows/phase-03-design-system-tokens.md`](.agent/workflows/phase-03-design-system-tokens.md),
+not here — that's the source of truth, this is an overview.
 
 ### Module structure
 
@@ -152,69 +146,19 @@ Each top-level module in the diagram corresponds to a Gradle module set up
 in Phase 1; the boxes underneath are feature areas within that module,
 not separate Gradle modules themselves.
 
-## Project Status & Roadmap
+## Project Status
 
-This project is planned in 37 dependency-ordered phases across 7 arcs.
-Full detail for each phase — goals, tasks, definition of done — lives in
-[`.agent/workflows/`](.agent/workflows/), one file per phase; a
-research summary of every third-party library and repo referenced below
-lives in [`docs/repo-reference.md`](docs/repo-reference.md).
+This project is planned in 38 dependency-ordered phases across 7 arcs
+plus post-launch additions. For detailed, continuously-updated status —
+what's done, what's fixed, what's still open, and who's working on what —
+see [`docs/roadmap.md`](docs/roadmap.md) rather than this file; a README
+is the wrong place for an audit log, so that detail lives there instead
+of here.
 
-| # | Phase | Owner | Status |
-|---|---|---|---|
-| **Foundation** | | | |
-| 1 | Project Scaffolding & Repository Setup | Joel | Done |
-| 2 | Architecture Foundation | Joel | Done |
-| 3 | Design System & Theming Tokens | Rahul | Done |
-| 4 | Local Data Model, Room Schema & File Storage | Joel | Test rewritten against real API — compile-check pending |
-| **Sticker Core** | | | |
-| 5 | Manual Sticker Creation Flow | Joel | Done |
-| 6 | Sticker Editing Suite | Joel | Needs a documented decision (overwrite vs. history) |
-| 7 | Sticker Organization: Categories & Favourites | Rahul | Done |
-| **Extraction** | | | |
-| 8 | Segmentation Approach Research & Library Evaluation | Rahul | Done |
-| 9 | Screenshot & Share-Intent Capture Pipeline | Joel | Done — observer wired and filter fixed |
-| 10 | On-Device Segmentation Integration & Touch-Up UI | Joel | Done — real ML Kit confirmed, Hilt-bound |
-| 11 | Gallery/Photo Picker Import Flow | Rahul | Done |
-| **Video & GIF** | | | |
-| 12 | Video Import & Trim UI | Rahul | Done |
-| 13 | Video-to-GIF / Animated WebP Conversion Pipeline | Joel | Real animated WebP encoder wired — compile-check pending |
-| 14 | GIF/WebP Size Optimization Pass | Joel | Blocked on Phase 13 |
-| 15 | Sticker/GIF Platform-Compatibility Research | Rahul | Done |
-| **Keyboard (flagship)** | | | |
-| 16 | Minimal Sticker-Only IME Shell | Joel | Done |
-| 17 | Full Typing Keyboard Core | Joel | Done — caps-lock and MIME fix confirmed |
-| 18 | Predictive Text Engine Research & Dictionary Pipeline | Joel | Done — pipeline doc written, dictionary provenance flagged as unresolved |
-| 19 | Predictive Text Engine Implementation | Joel | Done — log leak removed, two-strike learning rule added |
-| 20 | Auto-Capitalize & Auto-Correct Logic + Toggles | Joel | Done — real dictionary-veto bug found and fixed, test re-enabled |
-| 21 | Keyboard Theming Engine | Joel | Done |
-| 22 | Keyboard Layout Customization Engine | Joel | Done, but letters-only — symbols use the legacy layout |
-| 23 | Keyboard Image/Background Customization | Joel | Done |
-| 24 | Clipboard History Manager | Joel | Done — a main-thread DB crash on delete found and fixed |
-| 25 | Haptics & Vibration Feedback | Joel | Done |
-| 26 | Keyboard & App Settings UI | Joel | Done |
-| **Cross-device** | | | |
-| 27 | Device Pairing & Trust Establishment for Migration | Joel | Claimed done — never audited |
-| 28 | LAN Device-to-Device Migration Transfer | Joel | Claimed done — never audited |
-| 29 | Ephemeral Link-Sharing Architecture | Joel | Claimed done — never audited |
-| 30 | Ephemeral Link-Sharing Implementation & Received-Sticker Import | Joel | Claimed done — never audited |
-| **Quality, Size & Release** | | | |
-| 31 | Privacy & Permissions Audit | Joel | Claimed done — never audited |
-| 32 | App Size Budget Tracking & Optimization | Joel | Claimed done — never audited |
-| 33 | Accessibility & Localization Pass | Joel | Claimed done — never audited |
-| 34 | Unit Testing Strategy for Core Logic | Joel | Claimed done — never audited |
-| 35 | UI/Instrumented Testing for Sticker & Keyboard Flows | Joel | Claimed done — never audited |
-| 36 | F-Droid / Open-Source Distribution Packaging | Joel | Claimed done — never audited |
-| 37 | Documentation Pass | Rahul | Claimed done — never audited |
-
-Work was originally split roughly 60/40 by effort between Joel and Rahul.
-As of the phases-1-17 audit and fix pass, Joel is driving all remaining
-phases through Antigravity himself (18-36); Rahul's scope is now the
-documentation phase (37) plus whatever he already contributed to the
-completed early phases. Claude Code (Opus 4.8) is used to review
-Antigravity's work, not to do the building itself. See
-[`docs/agent-prompts.md`](docs/agent-prompts.md) for the exact prompts
-used to drive each phase, including the post-audit remediation prompts.
+Short version: the build compiles and the full unit suite passes.
+Several real pre-release issues are being worked through before this is
+ready for outside testers — tracked in the roadmap doc, not duplicated
+here.
 
 ## Repository Structure
 
@@ -229,7 +173,8 @@ used to drive each phase, including the post-audit remediation prompts.
 │   └── workflows/               # One file per build phase (phase-01 .. phase-37)
 ├── docs/
 │   ├── repo-reference.md       # Every third-party repo/library evaluated, by subsystem
-│   └── agent-prompts.md        # Exact prompts + explanations for running each phase
+│   ├── agent-prompts.md        # Exact prompts + explanations for running each phase
+│   └── roadmap.md              # Detailed phase-by-phase status and known issues
 ├── app/                         # Application module
 ├── sticker-core/                # Sticker creation, extraction, GIF/WebP, organization
 ├── keyboard-core/                # IME, theming, predictive text, clipboard, haptics
