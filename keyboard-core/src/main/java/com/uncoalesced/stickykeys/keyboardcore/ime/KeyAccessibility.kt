@@ -29,6 +29,42 @@ internal fun accessibleKeyLabel(keyOutput: String): String =
     }
 
 /**
+ * How a latching key should be tinted.
+ *
+ * Shift, caps lock and off used to render pixel-identically, which left the state
+ * description added for screen readers as the only channel carrying the difference -- a
+ * sighted user had nothing at all. These map onto existing theme tokens rather than
+ * introducing a new colour.
+ */
+internal enum class KeyAccent {
+    /** No latch, or latch is off: ordinary key colours. */
+    None,
+
+    /** Engaged for the next character only, tinted with the theme primary. */
+    Active,
+
+    /** Latched until switched off, tinted with the darker primary variant. */
+    Locked,
+}
+
+/** The tint a key should carry in [mode]. */
+internal fun accentForKey(
+    keyOutput: String,
+    mode: KeyboardMode,
+): KeyAccent =
+    when (keyOutput) {
+        "SHIFT" ->
+            when (mode) {
+                KeyboardMode.LETTERS_UPPER -> KeyAccent.Active
+                KeyboardMode.LETTERS_CAPS_LOCK -> KeyAccent.Locked
+                else -> KeyAccent.None
+            }
+        "SYMBOLS_SHIFT" ->
+            if (mode == KeyboardMode.SYMBOLS_SHIFTED) KeyAccent.Active else KeyAccent.None
+        else -> KeyAccent.None
+    }
+
+/**
  * Spoken state for keys that latch, so "Shift" alone does not hide which of three
  * positions it is in. Null for keys that carry no state.
  */

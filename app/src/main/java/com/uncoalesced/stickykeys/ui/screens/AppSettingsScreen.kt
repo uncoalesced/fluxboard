@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,12 +10,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,12 +30,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import com.uncoalesced.stickykeys.BuildConfig
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.data.local.AppPreferences
+import com.uncoalesced.stickykeys.data.local.ThemeMode
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +65,12 @@ class AppSettingsViewModel
 
         fun setDefaultExportFormat(format: String) {
             appPreferences.setDefaultExportFormat(format)
+        }
+
+        val themeMode = appPreferences.themeMode
+
+        fun setThemeMode(mode: ThemeMode) {
+            appPreferences.setThemeMode(mode)
         }
     }
 
@@ -87,11 +102,32 @@ fun AppSettingsScreen(
                         .fillMaxSize()
                         .padding(16.dp),
             ) {
-                Text(
-                    text = "App Settings",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(bottom = 24.dp),
-                )
+                // Brand header. Reuses the adaptive-icon foreground rather than shipping a
+                // second copy of the same artwork: it is already packaged at five densities,
+                // it is the transparent mark (so no black box on the light palette), and the
+                // 108dp canvas padding just reads as margin at this size.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                        contentDescription = null,
+                        modifier = Modifier.size(72.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.headlineMedium,
+                        )
+                        Text(
+                            text = BuildConfig.VERSION_NAME,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
 
                 // Category Management Entry
                 Row(
@@ -121,6 +157,38 @@ fun AppSettingsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // App theme. The light palette existed in the design tokens from the start
+                // but nothing ever selected it -- the app was hardcoded dark.
+                Text(
+                    stringResource(R.string.text_app_theme),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val currentThemeMode by viewModel.themeMode.collectAsState()
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val options =
+                        listOf(
+                            ThemeMode.SYSTEM to stringResource(R.string.text_theme_system),
+                            ThemeMode.LIGHT to stringResource(R.string.text_theme_light),
+                            ThemeMode.DARK to stringResource(R.string.text_theme_dark),
+                        )
+                    options.forEachIndexed { index, (mode, label) ->
+                        SegmentedButton(
+                            selected = currentThemeMode == mode,
+                            onClick = { viewModel.setThemeMode(mode) },
+                            shape =
+                                SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = options.size,
+                                ),
+                        ) {
+                            Text(label)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Default Export Format
                 Text(
