@@ -32,4 +32,32 @@ class AppPreferencesTest {
         prefs().setDefaultExportFormat("image/gif")
         assertEquals("image/gif", prefs().defaultExportFormat.value)
     }
+
+    @Test
+    fun `theme mode defaults to dark, matching what the app shipped as`() {
+        assertEquals(ThemeMode.DARK, prefs().themeMode.value)
+    }
+
+    @Test
+    fun `every theme mode can be selected and read back`() {
+        val preferences = prefs()
+        ThemeMode.entries.forEach { mode ->
+            preferences.setThemeMode(mode)
+            assertEquals(mode, preferences.themeMode.value)
+        }
+    }
+
+    @Test
+    fun `the theme choice survives a new instance, so it is really persisted`() {
+        // The app was hardcoded dark with nothing stored; picking light has to outlive the
+        // process, not just the composition.
+        prefs().setThemeMode(ThemeMode.LIGHT)
+        assertEquals(ThemeMode.LIGHT, prefs().themeMode.value)
+    }
+
+    @Test
+    fun `an unrecognised stored value falls back to dark rather than crashing`() {
+        assertEquals(ThemeMode.DARK, ThemeMode.fromStored("PUCE"))
+        assertEquals(ThemeMode.DARK, ThemeMode.fromStored(null))
+    }
 }

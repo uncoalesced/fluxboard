@@ -65,7 +65,13 @@ class KeyboardSettingsViewModel
         val themeManager: ThemeManager,
         val layoutManager: LayoutManager,
         private val clipboardDao: ClipboardDao,
+        val appPreferences: com.uncoalesced.stickykeys.data.local.AppPreferences,
     ) : ViewModel() {
+        /** Opening either editor is what arms the default-keyboard prompt. */
+        fun onCustomizerOpened() {
+            appPreferences.markCustomizerVisited()
+        }
+
         private val _uiState =
             MutableStateFlow<KeyboardSettingsUiState>(KeyboardSettingsUiState.Success)
         val uiState: StateFlow<KeyboardSettingsUiState> = _uiState.asStateFlow()
@@ -141,6 +147,11 @@ fun KeyboardSettingsScreen(
                 com.uncoalesced.stickykeys.ui.components
                     .KeyboardSetupCard()
 
+                // One-time nudge, due only after the keyboard is enabled and the user has
+                // been into a customiser. Shows itself at most once, ever.
+                com.uncoalesced.stickykeys.ui.components
+                    .DefaultKeyboardPrompt(viewModel.appPreferences)
+
                 // Typing Assistance
                 Text(
                     stringResource(R.string.text_typing_assistance),
@@ -196,7 +207,10 @@ fun KeyboardSettingsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = onNavigateToThemeEditor) {
+                    TextButton(onClick = {
+                        viewModel.onCustomizerOpened()
+                        onNavigateToThemeEditor()
+                    }) {
                         Text(stringResource(R.string.text_customize_theme))
                     }
                 }
@@ -246,7 +260,10 @@ fun KeyboardSettingsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = onNavigateToLayoutEditor) {
+                    TextButton(onClick = {
+                        viewModel.onCustomizerOpened()
+                        onNavigateToLayoutEditor()
+                    }) {
                         Text(stringResource(R.string.text_customize_layout))
                     }
                 }
