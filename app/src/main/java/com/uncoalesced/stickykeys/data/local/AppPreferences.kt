@@ -28,6 +28,7 @@ class AppPreferences
                     "default_export_format" ->
                         _defaultExportFormat.value =
                             prefs.getString("default_export_format", "image/webp") ?: "image/webp"
+                    "theme_mode" -> _themeMode.value = readThemeMode()
                 }
             }
 
@@ -44,4 +45,58 @@ class AppPreferences
         fun setDefaultExportFormat(format: String) {
             prefs.edit().putString("default_export_format", format).apply()
         }
+
+        private fun readThemeMode(): ThemeMode =
+            ThemeMode.fromStored(prefs.getString("theme_mode", null))
+
+        private val _themeMode = MutableStateFlow(readThemeMode())
+
+        /**
+         * Which palette the app's own UI uses. The light palette existed but nothing ever
+         * selected it -- the whole app was hardcoded dark with no way to change it and
+         * nothing persisted.
+         */
+        val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
+
+        fun setThemeMode(mode: ThemeMode) {
+            prefs.edit().putString("theme_mode", mode.name).apply()
+        }
+
+        /**
+         * True once the user has opened the theme or layout editor at least once.
+         *
+         * The trigger for the "make FluxBoard your default" prompt: asking the moment the
+         * keyboard is merely enabled is asking before the user has any reason to say yes,
+         * so the prompt waits until they have actually engaged with customisation.
+         */
+        val hasVisitedCustomizer: Boolean
+            get() = prefs.getBoolean("visited_customizer", false)
+
+        fun markCustomizerVisited() {
+            prefs.edit().putBoolean("visited_customizer", true).apply()
+        }
+
+        /** True once the default-keyboard prompt has been shown, whatever the answer was. */
+        val hasShownDefaultKeyboardPrompt: Boolean
+            get() = prefs.getBoolean("shown_default_kb_prompt", false)
+
+        /** Recorded when the prompt is displayed, not when it is accepted, so it never
+         *  reappears regardless of what the user chose. */
+        fun markDefaultKeyboardPromptShown() {
+            prefs.edit().putBoolean("shown_default_kb_prompt", true).apply()
+        }
     }
+
+/** App-level theme selection, persisted across launches. */
+enum class ThemeMode {
+    /** Follow the OS light/dark setting. */
+    SYSTEM,
+    LIGHT,
+    DARK,
+    ;
+
+    companion object {
+        /** Defaults to [DARK], which is what the app shipped as before this was settable. */
+        fun fromStored(value: String?): ThemeMode = entries.firstOrNull { it.name == value } ?: DARK
+    }
+}

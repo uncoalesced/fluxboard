@@ -16,16 +16,23 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import com.uncoalesced.stickykeys.keyboardcore.ime.rememberBackgroundBitmap
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyboardTheme
 import com.uncoalesced.stickykeys.keyboardcore.theme.ThemeManager
 import com.uncoalesced.stickykeys.keyboardcore.theme.TypeScale
@@ -33,7 +40,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 
@@ -179,20 +185,39 @@ fun ThemeEditorScreen(
             ) {
                 items(themes) { theme ->
                     val isSelected = theme.id == activeTheme?.id
-                    Row(
+                    // The picker used to be a bare list of theme names, so choosing one meant
+                    // applying it and looking at the keyboard to find out what it was. The
+                    // preview composable already existed; it just was not on this screen.
+                    Column(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    viewModel.setActiveTheme(theme.id)
-                                }.background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                ).padding(16.dp),
+                                .clickable { viewModel.setActiveTheme(theme.id) }
+                                .background(
+                                    if (isSelected) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                ).padding(horizontal = 16.dp, vertical = 12.dp)
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = "Theme ${theme.name}"
+                                    role = Role.RadioButton
+                                    stateDescription =
+                                        if (isSelected) "Selected" else "Not selected"
+                                },
                     ) {
                         Text(
                             text = theme.name,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                            color =
+                                if (isSelected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        KeyboardPreview(theme = theme, compact = true)
                     }
                 }
             }
@@ -275,24 +300,31 @@ fun ThemeEditorScreen(
     }
 }
 
+/**
+ * A miniature of the keyboard drawn in [theme]'s colours.
+ *
+ * [compact] trims it to a thumbnail for the preset picker, where one of these is drawn per
+ * theme; the full version is used for the live preview of the active theme.
+ */
 @Composable
-fun KeyboardPreview(theme: KeyboardTheme) {
-    val bgPath = theme.backgroundImagePath
-    val bgBitmap =
-        remember(bgPath) {
-            if (bgPath != null) {
-                val file = File(bgPath)
-                if (file.exists()) {
-                    android.graphics.BitmapFactory
-                        .decodeFile(file.absolutePath)
-                        ?.asImageBitmap()
-                } else {
-                    null
-                }
-            } else {
-                null
-            }
+fun KeyboardPreview(
+    theme: KeyboardTheme,
+    compact: Boolean = false,
+) {
+    val keyHeight = if (compact) 14.dp else 40.dp
+    val stripHeight = if (compact) 16.dp else 40.dp
+
+    // Downsampled and decoded off the main thread. A full-resolution decode per row would
+    // be far worse here than it was on the keyboard: the picker draws one preview per theme.
+    val density = LocalDensity.current
+    val previewWidthPx =
+        with(density) {
+            LocalConfiguration.current.screenWidthDp.dp
+                .roundToPx()
         }
+    val previewHeightPx = with(density) { (keyHeight * 4 + stripHeight).roundToPx() }
+    val bgBitmap =
+        rememberBackgroundBitmap(theme.backgroundImagePath, previewWidthPx, previewHeightPx)
 
     com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme(
         darkTheme = !theme.isLight,
@@ -334,19 +366,21 @@ fun KeyboardPreview(theme: KeyboardTheme) {
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .height(stripHeight)
                             .background(
                                 com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.surface,
                             ).padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    listOf("hello", "world", "theme").forEach {
-                        Text(
-                            text = it,
-                            color = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.onSurface,
-                            style = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.typography.labelLarge,
-                        )
+                    if (!compact) {
+                        listOf("hello", "world", "theme").forEach {
+                            Text(
+                                text = it,
+                                color = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.onSurface,
+                                style = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.typography.labelLarge,
+                            )
+                        }
                     }
                 }
 
@@ -389,16 +423,19 @@ fun KeyboardPreview(theme: KeyboardTheme) {
                                 modifier =
                                     Modifier
                                         .weight(weight)
-                                        .padding(2.dp)
-                                        .height(40.dp)
+                                        .padding(if (compact) 1.dp else 2.dp)
+                                        .height(keyHeight)
                                         .background(keyBg),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Text(
-                                    text = if (keyLabel.length > 1) keyLabel.take(1) else keyLabel,
-                                    color = keyFg,
-                                    style = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.typography.keyboardKey,
-                                )
+                                if (!compact) {
+                                    Text(
+                                        text =
+                                            if (keyLabel.length > 1) keyLabel.take(1) else keyLabel,
+                                        color = keyFg,
+                                        style = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.typography.keyboardKey,
+                                    )
+                                }
                             }
                         }
                     }

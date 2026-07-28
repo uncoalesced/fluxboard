@@ -41,7 +41,16 @@ class ImePanelHeightTest {
     @Test
     @Config(qualifiers = "w411dp-h891dp")
     fun `a full-height phone window gets the full preferred panel`() {
-        assertEquals(PREFERRED_PANEL_HEIGHT, measuredPanelHeight())
+        assertEquals(280.dp, measuredPanelHeight())
+    }
+
+    @Test
+    @Config(qualifiers = "w891dp-h411dp-land")
+    fun `landscape takes its preferred height from values-land, not the portrait value`() {
+        // values-land/dimens.xml overrides ime_panel_height to 200dp. Half of a 411dp
+        // landscape window is 205dp, so the resource is the binding constraint here -- which
+        // is the point: landscape sizing comes from the resource system, not a branch.
+        assertEquals(200.dp, measuredPanelHeight())
     }
 
     @Test
@@ -65,10 +74,7 @@ class ImePanelHeightTest {
     @Config(qualifiers = "w731dp-h411dp")
     fun `landscape is clamped rather than using the portrait height`() {
         val height = measuredPanelHeight()
-        assertTrue(
-            "panel took $height of a 411dp landscape window",
-            height < PREFERRED_PANEL_HEIGHT,
-        )
+        assertTrue("panel took $height of a 411dp landscape window", height < 280.dp)
     }
 
     @Test

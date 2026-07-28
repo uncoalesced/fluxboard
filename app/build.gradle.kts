@@ -40,6 +40,8 @@ android {
 
     buildFeatures {
         compose = true
+        // VERSION_NAME is shown in the settings brand header.
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.11"

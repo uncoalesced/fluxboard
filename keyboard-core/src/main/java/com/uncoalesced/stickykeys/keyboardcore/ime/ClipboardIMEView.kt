@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.keyboardcore.data.local.entity.ClipboardEntryEntity
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +38,7 @@ fun ClipboardIMEView(
                 // Clamped against the window: a flat 280dp left almost nothing of the host
                 // app visible in a split-screen pane.
                 .height(rememberImePanelHeight())
-                .background(MaterialTheme.colorScheme.surface),
+                .background(StickyKeysTheme.colors.surface),
     ) {
         // Toolbar
         Row(
@@ -45,20 +46,20 @@ fun ClipboardIMEView(
                 Modifier
                     .fillMaxWidth()
                     .height(48.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(StickyKeysTheme.colors.surfaceVariant),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = onBackToKeyboard) {
                 Text(
                     stringResource(R.string.text_back),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = StickyKeysTheme.colors.onSurfaceVariant,
                 )
             }
             Text(
                 text = "Clipboard History",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = StickyKeysTheme.typography.titleMedium,
+                color = StickyKeysTheme.colors.onSurfaceVariant,
             )
             TextButton(
                 onClick = { viewModel.clearAll() },
@@ -75,8 +76,8 @@ fun ClipboardIMEView(
             ) {
                 Text(
                     text = "Clipboard is empty",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    style = StickyKeysTheme.typography.bodyLarge,
+                    color = StickyKeysTheme.colors.onSurfaceVariant.copy(alpha = 0.7f),
                 )
             }
         } else {
@@ -115,7 +116,7 @@ fun ClipboardEntryRow(
                 },
         colors =
             CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                containerColor = StickyKeysTheme.colors.surfaceVariant,
             ),
     ) {
         Row(
@@ -127,8 +128,8 @@ fun ClipboardEntryRow(
         ) {
             Text(
                 text = entry.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                style = StickyKeysTheme.typography.bodyMedium,
+                color = StickyKeysTheme.colors.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -142,7 +143,7 @@ fun ClipboardEntryRow(
             ) {
                 Text(
                     stringResource(R.string.text_del),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                    color = StickyKeysTheme.colors.onSurface.copy(alpha = 0.7f),
                 )
             }
         }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<resources>
+    <!-- The pre-Compose window for dark mode. values/themes.xml carries the light
+         equivalent, so a user on the light palette no longer sees a dark flash before
+         Compose draws, and a user on dark no longer sees a light one. -->
+    <style name="Theme.StickyKeys" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF3D3B30</item>
+        <item name="android:statusBarColor">#FF3D3B30</item>
+        <item name="android:navigationBarColor">#FF3D3B30</item>
+    </style>
+</resources>

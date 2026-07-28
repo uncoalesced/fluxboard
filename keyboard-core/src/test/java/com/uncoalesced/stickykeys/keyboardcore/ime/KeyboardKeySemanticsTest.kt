@@ -42,7 +42,7 @@ class KeyboardKeySemanticsTest {
         output: String,
         display: String,
         mode: KeyboardMode = KeyboardMode.LETTERS_LOWER,
-        onPress: () -> Unit = {},
+        onKeyPress: (String) -> Unit = {},
     ) {
         composeRule.setContent {
             StickyKeysTheme {
@@ -52,7 +52,7 @@ class KeyboardKeySemanticsTest {
                     mode = mode,
                     background = Color.DarkGray,
                     foreground = Color.White,
-                    onPress = onPress,
+                    onKeyPress = onKeyPress,
                 )
             }
         }
@@ -106,11 +106,11 @@ class KeyboardKeySemanticsTest {
     }
 
     @Test
-    fun `activating a key through the semantics tree fires the handler`() {
-        var pressed = 0
-        setKey(output = "SPACE", display = " ", onPress = { pressed++ })
+    fun `activating a key through the semantics tree fires the handler with its own output`() {
+        val pressed = mutableListOf<String>()
+        setKey(output = "SPACE", display = " ", onKeyPress = { pressed += it })
         composeRule.onNodeWithContentDescription("Space").performClick()
-        assertTrue("expected the press handler to run, got $pressed", pressed == 1)
+        assertEquals(listOf("SPACE"), pressed)
     }
 
     @Test
@@ -126,7 +126,7 @@ class KeyboardKeySemanticsTest {
                     mode = mode,
                     background = Color.DarkGray,
                     foreground = Color.White,
-                    onPress = {},
+                    onKeyPress = {},
                 )
             }
         }

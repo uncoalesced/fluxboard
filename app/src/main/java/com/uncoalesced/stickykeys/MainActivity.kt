@@ -6,10 +6,14 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import com.uncoalesced.stickykeys.data.local.AppPreferences
+import com.uncoalesced.stickykeys.data.local.ThemeMode
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.navigation.AppNavGraph
 import com.uncoalesced.stickykeys.stickercore.capture.ScreenshotObserver
@@ -18,6 +22,9 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @javax.inject.Inject
+    lateinit var appPreferences: AppPreferences
+
     private var sharedImageUri by mutableStateOf<String?>(null)
     private var screenshotObserver: ScreenshotObserver? = null
 
@@ -37,7 +44,16 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            StickyKeysTheme {
+            // The app used to call StickyKeysTheme with its default darkTheme = true, so the
+            // light palette was unreachable no matter what the user or the OS wanted.
+            val themeMode by appPreferences.themeMode.collectAsState()
+            val darkTheme =
+                when (themeMode) {
+                    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                    ThemeMode.LIGHT -> false
+                    ThemeMode.DARK -> true
+                }
+            StickyKeysTheme(darkTheme = darkTheme) {
                 AppNavGraph(initialImageUri = sharedImageUri)
             }
         }
