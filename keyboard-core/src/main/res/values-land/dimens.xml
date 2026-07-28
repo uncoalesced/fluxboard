@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<resources>
+    <!-- Landscape windows are short, so the portrait height would leave almost no host
+         app visible. Rows share whatever is left after the strip rather than each
+         keeping a fixed key height, so the keyboard compresses instead of overflowing. -->
+    <dimen name="ime_panel_height">200dp</dimen>
+    <dimen name="suggestion_strip_height">32dp</dimen>
+    <dimen name="ime_content_padding">2dp</dimen>
+</resources>

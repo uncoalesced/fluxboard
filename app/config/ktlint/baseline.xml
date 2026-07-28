@@ -11,7 +11,7 @@
         <error line="17" column="1" source="standard:no-wildcard-imports" />
     </file>
     <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/KeyboardSettingsScreen.kt">
-        <error line="344" column="101" source="standard:max-line-length" />
+        <error line="361" column="101" source="standard:max-line-length" />
     </file>
     <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/LayoutEditorScreen.kt">
         <error line="7" column="1" source="standard:no-wildcard-imports" />
@@ -40,15 +40,13 @@
         <error line="11" column="1" source="standard:no-wildcard-imports" />
         <error line="14" column="1" source="standard:no-wildcard-imports" />
         <error line="15" column="1" source="standard:no-wildcard-imports" />
-        <error line="189" column="101" source="standard:max-line-length" />
-        <error line="194" column="101" source="standard:max-line-length" />
-        <error line="326" column="101" source="standard:max-line-length" />
-        <error line="339" column="101" source="standard:max-line-length" />
-        <error line="347" column="101" source="standard:max-line-length" />
-        <error line="348" column="101" source="standard:max-line-length" />
-        <error line="377" column="101" source="standard:max-line-length" />
-        <error line="386" column="101" source="standard:max-line-length" />
-        <error line="400" column="101" source="standard:max-line-length" />
+        <error line="358" column="101" source="standard:max-line-length" />
+        <error line="371" column="101" source="standard:max-line-length" />
+        <error line="380" column="101" source="standard:max-line-length" />
+        <error line="381" column="101" source="standard:max-line-length" />
+        <error line="411" column="101" source="standard:max-line-length" />
+        <error line="420" column="101" source="standard:max-line-length" />
+        <error line="436" column="101" source="standard:max-line-length" />
     </file>
     <file name="src/main/java/com/uncoalesced/stickykeys/ui/screens/creation/CropScreen.kt">
         <error line="12" column="1" source="standard:no-wildcard-imports" />

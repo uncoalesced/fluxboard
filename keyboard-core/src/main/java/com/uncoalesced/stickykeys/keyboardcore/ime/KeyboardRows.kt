@@ -1,7 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -10,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyDefinition
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysColors
 
 /**
  * The key grid, in a wrapper Compose can prove is stable.
@@ -57,6 +60,49 @@ internal fun rememberKeyPressHandler(
         }
     }
 
+/** The two colours a key is painted with. */
+internal data class KeyColors(
+    val background: Color,
+    val foreground: Color,
+)
+
+/**
+ * Picks a key's colours, including the latch accent.
+ *
+ * Pure and separate from the composable so the accent is assertable without rendering:
+ * Robolectric cannot capture pixels (`captureToImage` needs a real window surface), and a
+ * test that recomputed the expected colour the same way the view does would prove nothing.
+ */
+internal fun resolveKeyColors(
+    keyOutput: String,
+    weight: Float,
+    mode: KeyboardMode,
+    palette: StickyKeysColors,
+    hasBackgroundImage: Boolean,
+): KeyColors {
+    val isSpecialKey = weight > 1f
+    val accent = accentForKey(keyOutput, mode)
+
+    val backgroundBase =
+        when (accent) {
+            KeyAccent.Active -> palette.primary
+            KeyAccent.Locked -> palette.primaryVariant
+            KeyAccent.None -> if (isSpecialKey) palette.surfaceVariant else palette.surface
+        }
+    val foreground =
+        when (accent) {
+            KeyAccent.None ->
+                if (isSpecialKey) palette.onSurfaceVariant else palette.onSurface
+            else -> palette.onPrimary
+        }
+
+    return KeyColors(
+        background =
+            if (hasBackgroundImage) backgroundBase.copy(alpha = 0.75f) else backgroundBase,
+        foreground = foreground,
+    )
+}
+
 /**
  * Renders every key row.
  *
@@ -69,33 +115,40 @@ internal fun rememberKeyPressHandler(
 internal fun KeyboardRowsView(
     keyRows: KeyboardRows,
     mode: KeyboardMode,
-    surface: Color,
-    surfaceVariant: Color,
-    onSurface: Color,
-    onSurfaceVariant: Color,
+    palette: StickyKeysColors,
     hasBackgroundImage: Boolean,
     onKeyPress: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    for (row in keyRows.rows) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            for (keyDef in row) {
-                val isSpecialKey = keyDef.weight > 1f
-                val keyBgBase = if (isSpecialKey) surfaceVariant else surface
-                val keyBg = if (hasBackgroundImage) keyBgBase.copy(alpha = 0.75f) else keyBgBase
-                val keyFg = if (isSpecialKey) onSurfaceVariant else onSurface
+    Column(modifier = modifier.fillMaxWidth()) {
+        for (row in keyRows.rows) {
+            Row(
+                // Rows share whatever height is left after the suggestion strip rather than
+                // each claiming a fixed key height. That is what lets the same layout work in
+                // a short landscape window without overflowing it.
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                for (keyDef in row) {
+                    val colors =
+                        resolveKeyColors(
+                            keyOutput = keyDef.output,
+                            weight = keyDef.weight,
+                            mode = mode,
+                            palette = palette,
+                            hasBackgroundImage = hasBackgroundImage,
+                        )
 
-                KeyboardKey(
-                    keyOutput = keyDef.output,
-                    displayLabel = keyDef.displayLabel ?: getDisplayLabel(keyDef.output),
-                    mode = mode,
-                    background = keyBg,
-                    foreground = keyFg,
-                    modifier = Modifier.weight(keyDef.weight),
-                    onKeyPress = onKeyPress,
-                )
+                    KeyboardKey(
+                        keyOutput = keyDef.output,
+                        displayLabel = keyDef.displayLabel ?: getDisplayLabel(keyDef.output),
+                        mode = mode,
+                        background = colors.background,
+                        foreground = colors.foreground,
+                        modifier = Modifier.weight(keyDef.weight).fillMaxHeight(),
+                        onKeyPress = onKeyPress,
+                    )
+                }
             }
         }
     }

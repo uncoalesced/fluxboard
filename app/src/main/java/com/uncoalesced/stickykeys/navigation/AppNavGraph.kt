@@ -2,6 +2,11 @@
 package com.uncoalesced.stickykeys.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -10,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -20,6 +27,14 @@ import com.uncoalesced.stickykeys.ui.screens.AppSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.DevicePairingScreen
 import com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.StickersLibraryScreen
+import com.uncoalesced.stickykeys.keyboardcore.R as KeyboardCoreR
+
+/** One bottom-bar destination. */
+private data class NavEntry(
+    val route: String,
+    val title: String,
+    val icon: ImageVector,
+)
 
 @Composable
 fun AppNavGraph(initialImageUri: String? = null) {
@@ -32,12 +47,20 @@ fun AppNavGraph(initialImageUri: String? = null) {
         }
     }
 
+    // The icons used to be Text(title.first()), so "Styles" and "Settings" both rendered a
+    // bare "S" and the bar carried no usable signal at all.
     val screens =
         listOf(
-            "stickers" to "Styles",
-            "keyboard" to "Keyboard",
-            "transfer" to "Transfer",
-            "settings" to "Settings",
+            NavEntry("stickers", "Styles", Icons.Outlined.Star),
+            NavEntry(
+                "keyboard",
+                "Keyboard",
+                // Non-transitive R: this drawable belongs to keyboard-core, so it is not on
+                // the app module's own R class.
+                ImageVector.vectorResource(KeyboardCoreR.drawable.ic_keyboard_flux),
+            ),
+            NavEntry("transfer", "Transfer", Icons.Outlined.Share),
+            NavEntry("settings", "Settings", Icons.Outlined.Settings),
         )
 
     Scaffold(
@@ -46,9 +69,16 @@ fun AppNavGraph(initialImageUri: String? = null) {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
 
-                screens.forEach { (route, title) ->
+                screens.forEach { (route, title, icon) ->
                     NavigationBarItem(
-                        icon = { Text(title.first().toString()) }, // Stub icon
+                        icon = {
+                            Icon(
+                                imageVector = icon,
+                                // The label below already carries the name, so repeating it
+                                // here would make a screen reader say it twice.
+                                contentDescription = null,
+                            )
+                        },
                         label = { Text(title) },
                         selected = currentDestination?.hierarchy?.any { it.route == route } == true,
                         onClick = {
