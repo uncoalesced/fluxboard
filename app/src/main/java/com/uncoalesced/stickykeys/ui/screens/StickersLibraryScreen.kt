@@ -1,9 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
-import androidx.compose.ui.res.stringResource
-import com.uncoalesced.stickykeys.R
-
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,22 +8,29 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
@@ -41,164 +45,209 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
-import com.uncoalesced.stickykeys.stickercore.segmentation.SegmentationEngine
 
 sealed interface TabFilter {
     data object All : TabFilter
+
     data object Favourites : TabFilter
-    data class CategoryFilter(val category: Category) : TabFilter
+
+    data class CategoryFilter(
+        val category: Category,
+    ) : TabFilter
 }
 
 sealed interface StickersUiState {
     data object Loading : StickersUiState
+
     data class Success(
         val stickers: List<Sticker>,
         val categories: List<Category>,
-        val currentTab: TabFilter
+        val currentTab: TabFilter,
     ) : StickersUiState
 }
 
 @HiltViewModel
-class StickersViewModel @Inject constructor(
-    private val repository: StickerRepository,
-    private val engine: SegmentationEngine
-) : ViewModel() {
+class StickersViewModel
+    @Inject
+    constructor(
+        private val repository: StickerRepository,
+    ) : ViewModel() {
+        private val _selectedTab = MutableStateFlow<TabFilter>(TabFilter.All)
+        val selectedTab: StateFlow<TabFilter> = _selectedTab.asStateFlow()
 
-    private val _selectedTab = MutableStateFlow<TabFilter>(TabFilter.All)
-    val selectedTab: StateFlow<TabFilter> = _selectedTab.asStateFlow()
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val stickersFlow: Flow<List<Sticker>> = _selectedTab.flatMapLatest { tab ->
-        when (tab) {
-            is TabFilter.All -> repository.getAllStickers()
-            is TabFilter.Favourites -> repository.getFavouriteStickers()
-            is TabFilter.CategoryFilter -> repository.getStickersByCategory(tab.category.id)
-        }
-    }
-
-    val uiState: StateFlow<StickersUiState> = combine(
-        stickersFlow,
-        repository.getAllCategories(),
-        _selectedTab
-    ) { stickers, categories, currentTab ->
-        StickersUiState.Success(
-            stickers = stickers,
-            categories = categories,
-            currentTab = currentTab
-        )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
-        StickersUiState.Loading
-    )
-
-    private val _isBatchImporting = MutableStateFlow(false)
-    val isBatchImporting: StateFlow<Boolean> = _isBatchImporting.asStateFlow()
-
-    fun batchImportStickers(uriStrings: List<String>, context: android.content.Context) {
-        if (uriStrings.isEmpty()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            _isBatchImporting.value = true
-
-            uriStrings.forEach { uriStr ->
-                try {
-                    val uri = Uri.parse(uriStr)
-                    val stream = context.contentResolver.openInputStream(uri)
-                    val rawBmp = BitmapFactory.decodeStream(stream)
-                    if (rawBmp != null) {
-                        val segResult = engine.segmentSubject(context, rawBmp)
-                        val finalBmp = segResult.getOrDefault(rawBmp)
-
-                        val stickerId = UUID.randomUUID().toString()
-                        val webpBytes = ByteArrayOutputStream().apply {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                finalBmp.compress(android.graphics.Bitmap.CompressFormat.WEBP_LOSSLESS, 100, this)
-                            } else {
-                                @Suppress("DEPRECATION")
-                                finalBmp.compress(android.graphics.Bitmap.CompressFormat.WEBP, 100, this)
-                            }
-                        }.toByteArray()
-
-                        val thumbBytes = ByteArrayOutputStream().apply {
-                            val thumbBmp = android.graphics.Bitmap.createScaledBitmap(finalBmp, 256, 256, true)
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                thumbBmp.compress(android.graphics.Bitmap.CompressFormat.WEBP_LOSSY, 80, this)
-                            } else {
-                                @Suppress("DEPRECATION")
-                                thumbBmp.compress(android.graphics.Bitmap.CompressFormat.WEBP, 80, this)
-                            }
-                        }.toByteArray()
-
-                        val sticker = Sticker(
-                            id = stickerId,
-                            packId = null,
-                            categoryId = null,
-                            isFavourite = false,
-                            createdAt = System.currentTimeMillis(),
-                            mimeType = "image/webp",
-                            file = File(""),
-                            thumbnailFile = File("")
-                        )
-                        repository.saveSticker(sticker, webpBytes, thumbBytes)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private val stickersFlow: Flow<List<Sticker>> =
+            _selectedTab.flatMapLatest { tab ->
+                when (tab) {
+                    is TabFilter.All -> repository.getAllStickers()
+                    is TabFilter.Favourites -> repository.getFavouriteStickers()
+                    is TabFilter.CategoryFilter -> repository.getStickersByCategory(tab.category.id)
                 }
             }
-            _isBatchImporting.value = false
-        }
-    }
 
-    fun selectTab(tab: TabFilter) {
-        _selectedTab.value = tab
-    }
-
-    fun addCategory(name: String) {
-        if (name.isBlank()) return
-        viewModelScope.launch {
-            val newCategory = Category(
-                id = UUID.randomUUID().toString(),
-                name = name.trim(),
-                sortOrder = System.currentTimeMillis().toInt()
+        val uiState: StateFlow<StickersUiState> =
+            combine(
+                stickersFlow,
+                repository.getAllCategories(),
+                _selectedTab,
+            ) { stickers, categories, currentTab ->
+                StickersUiState.Success(
+                    stickers = stickers,
+                    categories = categories,
+                    currentTab = currentTab,
+                )
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                StickersUiState.Loading,
             )
-            repository.saveCategory(newCategory)
-        }
-    }
 
-    fun deleteCategory(id: String) {
-        viewModelScope.launch {
-            repository.deleteCategory(id)
-            if (_selectedTab.value is TabFilter.CategoryFilter && (_selectedTab.value as TabFilter.CategoryFilter).category.id == id) {
-                _selectedTab.value = TabFilter.All
+        private val _isBatchImporting = MutableStateFlow(false)
+        val isBatchImporting: StateFlow<Boolean> = _isBatchImporting.asStateFlow()
+
+        fun batchImportStickers(
+            uriStrings: List<String>,
+            context: android.content.Context,
+        ) {
+            if (uriStrings.isEmpty()) return
+            viewModelScope.launch(Dispatchers.IO) {
+                _isBatchImporting.value = true
+
+                uriStrings.forEach { uriStr ->
+                    try {
+                        val uri = Uri.parse(uriStr)
+                        val stream = context.contentResolver.openInputStream(uri)
+                        val finalBmp = BitmapFactory.decodeStream(stream)
+                        if (finalBmp != null) {
+                            // Imported as-is. v1 has no automatic background removal --
+                            // use the single-image flow and the manual eraser for cutouts.
+                            val stickerId = UUID.randomUUID().toString()
+                            val webpBytes =
+                                ByteArrayOutputStream()
+                                    .apply {
+                                        if (android.os.Build.VERSION.SDK_INT >=
+                                            android.os.Build.VERSION_CODES.R
+                                        ) {
+                                            finalBmp.compress(
+                                                android.graphics.Bitmap.CompressFormat.WEBP_LOSSLESS,
+                                                100,
+                                                this,
+                                            )
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            finalBmp.compress(
+                                                android.graphics.Bitmap.CompressFormat.WEBP,
+                                                100,
+                                                this,
+                                            )
+                                        }
+                                    }.toByteArray()
+
+                            val thumbBytes =
+                                ByteArrayOutputStream()
+                                    .apply {
+                                        val thumbBmp =
+                                            android.graphics.Bitmap.createScaledBitmap(
+                                                finalBmp,
+                                                256,
+                                                256,
+                                                true,
+                                            )
+                                        if (android.os.Build.VERSION.SDK_INT >=
+                                            android.os.Build.VERSION_CODES.R
+                                        ) {
+                                            thumbBmp.compress(
+                                                android.graphics.Bitmap.CompressFormat.WEBP_LOSSY,
+                                                80,
+                                                this,
+                                            )
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            thumbBmp.compress(
+                                                android.graphics.Bitmap.CompressFormat.WEBP,
+                                                80,
+                                                this,
+                                            )
+                                        }
+                                    }.toByteArray()
+
+                            val sticker =
+                                Sticker(
+                                    id = stickerId,
+                                    packId = null,
+                                    categoryId = null,
+                                    isFavourite = false,
+                                    createdAt = System.currentTimeMillis(),
+                                    mimeType = "image/webp",
+                                    file = File(""),
+                                    thumbnailFile = File(""),
+                                )
+                            repository.saveSticker(sticker, webpBytes, thumbBytes)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                _isBatchImporting.value = false
+            }
+        }
+
+        fun selectTab(tab: TabFilter) {
+            _selectedTab.value = tab
+        }
+
+        fun addCategory(name: String) {
+            if (name.isBlank()) return
+            viewModelScope.launch {
+                val newCategory =
+                    Category(
+                        id = UUID.randomUUID().toString(),
+                        name = name.trim(),
+                        sortOrder = System.currentTimeMillis().toInt(),
+                    )
+                repository.saveCategory(newCategory)
+            }
+        }
+
+        fun deleteCategory(id: String) {
+            viewModelScope.launch {
+                repository.deleteCategory(id)
+                if (_selectedTab.value is TabFilter.CategoryFilter &&
+                    (_selectedTab.value as TabFilter.CategoryFilter).category.id == id
+                ) {
+                    _selectedTab.value = TabFilter.All
+                }
+            }
+        }
+
+        fun toggleFavourite(stickerId: String) {
+            viewModelScope.launch {
+                repository.toggleFavourite(stickerId)
+            }
+        }
+
+        fun assignCategory(
+            sticker: Sticker,
+            categoryId: String?,
+        ) {
+            viewModelScope.launch {
+                repository.updateStickerMetadata(sticker.copy(categoryId = categoryId))
+            }
+        }
+
+        fun deleteSticker(stickerId: String) {
+            viewModelScope.launch {
+                repository.deleteSticker(stickerId)
             }
         }
     }
-
-    fun toggleFavourite(stickerId: String) {
-        viewModelScope.launch {
-            repository.toggleFavourite(stickerId)
-        }
-    }
-
-    fun assignCategory(sticker: Sticker, categoryId: String?) {
-        viewModelScope.launch {
-            repository.updateStickerMetadata(sticker.copy(categoryId = categoryId))
-        }
-    }
-
-    fun deleteSticker(stickerId: String) {
-        viewModelScope.launch {
-            repository.deleteSticker(stickerId)
-        }
-    }
-}
 
 @Composable
 fun StickersLibraryScreen(
     viewModel: StickersViewModel = hiltViewModel(),
     onImagePicked: (String) -> Unit = {},
     onVideoPicked: (String) -> Unit = {},
-    onStickerClick: (String) -> Unit = {}
+    onStickerClick: (String) -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -207,19 +256,21 @@ fun StickersLibraryScreen(
     var pendingImportUris by remember { mutableStateOf<List<String>>(emptyList()) }
     val isBatchImporting by viewModel.isBatchImporting.collectAsState()
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            pendingImportUris = uris.map { it.toString() }
+    val imagePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10),
+        ) { uris ->
+            if (uris.isNotEmpty()) {
+                pendingImportUris = uris.map { it.toString() }
+            }
         }
-    }
 
-    val videoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        uri?.let { onVideoPicked(it.toString()) }
-    }
+    val videoPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia(),
+        ) { uri ->
+            uri?.let { onVideoPicked(it.toString()) }
+        }
 
     when (val current = state) {
         is StickersUiState.Loading -> LoadingScreen()
@@ -229,32 +280,36 @@ fun StickersLibraryScreen(
                 floatingActionButton = {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val context = LocalContext.current
                         ExtendedFloatingActionButton(
                             onClick = {
                                 videoPickerLauncher.launch(
                                     PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.VideoOnly
-                                    )
+                                        ActivityResultContracts.PickVisualMedia.VideoOnly,
+                                    ),
                                 )
                             },
                             containerColor = StickyKeysTheme.colors.surfaceVariant,
-                            contentColor = StickyKeysTheme.colors.onBackground
+                            contentColor = StickyKeysTheme.colors.onBackground,
                         ) {
                             Text(stringResource(R.string.text_import_video))
                         }
 
                         ExtendedFloatingActionButton(
                             onClick = {
-                                val screenshotUri = com.uncoalesced.stickykeys.capture.ScreenshotHelper.getLastScreenshotUri(context)
+                                val screenshotUri =
+                                    com.uncoalesced.stickykeys.capture.ScreenshotHelper
+                                        .getLastScreenshotUri(
+                                            context,
+                                        )
                                 if (screenshotUri != null) {
                                     onImagePicked(screenshotUri.toString())
                                 }
                             },
                             containerColor = StickyKeysTheme.colors.secondary,
-                            contentColor = StickyKeysTheme.colors.onSecondary
+                            contentColor = StickyKeysTheme.colors.onSecondary,
                         ) {
                             Text(stringResource(R.string.text_extract_screenshot))
                         }
@@ -263,52 +318,69 @@ fun StickersLibraryScreen(
                             onClick = {
                                 imagePickerLauncher.launch(
                                     PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.ImageOnly
-                                    )
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                    ),
                                 )
                             },
                             containerColor = StickyKeysTheme.colors.primary,
-                            contentColor = StickyKeysTheme.colors.onPrimary
+                            contentColor = StickyKeysTheme.colors.onPrimary,
                         ) {
                             Text(stringResource(R.string.text_))
                         }
                     }
-                }
+                },
             ) { paddingValues ->
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
                 ) {
                     // Category & Filter Tabs
                     ScrollableTabRow(
-                        selectedTabIndex = when (current.currentTab) {
-                            is TabFilter.All -> 0
-                            is TabFilter.Favourites -> 1
-                            is TabFilter.CategoryFilter -> 2 + current.categories.indexOfFirst { it.id == (current.currentTab as TabFilter.CategoryFilter).category.id }
-                        }.coerceAtLeast(0),
+                        selectedTabIndex =
+                            when (current.currentTab) {
+                                is TabFilter.All -> 0
+                                is TabFilter.Favourites -> 1
+                                is TabFilter.CategoryFilter ->
+                                    2 +
+                                        current.categories.indexOfFirst {
+                                            it.id ==
+                                                (current.currentTab as TabFilter.CategoryFilter).category.id
+                                        }
+                            }.coerceAtLeast(0),
                         edgePadding = StickyKeysTheme.spacing.sm,
-                        containerColor = StickyKeysTheme.colors.surfaceVariant
+                        containerColor = StickyKeysTheme.colors.surfaceVariant,
                     ) {
                         Tab(
                             selected = current.currentTab is TabFilter.All,
                             onClick = { viewModel.selectTab(TabFilter.All) },
-                            text = { Text(stringResource(R.string.text_all)) }
+                            text = { Text(stringResource(R.string.text_all)) },
                         )
                         Tab(
                             selected = current.currentTab is TabFilter.Favourites,
                             onClick = { viewModel.selectTab(TabFilter.Favourites) },
-                            text = { Text(stringResource(R.string.text_favourites)) }
+                            text = { Text(stringResource(R.string.text_favourites)) },
                         )
                         current.categories.forEach { category ->
                             Tab(
-                                selected = current.currentTab is TabFilter.CategoryFilter && (current.currentTab as TabFilter.CategoryFilter).category.id == category.id,
-                                onClick = { viewModel.selectTab(TabFilter.CategoryFilter(category)) },
-                                text = { Text(category.name) }
+                                selected =
+                                    current.currentTab is TabFilter.CategoryFilter &&
+                                        (current.currentTab as TabFilter.CategoryFilter).category.id ==
+                                        category.id,
+                                onClick = {
+                                    viewModel.selectTab(
+                                        TabFilter.CategoryFilter(category),
+                                    )
+                                },
+                                text = { Text(category.name) },
                             )
                         }
                         IconButton(onClick = { showAddCategoryDialog = true }) {
-                            Text(stringResource(R.string.text_), style = StickyKeysTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.text_),
+                                style = StickyKeysTheme.typography.titleMedium,
+                            )
                         }
                     }
 
@@ -316,28 +388,39 @@ fun StickersLibraryScreen(
                     if (current.stickers.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 text = "No stickers in this view.",
                                 style = StickyKeysTheme.typography.bodyMedium,
-                                color = StickyKeysTheme.colors.onBackground
+                                color = StickyKeysTheme.colors.onBackground,
                             )
                         }
                     } else {
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(minSize = 100.dp),
                             contentPadding = PaddingValues(StickyKeysTheme.spacing.md),
-                            horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
-                            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
-                            modifier = Modifier.fillMaxSize()
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    StickyKeysTheme.spacing.sm,
+                                ),
+                            verticalArrangement =
+                                Arrangement.spacedBy(
+                                    StickyKeysTheme.spacing.sm,
+                                ),
+                            modifier = Modifier.fillMaxSize(),
                         ) {
-                            items(current.stickers, key = { it.id }) { sticker ->
+                            itemsIndexed(
+                                current.stickers,
+                                key = { _, it -> it.id },
+                            ) { index, sticker ->
                                 StickerGridItem(
                                     sticker = sticker,
+                                    positionLabel =
+                                        "Sticker ${index + 1} of ${current.stickers.size}",
                                     onStickerClick = { onStickerClick(sticker.id) },
                                     onToggleFavourite = { viewModel.toggleFavourite(sticker.id) },
-                                    onLongClick = { stickerForMenu = sticker }
+                                    onLongClick = { stickerForMenu = sticker },
                                 )
                             }
                         }
@@ -352,7 +435,7 @@ fun StickersLibraryScreen(
                     onAddCategory = { name ->
                         viewModel.addCategory(name)
                         showAddCategoryDialog = false
-                    }
+                    },
                 )
             }
 
@@ -369,7 +452,7 @@ fun StickersLibraryScreen(
                     onDeleteSticker = {
                         viewModel.deleteSticker(stickerForMenu!!.id)
                         stickerForMenu = null
-                    }
+                    },
                 )
             }
 
@@ -379,14 +462,20 @@ fun StickersLibraryScreen(
                 AlertDialog(
                     onDismissRequest = { pendingImportUris = emptyList() },
                     title = { Text("Import ${pendingImportUris.size} Images") },
-                    text = { Text(stringResource(R.string.text_choose_how_to_process_your_selected_photos)) },
+                    text = {
+                        Text(
+                            stringResource(
+                                R.string.text_choose_how_to_process_your_selected_photos,
+                            ),
+                        )
+                    },
                     confirmButton = {
                         Button(
                             onClick = {
                                 val uris = pendingImportUris
                                 pendingImportUris = emptyList()
                                 viewModel.batchImportStickers(uris, context)
-                            }
+                            },
                         ) {
                             Text(stringResource(R.string.text_auto_segment_batch))
                         }
@@ -397,11 +486,11 @@ fun StickersLibraryScreen(
                                 val firstUri = pendingImportUris.first()
                                 pendingImportUris = emptyList()
                                 onImagePicked(firstUri)
-                            }
+                            },
                         ) {
                             Text(stringResource(R.string.text_custom_edit))
                         }
-                    }
+                    },
                 )
             }
 
@@ -411,14 +500,17 @@ fun StickersLibraryScreen(
                     title = { Text(stringResource(R.string.text_batch_importing)) },
                     text = {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.md),
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    StickyKeysTheme.spacing.md,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             CircularProgressIndicator()
                             Text(stringResource(R.string.text_segmenting_saving_stickers))
                         }
                     },
-                    confirmButton = {}
+                    confirmButton = {},
                 )
             }
         }
@@ -427,53 +519,81 @@ fun StickersLibraryScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun StickerGridItem(
+internal fun StickerGridItem(
     sticker: Sticker,
+    positionLabel: String,
     onStickerClick: () -> Unit,
     onToggleFavourite: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
 ) {
-    val bitmap = remember(sticker.thumbnailFile) {
-        if (sticker.thumbnailFile.exists()) {
-            BitmapFactory.decodeFile(sticker.thumbnailFile.absolutePath)
-        } else null
-    }
+    val bitmap =
+        remember(sticker.thumbnailFile) {
+            if (sticker.thumbnailFile.exists()) {
+                BitmapFactory.decodeFile(sticker.thumbnailFile.absolutePath)
+            } else {
+                null
+            }
+        }
 
     Card(
-        modifier = Modifier
-            .size(100.dp)
-            .combinedClickable(
-                onClick = onStickerClick,
-                onLongClick = onLongClick
-            ),
-        colors = CardDefaults.cardColors(containerColor = StickyKeysTheme.colors.surfaceVariant)
+        modifier =
+            Modifier
+                .size(100.dp)
+                .combinedClickable(
+                    onClick = onStickerClick,
+                    onLongClick = onLongClick,
+                ),
+        colors = CardDefaults.cardColors(containerColor = StickyKeysTheme.colors.surfaceVariant),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Every item used to announce the identical string "Sticker", so a screen
+            // reader user could not tell one grid cell from the next, nor how far through
+            // the grid they were. The favourite state belongs in the same announcement --
+            // it is otherwise conveyed only by a star glyph and a colour.
+            val favouriteSuffix = if (sticker.isFavourite) ", favourite" else ""
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = stringResource(R.string.desc_sticker),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(StickyKeysTheme.spacing.xs)
+                    contentDescription = positionLabel + favouriteSuffix,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(StickyKeysTheme.spacing.xs),
                 )
             } else {
                 Text(
                     "Sticker",
                     style = StickyKeysTheme.typography.labelMedium,
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier =
+                        Modifier
+                            .align(Alignment.Center)
+                            .semantics {
+                                contentDescription = positionLabel + favouriteSuffix
+                            },
                 )
             }
 
             IconButton(
                 onClick = onToggleFavourite,
-                modifier = Modifier
-                    .size(24.dp)
-                    .align(Alignment.TopEnd)
+                modifier =
+                    Modifier
+                        .size(24.dp)
+                        .align(Alignment.TopEnd)
+                        .semantics {
+                            contentDescription = "Favourite"
+                            role = Role.Switch
+                            stateDescription = if (sticker.isFavourite) "On" else "Off"
+                        },
             ) {
                 Text(
                     text = if (sticker.isFavourite) "★" else "☆",
-                    color = if (sticker.isFavourite) StickyKeysTheme.colors.primary else StickyKeysTheme.colors.onBackground
+                    color =
+                        if (sticker.isFavourite) {
+                            StickyKeysTheme.colors.primary
+                        } else {
+                            StickyKeysTheme.colors.onBackground
+                        },
+                    modifier = Modifier.clearAndSetSemantics { },
                 )
             }
         }
@@ -483,7 +603,7 @@ private fun StickerGridItem(
 @Composable
 private fun AddCategoryDialog(
     onDismiss: () -> Unit,
-    onAddCategory: (String) -> Unit
+    onAddCategory: (String) -> Unit,
 ) {
     var text by remember { mutableStateOf("") }
     AlertDialog(
@@ -494,15 +614,17 @@ private fun AddCategoryDialog(
                 value = text,
                 onValueChange = { text = it },
                 label = { Text(stringResource(R.string.text_category_name)) },
-                singleLine = true
+                singleLine = true,
             )
         },
         confirmButton = {
-            TextButton(onClick = { onAddCategory(text) }) { Text(stringResource(R.string.text_add)) }
+            TextButton(
+                onClick = { onAddCategory(text) },
+            ) { Text(stringResource(R.string.text_add)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.text_cancel)) }
-        }
+        },
     )
 }
 
@@ -512,16 +634,27 @@ private fun StickerContextMenuDialog(
     categories: List<Category>,
     onDismiss: () -> Unit,
     onAssignCategory: (String?) -> Unit,
-    onDeleteSticker: () -> Unit
+    onDeleteSticker: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.text_sticker_options)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.xs)) {
-                Text(stringResource(R.string.text_assign_category), style = StickyKeysTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.text_assign_category),
+                    style = StickyKeysTheme.typography.bodyMedium,
+                )
                 TextButton(onClick = { onAssignCategory(null) }) {
-                    Text(if (sticker.categoryId == null) "• None (Unassigned)" else "None (Unassigned)")
+                    Text(
+                        if (sticker.categoryId ==
+                            null
+                        ) {
+                            "• None (Unassigned)"
+                        } else {
+                            "None (Unassigned)"
+                        },
+                    )
                 }
                 categories.forEach { cat ->
                     TextButton(onClick = { onAssignCategory(cat.id) }) {
@@ -530,12 +663,15 @@ private fun StickerContextMenuDialog(
                 }
                 HorizontalDivider()
                 TextButton(onClick = onDeleteSticker) {
-                    Text(stringResource(R.string.text_delete_sticker), color = StickyKeysTheme.colors.error)
+                    Text(
+                        stringResource(R.string.text_delete_sticker),
+                        color = StickyKeysTheme.colors.error,
+                    )
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.text_close)) }
-        }
+        },
     )
 }

@@ -3,20 +3,38 @@ package com.uncoalesced.stickykeys.keyboardcore.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primitives
-val Indigo500 = Color(0xFF6366F1)
-val Indigo400 = Color(0xFF818CF8)
-val Indigo600 = Color(0xFF4F46E5)
+// --- Brand palette (confirmed, "sticky3" board) -----------------------------
+// Dark mode is the DEFAULT experience (see StickyKeysTheme). These five values
+// are the source of truth; everything below maps them into semantic slots.
+//
+// Ink    #3D3B30  primary surface/background -- the dark-mode base
+// Blue   #5C80BC  primary accent -- buttons, active states, keyboard accent key
+// Slate  #4D5061  secondary neutral -- muted surfaces, secondary buttons
+// Yellow #E7E247  secondary/highlight ONLY -- sparse; never a default button/
+//                 active-state color (see BrandYellow, kept out of the semantic
+//                 slots on purpose so it can't become a default accent)
+// Cream  #E9EDDE  primary text/foreground on the dark base; light-mode bg
+val Ink = Color(0xFF3D3B30)
+val Blue = Color(0xFF5C80BC)
+val Slate = Color(0xFF4D5061)
+val Cream = Color(0xFFE9EDDE)
 
-val Teal400 = Color(0xFF2DD4BF)
-val Teal300 = Color(0xFF5EEAD4)
+/**
+ * Highlight accent. Intentionally NOT wired into [StickyKeysColors]' interactive
+ * slots so it can never become a default button/active color. Reference it
+ * directly, sparingly (a single call-to-action, a "new"/unread indicator).
+ * Always pair with [OnBrandYellow] for text -- Cream on Yellow fails contrast.
+ */
+val BrandYellow = Color(0xFFE7E247)
+val OnBrandYellow = Ink // Ink-on-Yellow = 8.23:1 (Cream-on-Yellow would be 1.15:1)
 
-val Slate50 = Color(0xFFF8FAFC)
-val Slate100 = Color(0xFFF1F5F9)
-val Slate200 = Color(0xFFE2E8F0)
-val Slate800 = Color(0xFF1E293B)
-val Slate900 = Color(0xFF0F172A)
-val Slate950 = Color(0xFF020617)
+// Derived tones (not new brand colors -- tonal variants for elevation/contrast):
+// BlueDark is a darker accent that passes AA for normal-size text on-accent
+// (white 6.73:1, cream 5.65:1), where brand Blue alone reaches only ~3.4-4.0:1.
+val BlueDark = Color(0xFF3F5C8C)
+val InkSurfaceVariant = Color(0xFF43454F) // muted dark surface (Cream on it 8.0:1)
+val CreamSurface = Color(0xFFF3F5EC) // light-preset elevated surface
+val CreamSurfaceVariant = Color(0xFFDCE0D2) // light-preset muted surface
 
 val ErrorRed = Color(0xFFEF4444)
 val ErrorRedDark = Color(0xFFDC2626)
@@ -40,39 +58,45 @@ data class StickyKeysColors(
     val onSurface: Color,
     val onSurfaceVariant: Color,
     val onError: Color,
-    val isLight: Boolean
+    val isLight: Boolean,
 )
 
-fun lightStickyKeysColors() = StickyKeysColors(
-    primary = Indigo500,
-    primaryVariant = Indigo600,
-    secondary = Teal400,
-    background = Slate50,
-    surface = Color.White,
-    surfaceVariant = Slate100,
-    error = ErrorRed,
-    onPrimary = Color.White,
-    onSecondary = Slate900,
-    onBackground = Slate900,
-    onSurface = Slate900,
-    onSurfaceVariant = Slate800,
-    onError = Color.White,
-    isLight = true
-)
+// Contrast against the dark base (WCAG AA, measured):
+//   Cream on Ink 9.45  Cream on Slate 6.69  Cream on InkSurfaceVariant 8.00  -> text is legible everywhere
+//   onPrimary (Cream) on Blue 3.35 -> primary labels must be large/bold (>=18sp or bold 14sp); use primaryVariant (BlueDark) for normal-size text on-accent
+//   Blue fill vs Ink 2.82, Slate vs Ink 1.41 -> filled elements share low luminance with the base; component edges rely on Material elevation + labels, not fill-vs-bg contrast. This is an accepted property of the brand palette, flagged rather than hidden.
+fun darkStickyKeysColors() =
+    StickyKeysColors(
+        primary = Blue,
+        primaryVariant = BlueDark,
+        secondary = Slate,
+        background = Ink,
+        surface = Slate,
+        surfaceVariant = InkSurfaceVariant,
+        error = ErrorRedDark,
+        onPrimary = Cream,
+        onSecondary = Cream,
+        onBackground = Cream,
+        onSurface = Cream,
+        onSurfaceVariant = Cream,
+        onError = Color.White,
+        isLight = false,
+    )
 
-fun darkStickyKeysColors() = StickyKeysColors(
-    primary = Indigo400,
-    primaryVariant = Indigo500,
-    secondary = Teal300,
-    background = Slate950,
-    surface = Slate900,
-    surfaceVariant = Slate800,
-    error = ErrorRedDark,
-    onPrimary = Slate900,
-    onSecondary = Slate900,
-    onBackground = Slate50,
-    onSurface = Slate50,
-    onSurfaceVariant = Slate200,
-    onError = Color.White,
-    isLight = false
-)
+fun lightStickyKeysColors() =
+    StickyKeysColors(
+        primary = Blue,
+        primaryVariant = BlueDark,
+        secondary = Slate,
+        background = Cream,
+        surface = CreamSurface,
+        surfaceVariant = CreamSurfaceVariant,
+        error = ErrorRed,
+        onPrimary = Color.White,
+        onSecondary = Cream,
+        onBackground = Ink,
+        onSurface = Ink,
+        onSurfaceVariant = Ink,
+        onError = Color.White,
+        isLight = true,
+    )

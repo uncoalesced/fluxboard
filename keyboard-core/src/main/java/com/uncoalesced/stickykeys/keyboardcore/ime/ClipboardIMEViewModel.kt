@@ -10,14 +10,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ClipboardIMEViewModel(
-    private val clipboardDao: ClipboardDao
+    private val clipboardDao: ClipboardDao,
 ) : ViewModel() {
-    
-    val clipboardEntries = clipboardDao.getAll().stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    val clipboardEntries =
+        clipboardDao.getAll().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList(),
+        )
 
     fun deleteEntry(id: Long) {
         // ClipboardDao methods are blocking; keep them off the main thread.

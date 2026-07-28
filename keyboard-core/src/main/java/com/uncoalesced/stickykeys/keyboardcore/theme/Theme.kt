@@ -1,28 +1,31 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 
-val LocalStickyKeysColors = staticCompositionLocalOf<StickyKeysColors> {
-    error("No StickyKeysColors provided")
-}
+val LocalStickyKeysColors =
+    staticCompositionLocalOf<StickyKeysColors> {
+        error("No StickyKeysColors provided")
+    }
 
-val LocalStickyKeysTypography = staticCompositionLocalOf<StickyKeysTypography> {
-    error("No StickyKeysTypography provided")
-}
+val LocalStickyKeysTypography =
+    staticCompositionLocalOf<StickyKeysTypography> {
+        error("No StickyKeysTypography provided")
+    }
 
-val LocalStickyKeysSpacing = staticCompositionLocalOf<StickyKeysSpacing> {
-    error("No StickyKeysSpacing provided")
-}
+val LocalStickyKeysSpacing =
+    staticCompositionLocalOf<StickyKeysSpacing> {
+        error("No StickyKeysSpacing provided")
+    }
 
-val LocalStickyKeysShapes = staticCompositionLocalOf<StickyKeysShapes> {
-    error("No StickyKeysShapes provided")
-}
+val LocalStickyKeysShapes =
+    staticCompositionLocalOf<StickyKeysShapes> {
+        error("No StickyKeysShapes provided")
+    }
 
 object StickyKeysTheme {
     val colors: StickyKeysColors
@@ -48,57 +51,61 @@ object StickyKeysTheme {
 
 @Composable
 fun StickyKeysTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Dark mode is the default first-launch experience, not system-driven.
+    // Light remains available as an explicit alternate (customColors / presets).
+    darkTheme: Boolean = true,
     typeScale: TypeScale = TypeScale.MEDIUM,
     customColors: StickyKeysColors? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val colors = customColors ?: if (darkTheme) {
-        darkStickyKeysColors()
-    } else {
-        lightStickyKeysColors()
-    }
+    val colors =
+        customColors ?: if (darkTheme) {
+            darkStickyKeysColors()
+        } else {
+            lightStickyKeysColors()
+        }
 
     val typography = stickyKeysTypography(scale = typeScale)
     val spacing = defaultStickyKeysSpacing
     val shapes = defaultStickyKeysShapes
 
-    // We still wrap in MaterialTheme just to provide basic defaults to underlying 
-    // Material components (like Ripple, Dialog, Surface defaults), but we map them 
+    // We still wrap in MaterialTheme just to provide basic defaults to underlying
+    // Material components (like Ripple, Dialog, Surface defaults), but we map them
     // conceptually to our tokens to ensure a consistent look.
-    val materialColors = if (darkTheme) {
-        androidx.compose.material3.darkColorScheme(
-            primary = colors.primary,
-            background = colors.background,
-            surface = colors.surface,
-            error = colors.error,
-            onPrimary = colors.onPrimary,
-            onBackground = colors.onBackground,
-            onSurface = colors.onSurface,
-            onError = colors.onError
-        )
-    } else {
-        androidx.compose.material3.lightColorScheme(
-            primary = colors.primary,
-            background = colors.background,
-            surface = colors.surface,
-            error = colors.error,
-            onPrimary = colors.onPrimary,
-            onBackground = colors.onBackground,
-            onSurface = colors.onSurface,
-            onError = colors.onError
-        )
-    }
+    val materialColors =
+        if (darkTheme) {
+            androidx.compose.material3.darkColorScheme(
+                primary = colors.primary,
+                background = colors.background,
+                surface = colors.surface,
+                error = colors.error,
+                onPrimary = colors.onPrimary,
+                onBackground = colors.onBackground,
+                onSurface = colors.onSurface,
+                onError = colors.onError,
+            )
+        } else {
+            androidx.compose.material3.lightColorScheme(
+                primary = colors.primary,
+                background = colors.background,
+                surface = colors.surface,
+                error = colors.error,
+                onPrimary = colors.onPrimary,
+                onBackground = colors.onBackground,
+                onSurface = colors.onSurface,
+                onError = colors.onError,
+            )
+        }
 
     CompositionLocalProvider(
         LocalStickyKeysColors provides colors,
         LocalStickyKeysTypography provides typography,
         LocalStickyKeysSpacing provides spacing,
-        LocalStickyKeysShapes provides shapes
+        LocalStickyKeysShapes provides shapes,
     ) {
         MaterialTheme(
             colorScheme = materialColors,
-            content = content
+            content = content,
         )
     }
 }

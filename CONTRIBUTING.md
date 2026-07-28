@@ -1,6 +1,6 @@
-# Contributing to StickyKeys
+# Contributing to FluxBoard
 
-Thank you for your interest in improving StickyKeys! Since this project is built entirely by the community, your contributions to the codebase, themes, layouts, and documentation are what keep it alive.
+Thank you for your interest in improving FluxBoard! Since this project is built entirely by the community, your contributions to the codebase, themes, layouts, and documentation are what keep it alive.
 
 ## 1. Development Setup
 
@@ -12,7 +12,7 @@ To build and test the project locally:
 
 ## 2. Adding a New Keyboard Theme
 
-Themes in StickyKeys are defined in JSON format. The Theme Engine reads these files and maps them to Jetpack Compose colors at runtime.
+Themes in FluxBoard are defined in JSON format. The Theme Engine reads these files and maps them to Jetpack Compose colors at runtime.
 
 To propose a new theme:
 1. Locate the default themes in `keyboard-core/src/main/assets/themes/`.
@@ -71,4 +71,4 @@ Our predictive text engine uses compressed N-gram tries.
 
 If you are planning a massive refactor or a brand new feature (e.g., adding an internet-reliant API):
 - **Stop and read `ARCHITECTURE.md` first.**
-- Open an Issue to discuss your idea before writing any code. StickyKeys has strict constraints on network usage and privacy (Zero Telemetry, 100% On-Device by default). We will reject features that violate these core principles.
+- Open an Issue to discuss your idea before writing any code. FluxBoard has strict constraints on network usage and privacy (Zero Telemetry, 100% On-Device by default). We will reject features that violate these core principles.
