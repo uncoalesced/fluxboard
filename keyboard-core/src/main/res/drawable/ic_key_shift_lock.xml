@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- Caps lock: the filled shift plus a bar, so the sustained state is distinguishable from
+     the one-shot latch by shape and not only by fill or accent colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2.6 L20.4,11.4 L16,11.4 L16,16.4 L8,16.4 L8,11.4 L3.6,11.4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,18.4 L16,18.4 L16,21 L8,21 Z" />
+</vector>
