@@ -111,11 +111,30 @@ class StickyKeysIME :
     }
 
     override fun onCreateInputView(): View {
+        // The owners go on the IME window's decor view, not on the ComposeView.
+        //
+        // setInputView() adds whatever this returns into the framework's own decor
+        // (android:id/inputArea, inside parentPanel). AbstractComposeView then resolves its
+        // window recomposer by walking UP from that decor root, so tags set on our own view
+        // are never in the search path. With them only on the ComposeView the process died
+        // the moment the keyboard was asked to show:
+        //
+        //     IllegalStateException: ViewTreeLifecycleOwner not found from
+        //         android.widget.LinearLayout{... android:id/parentPanel}
+        //         at AbstractComposeView.onAttachedToWindow
+        //         at InputMethodService.setInputView
+        //
+        // Setting them on the decor view puts them above every view Compose will inspect --
+        // both this one and anything the composition itself looks up (rememberSaveable
+        // resolves LocalSavedStateRegistryOwner the same way).
+        window.window?.decorView?.let { decor ->
+            decor.setViewTreeLifecycleOwner(this)
+            decor.setViewTreeViewModelStoreOwner(this)
+            decor.setViewTreeSavedStateRegistryOwner(this)
+        }
+
         val view =
             ComposeView(this).apply {
-                setViewTreeLifecycleOwner(this@StickyKeysIME)
-                setViewTreeViewModelStoreOwner(this@StickyKeysIME)
-                setViewTreeSavedStateRegistryOwner(this@StickyKeysIME)
                 setContent {
                     val stickerViewModel =
                         ViewModelProvider(
