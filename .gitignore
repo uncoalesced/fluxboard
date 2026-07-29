@@ -60,3 +60,11 @@ AUTHORS.md
 CLAUDE.md
 build/
 */build/
+
+# Release signing. The keystore itself lives OUTSIDE this repo; these patterns
+# are belt-and-braces in case one is ever copied in by mistake. Losing the
+# keystore or its password permanently breaks updates for this signing lineage.
+keystore.properties
+*.jks
+*.keystore
+*.p12
