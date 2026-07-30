@@ -140,11 +140,19 @@ class LayoutManager
         companion object {
             const val DEFAULT_LAYOUT_ID = "preset_qwerty"
 
+            /**
+             * The built-in layout, lower case and without the digit row.
+             *
+             * Case and the digit row are both applied at render time, not baked in here:
+             * this config is what gets persisted and diffed against custom layouts, and a
+             * saved copy carrying a transient view state would make the number-row toggle
+             * silently rewrite the user's layout file.
+             */
             fun buildDefaultLayout(): KeyboardLayoutConfig =
-                KeyboardLayoutConfig.fromLegacyLayout(
+                KeyboardLayoutConfig(
                     id = DEFAULT_LAYOUT_ID,
                     name = "QWERTY",
-                    legacyRows = KeyboardLayouts.qwertyLettersLower,
+                    rows = KeyboardLayouts.letterRows(upper = false, showNumberRow = false),
                 )
         }
     }
