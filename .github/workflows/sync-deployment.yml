@@ -1,0 +1,19 @@
+name: Sync Main to Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push main to deployment branch
+        run: |
+          git push origin origin/main:refs/heads/deployment --force
