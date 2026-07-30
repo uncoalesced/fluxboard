@@ -72,13 +72,21 @@ class StickyKeysIME :
     @Inject
     lateinit var incognitoState: IncognitoState
 
+    @Inject
+    lateinit var emojiRepository:
+        com.uncoalesced.stickykeys.keyboardcore.emoji.EmojiRepository
+
+    @Inject
+    lateinit var usageLog: com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
+
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val viewModelStore: ViewModelStore get() = store
-    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+    override val savedStateRegistry: SavedStateRegistry
+        get() = savedStateRegistryController.savedStateRegistry
 
     private val viewModelFactory by lazy {
         object : ViewModelProvider.Factory {
@@ -94,9 +102,12 @@ class StickyKeysIME :
                         layoutManager,
                         hapticsManager,
                         incognitoState,
+                        usageLog,
                     ) as T
                 } else if (modelClass.isAssignableFrom(ClipboardIMEViewModel::class.java)) {
                     return ClipboardIMEViewModel(clipboardDao) as T
+                } else if (modelClass.isAssignableFrom(EmojiPickerViewModel::class.java)) {
+                    return EmojiPickerViewModel(repository, emojiRepository) as T
                 }
                 throw IllegalArgumentException("Unknown ViewModel class")
             }
@@ -108,6 +119,38 @@ class StickyKeysIME :
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         clipboardHistoryManager.startListening()
+        requestHighRefreshRate()
+    }
+
+    /**
+     * Asks the display for its fastest mode while the keyboard is up.
+     *
+     * A window gets 60Hz unless it says otherwise. The system only raises the refresh rate
+     * for windows that ask, so on a 120Hz panel every animation this keyboard runs -- key
+     * colour transitions, the mode crossfade, the toolbar reveal -- was being sampled at 60,
+     * which is what reads as stutter. Nothing about the animation code was wrong; it was
+     * being shown half the frames it produced.
+     *
+     * `preferredDisplayModeId` rather than `preferredRefreshRate`: the latter is a hint the
+     * compositor may ignore, while naming a concrete mode at the *current resolution* is
+     * honoured. Filtering by resolution matters -- some devices expose high-refresh modes
+     * only at a reduced resolution, and switching those would visibly resize the display.
+     */
+    private fun requestHighRefreshRate() {
+        val win = window?.window ?: return
+        val display = win.decorView.display ?: return
+        val current = display.mode
+        val best =
+            display.supportedModes
+                .filter {
+                    it.physicalWidth == current.physicalWidth &&
+                        it.physicalHeight == current.physicalHeight
+                }.maxByOrNull { it.refreshRate }
+                ?: return
+        if (best.modeId != current.modeId) {
+            win.attributes =
+                win.attributes.apply { preferredDisplayModeId = best.modeId }
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -151,12 +194,18 @@ class StickyKeysIME :
                             this@StickyKeysIME,
                             viewModelFactory,
                         )[ClipboardIMEViewModel::class.java]
+                    val emojiPickerViewModel =
+                        ViewModelProvider(
+                            this@StickyKeysIME,
+                            viewModelFactory,
+                        )[EmojiPickerViewModel::class.java]
 
                     MainIMEView(
                         keyboardController = this@StickyKeysIME,
                         typingViewModel = typingViewModel,
                         stickerIMEViewModel = stickerViewModel,
                         clipboardIMEViewModel = clipboardViewModel,
+                        emojiPickerViewModel = emojiPickerViewModel,
                         fileManager = fileManager,
                         onStickerClick = { commitStickerContent(it) },
                     )
@@ -240,12 +289,16 @@ class StickyKeysIME :
 
     override fun onWindowShown() {
         super.onWindowShown()
+        usageLog.onSessionStart()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
     }
 
     override fun onWindowHidden() {
         super.onWindowHidden()
+        // Flushed when the keyboard goes away rather than on a timer: an IME process can be
+        // killed at any moment, and a session that only existed in memory would be lost.
+        usageLog.onSessionEnd()
         // Keyboard no longer shown -> not on an incognito field any more.
         incognitoState.set(false)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
@@ -315,6 +368,39 @@ class StickyKeysIME :
 
     override fun switchMode(mode: AppMode) {
         // Mode state is mostly handled internally in MainIMEView
+    }
+
+    override fun sendEditingKey(
+        keyCode: Int,
+        shift: Boolean,
+        ctrl: Boolean,
+    ) {
+        val ic = currentInputConnection ?: return
+        var meta = 0
+        if (shift) meta = meta or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        if (ctrl) meta = meta or KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+
+        // Built by hand rather than via the two-argument KeyEvent constructor, which has no
+        // metaState parameter -- without one, a held Select would move the caret instead of
+        // extending the selection.
+        val now = android.os.SystemClock.uptimeMillis()
+        ic.sendKeyEvent(
+            KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta),
+        )
+        ic.sendKeyEvent(
+            KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, meta),
+        )
+    }
+
+    override fun performEditAction(actionId: Int) {
+        currentInputConnection?.performContextMenuAction(actionId)
+    }
+
+    override fun showInputMethodPicker() {
+        val imm =
+            getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                as? android.view.inputmethod.InputMethodManager
+        imm?.showInputMethodPicker()
     }
 
     private fun commitStickerContent(sticker: Sticker) {
