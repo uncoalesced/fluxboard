@@ -13,6 +13,8 @@ data class KeyboardTheme(
     val typeScale: TypeScale,
     val backgroundImagePath: String? = null,
     val imageOverlayOpacity: Float = 0.4f,
+    /** Per-key presentation overrides. Defaults to the shipped look. */
+    val keyStyle: KeyStyle = KeyStyle.Default,
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
@@ -41,6 +43,7 @@ data class KeyboardTheme(
         colorsJson.put("onError", colorToHex(colors.onError))
 
         json.put("colors", colorsJson)
+        json.put("keyStyle", keyStyle.toJson())
         return json
     }
 
@@ -96,6 +99,10 @@ data class KeyboardTheme(
                 typeScale = typeScale,
                 backgroundImagePath = backgroundImagePath,
                 imageOverlayOpacity = imageOverlayOpacity,
+                // Absent in every theme written before per-key styling existed, including
+                // the shipped presets in assets/themes. Those must keep loading as the
+                // untouched default rather than as a blank keyboard.
+                keyStyle = KeyStyle.fromJson(json.optJSONObject("keyStyle")),
             )
         }
 
