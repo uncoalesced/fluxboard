@@ -12,8 +12,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
-import com.uncoalesced.stickykeys.keyboardcore.layout.KeyDefinition
+import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
+import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -63,20 +64,25 @@ class KeyboardRecompositionTest {
     @Composable
     private fun CountingKey(
         keyOutput: String,
-        displayLabel: String,
+        glyph: KeyGlyph,
+        hint: String?,
         mode: KeyboardMode,
         background: Color,
         foreground: Color,
+        alternates: KeyAlternatesState,
         onKeyPress: (String) -> Unit,
         counter: RecompositionCounter,
     ) {
         counter.count++
         KeyboardKey(
             keyOutput = keyOutput,
-            displayLabel = displayLabel,
+            glyph = glyph,
+            hint = hint,
             mode = mode,
             background = background,
             foreground = foreground,
+            alternates = alternates,
+            alternateCellWidthPx = 100f,
             onKeyPress = onKeyPress,
         )
     }
@@ -87,14 +93,20 @@ class KeyboardRecompositionTest {
         onKeyPress: (String) -> Unit,
         counter: RecompositionCounter,
     ) {
+        // Hoisted, exactly as KeyboardRowsView hoists it. Allocating a fresh one per key
+        // would hand every key an unstable parameter and defeat the very skipping this test
+        // exists to measure -- which is itself the failure mode being guarded against.
+        val alternates = remember { KeyAlternatesState() }
         keyRows.rows.forEach { row ->
             row.forEach { keyDef ->
                 CountingKey(
                     keyOutput = keyDef.output,
-                    displayLabel = keyDef.displayLabel ?: getDisplayLabel(keyDef.output),
+                    glyph = keyGlyph(keyDef.output, keyDef.displayLabel),
+                    hint = keyDef.hint,
                     mode = KeyboardMode.LETTERS_LOWER,
                     background = Color.DarkGray,
                     foreground = Color.White,
+                    alternates = alternates,
                     onKeyPress = onKeyPress,
                     counter = counter,
                 )
@@ -239,9 +251,10 @@ class KeyboardRecompositionTest {
         // any composable taking one is marked non-skippable regardless of equality.
         val rebuilt =
             KeyboardRows(
-                defaultRows.rows.map { row ->
-                    row.map { KeyDefinition(it.id, it.output, it.displayLabel, it.weight) }
-                },
+                // copy() rather than a positional rebuild: listing the fields by hand meant
+                // adding `hint` to KeyDefinition silently dropped it here, and the test then
+                // failed for a reason that had nothing to do with what it measures.
+                defaultRows.rows.map { row -> row.map { it.copy() } },
             )
         assertEquals(defaultRows, rebuilt)
     }
@@ -262,4 +275,14 @@ private class NoOpController : KeyboardController {
     override fun handleEditorAction() = Unit
 
     override fun switchMode(mode: AppMode) = Unit
+
+    override fun sendEditingKey(
+        keyCode: Int,
+        shift: Boolean,
+        ctrl: Boolean,
+    ) = Unit
+
+    override fun performEditAction(actionId: Int) = Unit
+
+    override fun showInputMethodPicker() = Unit
 }
