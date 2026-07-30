@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -33,9 +34,14 @@ import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.ime.rememberBackgroundBitmap
+import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
+import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
+import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyboardTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.keyboardcore.theme.ThemeManager
 import com.uncoalesced.stickykeys.keyboardcore.theme.TypeScale
+import com.uncoalesced.stickykeys.ui.components.KeyStyleControls
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -112,32 +118,40 @@ class ThemeEditorViewModel
             }
         }
 
-        fun updateActiveThemeOverlayOpacity(opacity: Float) {
+        /**
+         * Applies an edit to the active theme, forking a preset into a custom copy first.
+         *
+         * The fork id is derived from the preset rather than random. A random UUID per call
+         * looked fine for a one-shot edit but is wrong for anything continuous: dragging a
+         * slider fires this on every frame, and `activeTheme` only becomes the new custom
+         * theme once the manager has reloaded and the preference has propagated -- so every
+         * intervening frame still saw a preset and forked *again*. One drag could leave a
+         * dozen near-identical "Custom Ink" themes in the list. A derived id makes repeated
+         * edits converge on the same theme, which is what the user meant by dragging.
+         */
+        private fun mutateActiveTheme(transform: (KeyboardTheme) -> KeyboardTheme) {
             val theme = activeTheme.value ?: return
             viewModelScope.launch {
-                val targetThemeId =
-                    if (theme.id.startsWith("preset_")) {
-                        "custom_" + UUID.randomUUID().toString()
+                val isPreset = theme.id.startsWith("preset_")
+                val base =
+                    if (isPreset) {
+                        theme.copy(
+                            id = "custom_${theme.id}",
+                            name = "Custom ${theme.name}",
+                        )
                     } else {
-                        theme.id
+                        theme
                     }
-                val updatedTheme =
-                    theme.copy(
-                        id = targetThemeId,
-                        name =
-                            if (theme.id.startsWith(
-                                    "preset_",
-                                )
-                            ) {
-                                "Custom ${theme.name}"
-                            } else {
-                                theme.name
-                            },
-                        imageOverlayOpacity = opacity,
-                    )
-                themeManager.saveCustomTheme(updatedTheme)
+                themeManager.saveCustomTheme(transform(base))
             }
         }
+
+        fun updateActiveThemeOverlayOpacity(opacity: Float) =
+            mutateActiveTheme { it.copy(imageOverlayOpacity = opacity) }
+
+        /** Per-key styling edits all route through here, so the fork rule lives in one place. */
+        fun updateKeyStyle(transform: (KeyStyle) -> KeyStyle) =
+            mutateActiveTheme { it.copy(keyStyle = transform(it.keyStyle)) }
 
         fun removeActiveThemeBackgroundImage() {
             val theme = activeTheme.value ?: return
@@ -152,6 +166,7 @@ class ThemeEditorViewModel
 @Composable
 fun ThemeEditorScreen(
     onNavigateBack: () -> Unit,
+    onOpenPreview: () -> Unit = {},
     viewModel: ThemeEditorViewModel = hiltViewModel(),
 ) {
     val themes by viewModel.availableThemes.collectAsState()
@@ -261,6 +276,24 @@ fun ThemeEditorScreen(
                             valueRange = 0.0f..0.9f,
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    KeyStyleControls(
+                        style = activeTheme?.keyStyle ?: KeyStyle.Default,
+                        onChange = { transform -> viewModel.updateKeyStyle(transform) },
+                        hasBackgroundImage = activeTheme?.backgroundImagePath != null,
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // A static swatch cannot tell you whether a keyboard is comfortable to
+                    // type on -- the haze, the key size and the haptics only read under a
+                    // thumb. This opens the real keyboard with somewhere to type.
+                    Button(
+                        onClick = onOpenPreview,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Open live preview")
+                    }
                 }
             }
 
@@ -326,7 +359,7 @@ fun KeyboardPreview(
     val bgBitmap =
         rememberBackgroundBitmap(theme.backgroundImagePath, previewWidthPx, previewHeightPx)
 
-    com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme(
+    StickyKeysTheme(
         darkTheme = !theme.isLight,
         typeScale = theme.typeScale,
         customColors = theme.colors,
@@ -355,7 +388,7 @@ fun KeyboardPreview(
                             if (bgBitmap ==
                                 null
                             ) {
-                                com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.background
+                                StickyKeysTheme.colors.background
                             } else {
                                 Color.Transparent
                             },
@@ -368,7 +401,7 @@ fun KeyboardPreview(
                             .fillMaxWidth()
                             .height(stripHeight)
                             .background(
-                                com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.surface,
+                                StickyKeysTheme.colors.surface,
                             ).padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
@@ -377,8 +410,8 @@ fun KeyboardPreview(
                         listOf("hello", "world", "theme").forEach {
                             Text(
                                 text = it,
-                                color = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.onSurface,
-                                style = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.typography.labelLarge,
+                                color = StickyKeysTheme.colors.onSurface,
+                                style = StickyKeysTheme.typography.labelLarge,
                             )
                         }
                     }
@@ -392,6 +425,9 @@ fun KeyboardPreview(
                         listOf("SHIFT", "z", "x", "c", "v", "b", "n", "m", "DEL"),
                         listOf("SYMBOLS", "SPACE", "ENTER"),
                     )
+
+                val keyTypography =
+                    StickyKeysTheme.typography
 
                 for (row in rows) {
                     Row(
@@ -408,16 +444,24 @@ fun KeyboardPreview(
                                 }
 
                             val isSpecialKey = weight > 1f
-                            val keyBgBase = if (isSpecialKey) com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.surfaceVariant else com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.surface
+                            val keyBgBase =
+                                if (isSpecialKey) {
+                                    StickyKeysTheme.colors.surfaceVariant
+                                } else {
+                                    StickyKeysTheme.colors.surface
+                                }
                             val keyBg =
-                                if (bgBitmap !=
-                                    null
-                                ) {
+                                if (bgBitmap != null) {
                                     keyBgBase.copy(alpha = 0.75f)
                                 } else {
                                     keyBgBase
                                 }
-                            val keyFg = if (isSpecialKey) com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.onSurfaceVariant else com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.colors.onSurface
+                            val keyFg =
+                                if (isSpecialKey) {
+                                    StickyKeysTheme.colors.onSurfaceVariant
+                                } else {
+                                    StickyKeysTheme.colors.onSurface
+                                }
 
                             Box(
                                 modifier =
@@ -429,12 +473,26 @@ fun KeyboardPreview(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (!compact) {
-                                    Text(
-                                        text =
-                                            if (keyLabel.length > 1) keyLabel.take(1) else keyLabel,
-                                        color = keyFg,
-                                        style = com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme.typography.keyboardKey,
-                                    )
+                                    // Was `keyLabel.take(1)`, which drew SHIFT, SPACE and
+                                    // SYMBOLS as three identical "S" keys and DEL as "D".
+                                    // Shares the live keyboard's glyph table so the preview
+                                    // is actually a preview.
+                                    when (val glyph = keyGlyph(keyLabel)) {
+                                        is KeyGlyph.Icon ->
+                                            Icon(
+                                                painter = painterResource(glyph.res),
+                                                contentDescription = glyph.description,
+                                                tint = keyFg,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        is KeyGlyph.Label ->
+                                            Text(
+                                                text = glyph.text,
+                                                color = keyFg,
+                                                maxLines = 1,
+                                                style = keyTypography.keyboardKey,
+                                            )
+                                    }
                                 }
                             }
                         }
