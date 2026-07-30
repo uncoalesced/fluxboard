@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- Backspace. Was rendering as the literal glyph U+232B, which falls back to a tofu box on
+     devices whose system font lacks it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineJoin="round"
+        android:pathData="M9,5.2 L20,5.2 A1.6,1.6 0 0 1 21.6,6.8 L21.6,17.2 A1.6,1.6 0 0 1 20,18.8 L9,18.8 L2.6,12 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:pathData="M12.4,9.6 L17.4,14.6 M17.4,9.6 L12.4,14.6" />
+</vector>

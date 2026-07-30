@@ -36,6 +36,8 @@
     <string name="text_typing_assistance">Typing Assistance</string>
     <string name="text_auto_capitalization">Auto-Capitalization</string>
     <string name="text_auto_correction">Auto-Correction</string>
+    <string name="text_number_row">Number row</string>
+    <string name="text_number_row_summary">Always show 1-0 above the letters. The corner symbols on each key are reached by holding it, and are unaffected by this.</string>
     <string name="text_appearance">Appearance</string>
     <string name="text_app_theme">App Theme</string>
     <string name="text_theme_system">System</string>

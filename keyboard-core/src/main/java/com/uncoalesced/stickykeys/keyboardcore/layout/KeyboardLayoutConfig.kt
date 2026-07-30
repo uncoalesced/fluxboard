@@ -7,12 +7,19 @@ import org.json.JSONObject
 /**
  * Represents a single key on the keyboard with its output behavior,
  * display appearance, and relative sizing within a row.
+ *
+ * [hint] is the small secondary token drawn in the key's corner and reached by holding it --
+ * `%` on `q`, `@` on `a`. It is a key-output token rather than free text, so it renders
+ * through the same [KeyGlyph] table as a primary label and an icon hint (the mic over the
+ * comma key) needs no special case. Keeping it on the key rather than in a lookup beside the
+ * layout is what lets a custom layout move a letter without its hint going stale.
  */
 data class KeyDefinition(
     val id: String,
     val output: String,
     val displayLabel: String? = null,
     val weight: Float = 1.0f,
+    val hint: String? = null,
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
@@ -20,6 +27,9 @@ data class KeyDefinition(
         json.put("output", output)
         if (displayLabel != null) {
             json.put("displayLabel", displayLabel)
+        }
+        if (hint != null) {
+            json.put("hint", hint)
         }
         json.put("weight", weight.toDouble())
         return json
@@ -40,6 +50,7 @@ data class KeyDefinition(
                         null
                     },
                 weight = json.optDouble("weight", 1.0).toFloat(),
+                hint = if (json.has("hint")) json.getString("hint") else null,
             )
     }
 }

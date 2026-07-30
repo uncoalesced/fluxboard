@@ -3,6 +3,7 @@ package com.uncoalesced.stickykeys.keyboardcore.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.uncoalesced.stickykeys.keyboardcore.haptics.DEFAULT_HAPTICS_PERCENT
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,8 +43,10 @@ class KeyboardPreferences
                         _hapticsEnabled.value =
                             prefs.getBoolean("haptics_enabled", true)
                     "haptics_intensity" ->
-                        _hapticsIntensity.value =
-                            prefs.getInt("haptics_intensity", 50)
+                        _hapticsIntensity.value = readHapticsPercent()
+                    "show_number_row" ->
+                        _showNumberRow.value =
+                            prefs.getBoolean("show_number_row", true)
                 }
             }
 
@@ -69,8 +72,32 @@ class KeyboardPreferences
         private val _hapticsEnabled = MutableStateFlow(prefs.getBoolean("haptics_enabled", true))
         val hapticsEnabled: StateFlow<Boolean> = _hapticsEnabled.asStateFlow()
 
-        private val _hapticsIntensity = MutableStateFlow(prefs.getInt("haptics_intensity", 50))
+        /**
+         * Haptic strength as a slider percentage, 0-100.
+         *
+         * This used to be a raw motor amplitude in 1..255 written straight into
+         * `VibrationEffect.createOneShot`, which made the setting device-dependent and made
+         * zero unreachable -- the slider could not turn haptics off. Values left over from
+         * that scale are clamped rather than rescaled: the only way to hold one is to have
+         * moved the old slider, and clamping is both cheap and monotonic.
+         */
+        private val _hapticsIntensity = MutableStateFlow(readHapticsPercent())
         val hapticsIntensity: StateFlow<Int> = _hapticsIntensity.asStateFlow()
+
+        private fun readHapticsPercent(): Int =
+            prefs
+                .getInt("haptics_intensity", DEFAULT_HAPTICS_PERCENT)
+                .coerceIn(0, 100)
+
+        /**
+         * Whether the always-visible 1-0 row is shown above the letters.
+         *
+         * Defaults on, matching the reference layout. Independent of the corner hints, which
+         * carry symbols rather than digits -- turning this off does not put numbers back
+         * within reach of a long press, so the two settings are not substitutes.
+         */
+        private val _showNumberRow = MutableStateFlow(prefs.getBoolean("show_number_row", true))
+        val showNumberRow: StateFlow<Boolean> = _showNumberRow.asStateFlow()
 
         init {
             prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -96,7 +123,12 @@ class KeyboardPreferences
             prefs.edit().putBoolean("haptics_enabled", enabled).apply()
         }
 
+        fun setShowNumberRow(show: Boolean) {
+            prefs.edit().putBoolean("show_number_row", show).apply()
+        }
+
+        /** [intensity] is a slider percentage, 0-100. Zero is valid and means silent. */
         fun setHapticsIntensity(intensity: Int) {
-            prefs.edit().putInt("haptics_intensity", intensity.coerceIn(1, 255)).apply()
+            prefs.edit().putInt("haptics_intensity", intensity.coerceIn(0, 100)).apply()
         }
     }

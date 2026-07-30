@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.uncoalesced.stickykeys.data.local.AppPreferences
 import com.uncoalesced.stickykeys.data.local.ThemeMode
+import com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
+import com.uncoalesced.stickykeys.keyboardcore.haptics.ProvideHapticIndication
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.navigation.AppNavGraph
 import com.uncoalesced.stickykeys.stickercore.capture.ScreenshotObserver
@@ -24,6 +26,9 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     @javax.inject.Inject
     lateinit var appPreferences: AppPreferences
+
+    @javax.inject.Inject
+    lateinit var hapticsManager: HapticsManager
 
     private var sharedImageUri by mutableStateOf<String?>(null)
     private var screenshotObserver: ScreenshotObserver? = null
@@ -54,7 +59,12 @@ class MainActivity : ComponentActivity() {
                     ThemeMode.DARK -> true
                 }
             StickyKeysTheme(darkTheme = darkTheme) {
-                AppNavGraph(initialImageUri = sharedImageUri)
+                // Every button in the app gets the same press haptic as a key, driven by the
+                // same enable switch and strength slider. Installed once here rather than at
+                // ninety call sites, so screens added later inherit it.
+                ProvideHapticIndication(hapticsManager) {
+                    AppNavGraph(initialImageUri = sharedImageUri)
+                }
             }
         }
     }
