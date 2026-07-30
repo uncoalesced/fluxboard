@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -21,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.keyboardcore.theme.TypeScale
 import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
@@ -76,6 +78,16 @@ internal fun rememberInterceptingController(
                 appModeState.value = mode
                 delegate.switchMode(mode)
             }
+
+            override fun sendEditingKey(
+                keyCode: Int,
+                shift: Boolean,
+                ctrl: Boolean,
+            ) = delegate.sendEditingKey(keyCode, shift, ctrl)
+
+            override fun performEditAction(actionId: Int) = delegate.performEditAction(actionId)
+
+            override fun showInputMethodPicker() = delegate.showInputMethodPicker()
         }
     }
 
@@ -85,6 +97,7 @@ fun MainIMEView(
     typingViewModel: TypingViewModel,
     stickerIMEViewModel: StickerIMEViewModel,
     clipboardIMEViewModel: ClipboardIMEViewModel,
+    emojiPickerViewModel: EmojiPickerViewModel,
     fileManager: StickerFileManager,
     onStickerClick: (Sticker) -> Unit,
 ) {
@@ -98,6 +111,7 @@ fun MainIMEView(
         darkTheme = activeTheme?.isLight?.not() ?: true,
         typeScale = activeTheme?.typeScale ?: TypeScale.MEDIUM,
         customColors = activeTheme?.colors,
+        keyStyle = activeTheme?.keyStyle ?: KeyStyle.Default,
     ) {
         // Hold the panel above the gesture bar.
         //
@@ -140,6 +154,29 @@ fun MainIMEView(
                             typingViewModel = typingViewModel,
                         )
                     }
+                    AppMode.EMOJI_PICKER -> {
+                        EmojiPickerView(
+                            viewModel = emojiPickerViewModel,
+                            fileManager = fileManager,
+                            onEmojiClick = { glyph ->
+                                // Committed as plain text; the platform's emoji font draws
+                                // it. Deliberately no mode switch afterwards -- picking one
+                                // emoji is almost always followed by picking another.
+                                interceptingController.commitText(glyph)
+                            },
+                            onStickerClick = {
+                                onStickerClick(it)
+                                interceptingController.switchMode(AppMode.TYPING)
+                            },
+                            onBackToKeyboard = {
+                                interceptingController.switchMode(AppMode.TYPING)
+                            },
+                            modifier = Modifier.height(rememberImePanelHeight()),
+                        )
+                    }
+                    // Phase 16's dedicated sticker-only panel. No key routes here any more --
+                    // the emoji key and the quick-access grid both open EMOJI_PICKER. Kept
+                    // reachable in code pending a decision on retiring it; see the report.
                     AppMode.STICKERS -> {
                         StickerIMEView(
                             viewModel = stickerIMEViewModel,
@@ -151,6 +188,16 @@ fun MainIMEView(
                             onBackToKeyboard = {
                                 interceptingController.switchMode(AppMode.TYPING)
                             },
+                        )
+                    }
+                    AppMode.TEXT_EDIT -> {
+                        TextEditPanel(
+                            controller = interceptingController,
+                            palette = StickyKeysTheme.colors,
+                            onBackToKeyboard = {
+                                interceptingController.switchMode(AppMode.TYPING)
+                            },
+                            modifier = Modifier.height(rememberImePanelHeight()),
                         )
                     }
                     AppMode.CLIPBOARD -> {
