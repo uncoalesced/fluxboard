@@ -50,6 +50,9 @@ class IncognitoLearningTest {
                 mockk<LayoutManager>(relaxed = true),
                 mockk<HapticsManager>(relaxed = true),
                 IncognitoState(),
+                mockk<com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder>(
+                    relaxed = true,
+                ),
             )
     }
 
