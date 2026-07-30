@@ -20,6 +20,17 @@ val Slate = Color(0xFF4D5061)
 val Cream = Color(0xFFE9EDDE)
 
 /**
+ * The dark-mode base.
+ *
+ * Pure black rather than [Ink]. Ink is a warm near-black that reads as washed-out grey next
+ * to the keys drawn on it, and on the OLED panels this app's audience mostly carries it
+ * costs power for a colour nobody asked for. Ink is kept, still named, and still used for
+ * `OnBrandYellow` and the light palette's foreground -- this changes the base surface only,
+ * not the brand.
+ */
+val TrueBlack = Color(0xFF000000)
+
+/**
  * Highlight accent. Intentionally NOT wired into [StickyKeysColors]' interactive
  * slots so it can never become a default button/active color. Reference it
  * directly, sparingly (a single call-to-action, a "new"/unread indicator).
@@ -62,7 +73,8 @@ data class StickyKeysColors(
 )
 
 // Contrast against the dark base (WCAG AA, measured):
-//   Cream on Ink 9.45  Cream on Slate 6.69  Cream on InkSurfaceVariant 8.00  -> text is legible everywhere
+//   Cream on TrueBlack 17.9 (was 9.45 on Ink)  Cream on Slate 6.69  Cream on InkSurfaceVariant 8.00
+//     -> text is legible everywhere, and the base change only improved it
 //   onPrimary (Cream) on Blue 3.35 -> primary labels must be large/bold (>=18sp or bold 14sp); use primaryVariant (BlueDark) for normal-size text on-accent
 //   Blue fill vs Ink 2.82, Slate vs Ink 1.41 -> filled elements share low luminance with the base; component edges rely on Material elevation + labels, not fill-vs-bg contrast. This is an accepted property of the brand palette, flagged rather than hidden.
 fun darkStickyKeysColors() =
@@ -70,7 +82,7 @@ fun darkStickyKeysColors() =
         primary = Blue,
         primaryVariant = BlueDark,
         secondary = Slate,
-        background = Ink,
+        background = TrueBlack,
         surface = Slate,
         surfaceVariant = InkSurfaceVariant,
         error = ErrorRedDark,

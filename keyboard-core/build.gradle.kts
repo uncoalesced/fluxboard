@@ -20,6 +20,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Tester usage logging is gated by source set, not by a BuildConfig flag: the recording
+    // implementation exists only in src/debug and a no-op only in src/release, so it cannot
+    // be reached -- even by Hilt's generated factories -- in a stable build. A boolean was
+    // tried first and did not hold; see verifyNoUsageLoggingInRelease in the app module.
     buildFeatures {
         compose = true
     }
