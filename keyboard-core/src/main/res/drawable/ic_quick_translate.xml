@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- Translate. A Latin "A" beside the CJK character for "script", drawn as paths rather
+     than set as text: a literal CJK glyph depends on a CJK font being present, which is not
+     guaranteed on a de-Googled or minimal Android build, and would fall back to tofu. Not an
+     emoji, per the project's no-emoji rule. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Latin A -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M2.4,12.6 L5.6,4.4 L8.8,12.6 M3.7,9.9 L7.5,9.9" />
+    <!-- CJK "wen": top stroke, horizontal bar, then the two crossing strokes -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M16.4,10.6 L16.4,12.2 M12.4,14.2 L20.4,14.2 M18.6,16 L13.4,21.4 M14.2,16 L19.4,21.4" />
+</vector>

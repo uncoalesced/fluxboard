@@ -19,10 +19,10 @@ app/build/
 keyboard-core/build/
 sticker-core/build/
 transfer/build/
+*/build/
 
 # Gradle files
 .gradle/
-build/
 local.properties
 
 # Log files
@@ -45,25 +45,20 @@ Thumbs.db
 # Kotlin Gradle plugin data
 .kotlin/
 
-# Agents
+# Agents & Repository Documentation
 .agent/
 .agents/
+.agents/skills/
 AGENTS.md
 CLAUDE.md
+ARCHITECTURE.md
+AUTHORS.md
+
 # Python (dictionary-tools/ build pipeline)
 __pycache__/
 *.pyc
 
-AGENTS.md
-ARCHITECTURE.md
-AUTHORS.md
-CLAUDE.md
-build/
-*/build/
-
-# Release signing. The keystore itself lives OUTSIDE this repo; these patterns
-# are belt-and-braces in case one is ever copied in by mistake. Losing the
-# keystore or its password permanently breaks updates for this signing lineage.
+# Release signing
 keystore.properties
 *.jks
 *.keystore

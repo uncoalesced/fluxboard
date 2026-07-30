@@ -2,4 +2,7 @@
 <!-- Engineered by uncoalesced -->
 <paths>
     <files-path name="stickers" path="stickers/" />
+    <!-- Scoped to the single log file, not to filesDir, so sharing diagnostics can never
+         hand out a URI to the sticker store, the themes or the personal dictionary. -->
+    <files-path name="usage_log" path="fluxboard-usage.md" />
 </paths>

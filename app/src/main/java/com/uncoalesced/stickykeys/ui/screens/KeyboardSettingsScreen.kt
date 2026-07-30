@@ -1,6 +1,9 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
+import android.content.Intent
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +22,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -32,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,6 +71,7 @@ class KeyboardSettingsViewModel
         val layoutManager: LayoutManager,
         private val clipboardDao: ClipboardDao,
         val appPreferences: com.uncoalesced.stickykeys.data.local.AppPreferences,
+        private val usageLog: com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder,
     ) : ViewModel() {
         /** Opening either editor is what arms the default-keyboard prompt. */
         fun onCustomizerOpened() {
@@ -85,6 +91,10 @@ class KeyboardSettingsViewModel
         val hapticsEnabled = preferences.hapticsEnabled
         val hapticsIntensity = preferences.hapticsIntensity
 
+        val showNumberRow = preferences.showNumberRow
+
+        fun setShowNumberRow(show: Boolean) = preferences.setShowNumberRow(show)
+
         fun setAutoCapitalize(enabled: Boolean) = preferences.setAutoCapitalize(enabled)
 
         fun setAutoCorrect(enabled: Boolean) = preferences.setAutoCorrect(enabled)
@@ -102,6 +112,13 @@ class KeyboardSettingsViewModel
                 clipboardDao.deleteAll()
             }
         }
+
+        /** Compile-time false in release; the settings section is omitted entirely then. */
+        val usageLoggingEnabled: Boolean get() = usageLog.enabled
+
+        fun usageLogUri() = usageLog.shareIntentFile()
+
+        fun clearUsageLog() = usageLog.clear()
     }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,6 +135,7 @@ fun KeyboardSettingsScreen(
         is KeyboardSettingsUiState.Success -> {
             val autoCap by viewModel.autoCapitalizeEnabled.collectAsState()
             val autoCorrect by viewModel.autoCorrectEnabled.collectAsState()
+            val showNumberRow by viewModel.showNumberRow.collectAsState()
 
             val activeThemeId by viewModel.activeThemeId.collectAsState()
             val activeLayoutId by viewModel.activeLayoutId.collectAsState()
@@ -129,6 +147,7 @@ fun KeyboardSettingsScreen(
             val availableLayouts by viewModel.layoutManager.availableLayouts.collectAsState()
 
             var showClearClipboardDialog by remember { mutableStateOf(false) }
+            val context = LocalContext.current
 
             Column(
                 modifier =
@@ -182,6 +201,26 @@ fun KeyboardSettingsScreen(
                     Switch(
                         checked = autoCorrect,
                         onCheckedChange = { viewModel.setAutoCorrect(it) },
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_number_row),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_number_row_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = showNumberRow,
+                        onCheckedChange = { viewModel.setShowNumberRow(it) },
                     )
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
@@ -321,14 +360,29 @@ fun KeyboardSettingsScreen(
                     )
                 }
                 if (hapticsEnabled) {
-                    Text(
-                        stringResource(R.string.text_vibration_strength),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.text_vibration_strength),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            "$hapticsIntensity%",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    // 0-100 percent, not a raw motor amplitude. The old 1..255 range was the
+                    // value handed straight to the vibrator, so it meant different strengths
+                    // on different phones and could never be turned down to nothing.
                     Slider(
                         value = hapticsIntensity.toFloat(),
                         onValueChange = { viewModel.setHapticsIntensity(it.toInt()) },
-                        valueRange = 1f..255f,
+                        valueRange = 0f..100f,
+                        steps = 99,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     )
                 }
@@ -381,6 +435,57 @@ fun KeyboardSettingsScreen(
                             }
                         },
                     )
+                }
+
+                // Absent entirely from a stable or F-Droid build: USAGE_LOGGING is a
+                // compile-time false there, so this whole block folds away rather than
+                // showing a control for a file that is never written.
+                if (viewModel.usageLoggingEnabled) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                    Text(
+                        "Tester diagnostics",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "This build keeps a local file of session lengths and key counts. " +
+                            "No typed text is recorded, and nothing is ever sent anywhere " +
+                            "unless you share it yourself below.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            val uri = viewModel.usageLogUri()
+                            if (uri == null) {
+                                Toast
+                                    .makeText(
+                                        context,
+                                        "No usage recorded yet",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            } else {
+                                val send =
+                                    Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/markdown"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                // The chooser is the point: the destination is the tester's
+                                // choice every single time, and FluxBoard never has one.
+                                context.startActivity(
+                                    Intent.createChooser(send, "Share usage log"),
+                                )
+                            }
+                        }) {
+                            Text("Share usage log")
+                        }
+                        OutlinedButton(onClick = { viewModel.clearUsageLog() }) {
+                            Text("Clear")
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))

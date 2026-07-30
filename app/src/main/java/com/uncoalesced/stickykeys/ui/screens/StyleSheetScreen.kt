@@ -72,8 +72,11 @@ fun StyleSheetScreen() {
                         StickyKeysTheme.colors.secondary,
                         StickyKeysTheme.colors.onSecondary,
                     )
+                    // The dark base is pure black now, not Ink. Ink survives as the light
+                    // theme's foreground and as OnBrandYellow, so the token still exists --
+                    // but naming it here would describe a colour this row no longer shows.
                     ColorRow(
-                        "Background (Ink)",
+                        "Background",
                         StickyKeysTheme.colors.background,
                         StickyKeysTheme.colors.onBackground,
                     )
