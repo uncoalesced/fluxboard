@@ -1,83 +1,122 @@
-# Producing a Tester APK (interim, debug-signed)
+# Producing a Tester APK
 
-This is the interim path for handing a working APK to testers directly, separate
-from the F-Droid build recipe. It uses the **debug** build type, which Android
-signs automatically with the auto-generated debug keystore -- so there is no
-keystore to create or protect yet.
+Testers now get a **signed release** APK. The release signing config exists and
+works, so builds upgrade in place instead of forcing an uninstall between
+versions. The debug path below is still useful for development, but is no longer
+what you hand to a tester.
 
 ## The one command
 
 ```
-./gradlew assembleDebug
+.\gradlew.bat clean :app:packageReleaseArtifact
 ```
 
-Output APK:
+Output:
 
 ```
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/distributable/FluxBoard-v0.1.1-ALPHA-release.apk
 ```
 
-Install on a connected device with `adb install -r app/build/outputs/apk/debug/app-debug.apk`,
-or just send testers the `.apk` file to sideload.
+`packageReleaseArtifact` wraps `assembleRelease` and copies the APK out under a
+name that says what it is -- `app-release.apk` tells a tester nothing. Build it
+`clean`: incremental runs cache `compileDebugKotlin` as UP-TO-DATE and have
+hidden a broken build here before.
 
-For the artifact that actually ships to testers, build it clean so nothing stale
-is carried over from an incremental run:
+Two checks run automatically on every release build and fail it if they trip:
 
-```
-.\gradlew.bat clean assembleDebug
-```
+- `verifyRoomKeepRules` -- catches the R8 stripping that killed the very first
+  signed release on launch.
+- `verifyNoUsageLoggingInRelease` -- proves the tester usage log is genuinely
+  absent from a stable build (see below).
+
+## What's new in v0.1.1-ALPHA
+
+Written for testers -- what you would actually notice, not a changelog.
+
+- **The keyboard opens.** In v0.1.0 selecting FluxBoard did nothing at all. That
+  is fixed; this is the headline change.
+- **Emoji.** Tapping the smiley key opens a combined picker: your stickers first,
+  then the full emoji set in the usual categories. Emoji are drawn by your
+  phone's own emoji font, so they look like they do everywhere else.
+- **Haptics actually fire**, and the vibration slider is now a sensible 0-100%
+  rather than a raw motor value. Zero means off. Every button in the app buzzes,
+  not just the keys.
+- **Hold the space bar and slide** left or right to move the cursor. It speeds up
+  the longer you hold the drag.
+- **Hold a key for its corner symbol** -- `q` gives `%`, `a` gives `@`, and so
+  on. Hold backspace to delete repeatedly.
+- **A number row** above the letters, on by default. Turn it off in Keyboard
+  Settings if you would rather have the space.
+- **The arrow at the top-left** opens a row of shortcuts: stickers/emoji,
+  clipboard, a text-editing panel (cursor keys, select, copy, paste), and a
+  keyboard switcher. Translate, grammar check and the mic are placeholders and
+  say so when tapped. Opening this row makes the keyboard taller rather than
+  squashing the keys.
+- **Much deeper theming.** Key fill, text, borders and a glow effect all take
+  their own colour and opacity, and there is a live preview with a text box so
+  you can feel the result before committing to it.
+- **The dark theme is properly black now**, which also helps on OLED screens.
+- **The keyboard no longer overlaps the gesture bar** at the bottom of the
+  screen.
+
+### About the usage log
+
+This tester build keeps a small local file of how much you have used the
+keyboard: session lengths, key counts, that sort of thing. **No typed text,
+words, clipboard contents or app names are recorded**, and nothing is ever sent
+anywhere. If you want to share it, there is a "Share usage log" button in
+Keyboard Settings that opens the normal Android share sheet -- you choose where
+it goes, every time.
+
+This exists **only in tester builds**. A real stable or F-Droid release does not
+contain the code at all, which the build verifies rather than assumes.
 
 ## What a fresh installer needs to know
 
-- **Android 8.0 (API 26) or newer.** Anything below the minSdk 26 floor will
-  refuse to install.
+- **Android 8.0 (API 26) or newer.** Below the minSdk 26 floor it will refuse to
+  install.
 - **"Install unknown apps" must be enabled** for whichever app delivers the file
   (browser, Files, Drive, messaging). Android blocks sideloading otherwise. The
-  prompt appears on first install attempt; grant it to that specific app.
-- **The debug signature is expected.** The APK is signed with the local debug
-  keystore, not a release key. It installs fine, but it will not upgrade in place
-  over any future release-signed build -- that will need an uninstall first.
+  prompt appears on the first install attempt; grant it to that specific app.
+- **Upgrading from v0.1.0 works in place** -- same signing key. But a device
+  running an old *debug* build must uninstall first: debug and release are signed
+  with different keys and Android will refuse the swap.
 - **FluxBoard must be enabled and selected before the keyboard does anything.**
   Open the app, go to the Keyboard tab, and use the setup card at the top: it
   opens system keyboard settings for step 1 and the keyboard picker for step 2,
-  and disappears once both are done. Nothing else in the app depends on this;
-  stickers and editing work without it.
+  and disappears once both are done. Stickers and editing work without it.
 - **Link sharing is LAN-only right now.** The relay server exists in `relay/` but
-  is not deployed anywhere, so two devices can only exchange stickers while on
-  the same Wi-Fi network. Off-network sharing will fail to connect. Device-to-
-  device migration (QR pairing) is LAN-only by design and is unaffected.
+  is not deployed anywhere, so two devices can only exchange stickers on the same
+  Wi-Fi network. Off-network sharing will fail to connect. Device-to-device
+  migration (QR pairing) is LAN-only by design and is unaffected.
 - **No automatic background removal in this build.** Sticker cutouts are crop
   plus the manual eraser. Automatic subject segmentation was removed along with
   ML Kit; see `docs/privacy-audit.md`.
 - **Camera permission is only for QR pairing.** It is requested at the point of
   use on the scan screen, never at launch.
 
+## The debug build, for development
+
+```
+.\gradlew.bat clean assembleDebug
+```
+
+```
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+Debug-signed, not minified, `debuggable`, and the only variant that contains the
+usage-logging code. Fine for development; use the release artifact for testers.
+
 If the Gradle launcher picks up an old JDK, prefix with the JDK 17+ path, e.g.
 `JAVA_HOME="C:/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug`.
 
-## Why debug, not release, for now
+## Signing
 
-`app/build.gradle.kts` has a `release { }` build type (minify + resource
-shrinking + ProGuard) but **no `signingConfig`**. `./gradlew assembleRelease`
-therefore produces an **unsigned** APK that cannot be installed directly -- fine
-for the F-Droid pipeline (F-Droid signs its own builds) but not for handing to a
-tester.
+`app/build.gradle.kts` reads `keystore.properties` from the repo root, which is
+**gitignored** and points at a keystore stored **outside the repo**. When that
+file is absent the release build degrades to unsigned rather than failing, so
+fresh clones, CI and F-Droid still work -- F-Droid signs its own builds anyway.
 
-The debug build is:
-- automatically signed with the local debug keystore (`~/.android/debug.keystore`),
-- installable on any device with "install unknown apps" enabled,
-- functionally complete for testing every feature.
-
-Its only differences from a release build: it is `debuggable`, not minified, and
-carries the debug signature -- none of which block feature testing.
-
-## DECISION NEEDED before a real release build
-
-Shipping a signed **release** APK/AAB (for updates testers can upgrade in place,
-or for any store) requires a release signing key. **Creating that keystore is a
-decision, not an automatic step**: whoever owns it must back it up, because
-losing it means no future update can ever be signed with the same identity, which
-breaks in-place upgrades for every user. This has intentionally NOT been done
-automatically. When you are ready, decide on and create the keystore, then a
-`signingConfigs { }` + `release.signingConfig` block gets wired into
-`app/build.gradle.kts`.
+Never commit the keystore or its password. Losing either permanently breaks
+in-place updates for everyone already on a release build.
