@@ -11,8 +11,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.abs
 
 /**
  * What a key does when it is held rather than tapped.
@@ -34,6 +38,49 @@ internal sealed interface LongPress {
     data class Alternates(
         val options: List<String>,
     ) : LongPress
+
+    /** Drag sideways to walk the caret instead of typing. The space bar. */
+    data object Scrub : LongPress
+}
+
+/**
+ * How far the finger must travel sideways before a space-bar press becomes a scrub.
+ *
+ * This is the "low sensitivity" requirement, and it is the whole reason the gesture is safe
+ * to put on the most-pressed key on the board. Ordinary taps move a couple of pixels and
+ * thumbs wobble on the way down; anything under this is still a space. Once crossed, the
+ * press can no longer produce a space at all -- a gesture that both moved the caret and
+ * typed would be worse than either.
+ */
+internal const val SCRUB_ACTIVATION_DP = 18f
+
+/** Finger travel per caret step at the start of a scrub. */
+private const val SCRUB_STEP_START_DP = 14f
+
+/** Finger travel per caret step once the drag has been sustained. */
+private const val SCRUB_STEP_MIN_DP = 4f
+
+/** Sustained dragging only starts winding up after this long, so short corrections stay 1:1. */
+private const val SCRUB_ACCEL_DELAY_MS = 250L
+
+/** How long the ramp from the start step to the minimum step takes. */
+private const val SCRUB_ACCEL_RAMP_MS = 1200f
+
+/**
+ * Finger travel required for one caret step, given how long the scrub has been running.
+ *
+ * This is the acceleration: the distance per character *shrinks* the longer the drag is
+ * sustained, so the same finger speed walks the caret faster the longer it is held. Ramping
+ * the step rather than multiplying a velocity keeps the gesture positional -- the caret
+ * still tracks the finger and stops dead when the finger stops, which a velocity model does
+ * not do.
+ *
+ * Pure, so the ramp is assertable without a touchscreen.
+ */
+internal fun scrubStepDp(heldMillis: Long): Float {
+    val past = (heldMillis - SCRUB_ACCEL_DELAY_MS).coerceAtLeast(0L)
+    val progress = (past / SCRUB_ACCEL_RAMP_MS).coerceIn(0f, 1f)
+    return SCRUB_STEP_START_DP + (SCRUB_STEP_MIN_DP - SCRUB_STEP_START_DP) * progress
 }
 
 /** How long a press must be held before it stops counting as a tap. */
@@ -72,28 +119,108 @@ private val PUNCTUATION_ALTERNATES =
     )
 
 /**
- * The digit each top-row letter carries in its corner.
+ * The hold behaviour for a key.
  *
- * Keyed by letter rather than by column index so it survives a custom layout reordering the
- * row, and so a layout without a given letter simply has no digit there rather than shifting
- * every other key's number.
+ * Driven by the layout's own [hint] rather than a table keyed on letters. A hardcoded map
+ * would go stale the moment a custom layout moved a key, and would disagree with the corner
+ * glyph the user can see -- the promise the superscript makes is precisely "hold this and
+ * you get that", so the two must come from one field.
+ *
+ * Hints that are not a single character are labels, not outputs: `,!?` advertises that
+ * alternates exist, and `MIC` names an icon. Neither is typeable, so both fall through to
+ * the explicit tables.
  */
-private val TOP_ROW_DIGITS =
-    mapOf(
-        "q" to "1", "w" to "2", "e" to "3", "r" to "4", "t" to "5",
-        "y" to "6", "u" to "7", "i" to "8", "o" to "9", "p" to "0",
-    )
-
-/** The digit shown small in a key's corner, or null if it carries none. */
-internal fun cornerHintFor(keyOutput: String): String? = TOP_ROW_DIGITS[keyOutput.lowercase()]
-
-/** The hold behaviour for a key, derived from its output alone. */
-internal fun longPressFor(keyOutput: String): LongPress {
+internal fun longPressFor(
+    keyOutput: String,
+    hint: String? = null,
+): LongPress {
+    if (keyOutput == "SPACE") return LongPress.Scrub
     if (keyOutput == "DEL") return LongPress.Repeat
     PUNCTUATION_ALTERNATES[keyOutput]?.let { return LongPress.Alternates(it) }
-    cornerHintFor(keyOutput)?.let { return LongPress.Alternates(listOf(it)) }
+    if (hint != null && hint.length == 1) return LongPress.Alternates(listOf(hint))
     return LongPress.None
 }
+
+/**
+ * The space-bar scrub: touch down, drag distance, hold duration.
+ *
+ * Three pieces of state rather than an `onDrag` callback, because each answers a different
+ * question that a raw drag stream cannot. Accumulated horizontal travel decides *whether*
+ * this is a scrub at all and survives the finger changing direction; elapsed time since
+ * activation decides *how fast* it walks; and the leftover accumulator decides *when* the
+ * next step lands, so travel is never rounded away between events. A plain drag callback
+ * would emit one step per touch sample, which makes the speed a property of the device's
+ * reporting rate instead of the user's finger.
+ *
+ * Emits nothing until [activationPx] is crossed, and once it has, never types a space.
+ */
+private suspend fun AwaitPointerEventScope.runScrub(
+    activationPx: Float,
+    stepPxFor: (Long) -> Float,
+    onScrub: (Int, Boolean) -> Unit,
+    onTap: () -> Unit,
+) {
+    var travelX = 0f
+    var travelY = 0f
+    var accumulator = 0f
+    var scrubbing = false
+    var scrubStartedAt = 0L
+    var lastHapticAt = 0L
+
+    while (true) {
+        val event = awaitPointerEvent()
+        val change = event.changes.firstOrNull() ?: break
+        val delta = change.positionChange()
+        travelX += delta.x
+        travelY += delta.y
+
+        if (!scrubbing) {
+            // Sideways intent required, not just distance: a swipe down off the space bar to
+            // dismiss the keyboard travels far, and should not drag the caret on its way out.
+            if (abs(travelX) >= activationPx && abs(travelX) > abs(travelY)) {
+                scrubbing = true
+                scrubStartedAt = change.uptimeMillis
+                accumulator = 0f
+                // Step once on activation rather than only arming the accumulator. Crossing
+                // the threshold is already an unambiguous sideways intent, and making the
+                // user travel the activation distance *and then* a full step before anything
+                // moved would put roughly 32dp of dead travel at the start of every scrub.
+                onScrub(if (travelX > 0f) 1 else -1, true)
+                lastHapticAt = change.uptimeMillis
+            }
+        }
+
+        if (scrubbing) {
+            accumulator += delta.x
+            val held = change.uptimeMillis - scrubStartedAt
+            val step = stepPxFor(held)
+            while (abs(accumulator) >= step && step > 0f) {
+                val direction = if (accumulator > 0f) 1 else -1
+                // Throttled, not per-step. At the accelerated end a fast drag crosses a step
+                // every few milliseconds, and an unthrottled buzz there stops being discrete
+                // feedback and becomes one continuous vibration -- which conveys nothing and
+                // is unpleasant to hold.
+                val hapticDue = change.uptimeMillis - lastHapticAt >= SCRUB_HAPTIC_MIN_INTERVAL_MS
+                onScrub(direction, hapticDue)
+                if (hapticDue) lastHapticAt = change.uptimeMillis
+                accumulator -= direction * step
+            }
+            // Claim the events so no ancestor can also read this drag as a scroll.
+            change.consume()
+        }
+
+        if (!change.pressed) break
+    }
+
+    // A press that never became a scrub is still an ordinary space. The elapsed time is not
+    // consulted: resting on the space bar without moving should type one space, not none.
+    if (!scrubbing) {
+        onTap()
+    }
+}
+
+/** Floor between scrub haptics, so the accelerated end does not become a continuous buzz. */
+private const val SCRUB_HAPTIC_MIN_INTERVAL_MS = 28L
 
 /**
  * The alternates strip, hoisted out of the key that opened it.
@@ -169,10 +296,24 @@ internal fun Modifier.keyGestures(
     cellWidthPx: Float,
     keyBounds: () -> Rect,
     onCommit: (String) -> Unit,
+    onScrub: (Int, Boolean) -> Unit = { _, _ -> },
 ): Modifier =
     this.pointerInput(keyOutput, longPress, alternates, cellWidthPx) {
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false)
+            val down = awaitFirstDown(requireUnconsumed = false)
+
+            // Scrubbing is decided before the long-press clock, not after it. Gating it on
+            // the hold threshold would mean the cursor sat still for the first 350ms of a
+            // drag, which reads as the gesture being broken rather than deliberate.
+            if (longPress is LongPress.Scrub) {
+                runScrub(
+                    activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
+                    stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
+                    onScrub = onScrub,
+                    onTap = { onCommit(keyOutput) },
+                )
+                return@awaitEachGesture
+            }
 
             // null  -> the threshold elapsed, this is a hold
             // true  -> released before the threshold, an ordinary tap
