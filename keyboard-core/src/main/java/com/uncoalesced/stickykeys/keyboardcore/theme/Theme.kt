@@ -27,6 +27,15 @@ val LocalStickyKeysShapes =
         error("No StickyKeysShapes provided")
     }
 
+/**
+ * Per-key presentation overrides.
+ *
+ * Defaulted rather than erroring like the others, because every existing call site that
+ * renders a key predates it and must keep working untouched -- and because the default *is*
+ * the shipped look, so a missing provider is a correct keyboard rather than a bug.
+ */
+val LocalStickyKeysKeyStyle = staticCompositionLocalOf { KeyStyle.Default }
+
 object StickyKeysTheme {
     val colors: StickyKeysColors
         @Composable
@@ -47,6 +56,11 @@ object StickyKeysTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalStickyKeysShapes.current
+
+    val keyStyle: KeyStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalStickyKeysKeyStyle.current
 }
 
 @Composable
@@ -56,6 +70,7 @@ fun StickyKeysTheme(
     darkTheme: Boolean = true,
     typeScale: TypeScale = TypeScale.MEDIUM,
     customColors: StickyKeysColors? = null,
+    keyStyle: KeyStyle = KeyStyle.Default,
     content: @Composable () -> Unit,
 ) {
     val colors =
@@ -102,6 +117,7 @@ fun StickyKeysTheme(
         LocalStickyKeysTypography provides typography,
         LocalStickyKeysSpacing provides spacing,
         LocalStickyKeysShapes provides shapes,
+        LocalStickyKeysKeyStyle provides keyStyle,
     ) {
         MaterialTheme(
             colorScheme = materialColors,
