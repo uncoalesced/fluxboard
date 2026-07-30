@@ -1,0 +1,197 @@
+// Engineered by uncoalesced
+package com.uncoalesced.stickykeys.keyboardcore.diagnostics
+
+import android.content.Context
+import androidx.core.content.FileProvider
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.max
+
+/**
+ * Local-only usage diagnostics for alpha and beta testers.
+ *
+ * ## What this deliberately is not
+ *
+ * There is no network code in this file and there is none anywhere downstream of it. Nothing
+ * here uploads, queues, schedules, syncs or phones home, and no caller does either -- the
+ * only way any of this leaves the device is the user picking a target in the Android share
+ * sheet themselves, from [shareIntentFile]. That is not an incidental property of the current
+ * implementation; it is the requirement, and this class exists in a project whose first rule
+ * is "zero telemetry, ever".
+ *
+ * ## How it is switched off
+ *
+ * Every entry point begins with [enabled], which is `BuildConfig.USAGE_LOGGING` and nothing
+ * else. That field is set per build type in `app/build.gradle.kts`: true for debug, false for
+ * release. A stable or F-Droid build is a release build, so the flag is a compile-time
+ * constant `false` there and R8 removes the calls and then this class with them.
+ * `verifyNoUsageLoggingInRelease` checks that on the built artifact instead of assuming it.
+ *
+ * ## What it records
+ *
+ * Only counters and durations that answer "is this keyboard actually being used, and where
+ * does it fall over" -- session count and length, keystrokes, backspaces, autocorrect
+ * accepted and undone, mode switches, crashes-since-last-open. **No typed text, no words, no
+ * clipboard contents, no app or field identifiers.** A diagnostic file that quotes what
+ * somebody typed would be a worse privacy problem than having no diagnostics at all.
+ */
+@Singleton
+class UsageLog
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+    ) : UsageRecorder {
+        /**
+         * Always true here. This file is compiled only into debug variants, so its mere
+         * existence is the gate -- there is no flag to get out of sync with reality.
+         */
+        override val enabled: Boolean = true
+
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        // Counters are cheap and in-memory; the file is only rewritten on flush, so a
+        // keystroke never costs a disk write.
+        private val mutex = Mutex()
+        private var sessionStartedAt = 0L
+        private var keystrokes = 0L
+        private var backspaces = 0L
+        private var autocorrectsAccepted = 0L
+        private var autocorrectsUndone = 0L
+        private var modeSwitches = 0L
+        private var scrubGestures = 0L
+
+        val file: File get() = File(context.filesDir, FILE_NAME)
+
+        override fun onSessionStart() {
+            sessionStartedAt = System.currentTimeMillis()
+        }
+
+        override fun onSessionEnd() {
+            val started = sessionStartedAt
+            if (started == 0L) return
+            sessionStartedAt = 0L
+            val durationMs = max(0L, System.currentTimeMillis() - started)
+            scope.launch { appendSession(durationMs) }
+        }
+
+        override fun onKeystroke() {
+            keystrokes++
+        }
+
+        override fun onBackspace() {
+            backspaces++
+        }
+
+        override fun onAutocorrectAccepted() {
+            autocorrectsAccepted++
+        }
+
+        override fun onAutocorrectUndone() {
+            autocorrectsUndone++
+        }
+
+        override fun onModeSwitch() {
+            modeSwitches++
+        }
+
+        override fun onScrubGesture() {
+            scrubGestures++
+        }
+
+        private suspend fun appendSession(durationMs: Long) {
+            mutex.withLock {
+                val target = file
+                if (!target.exists()) {
+                    target.writeText(header())
+                }
+                target.appendText(sessionRow(durationMs))
+                // Reset per-session counters only after a successful write, so a failed
+                // append does not silently discard the session it was recording.
+                keystrokes = 0
+                backspaces = 0
+                autocorrectsAccepted = 0
+                autocorrectsUndone = 0
+                modeSwitches = 0
+                scrubGestures = 0
+            }
+        }
+
+        private fun header(): String =
+            buildString {
+                appendLine("# FluxBoard usage log")
+                appendLine()
+                appendLine("Local diagnostics for alpha and beta testing. This file is written")
+                appendLine("only on this device and is never uploaded. Share it yourself if and")
+                appendLine("when you want to; nothing sends it for you.")
+                appendLine()
+                appendLine("No typed text, words, clipboard contents or app names are recorded.")
+                appendLine()
+                // Library BuildConfig carries no VERSION_NAME; the build type is the part
+                // that matters here anyway, since it is what decides the file exists at all.
+                appendLine("Build type: debug (tester build)")
+                appendLine()
+                appendLine(
+                    "| Ended | Session (s) | Keys | Backspace | Autocorrect | Undone | Modes | Scrubs |",
+                )
+                appendLine(
+                    "|---|---|---|---|---|---|---|---|",
+                )
+            }
+
+        private fun sessionRow(durationMs: Long): String {
+            val stamp =
+                SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
+            return "| $stamp | ${durationMs / 1000} | $keystrokes | $backspaces | " +
+                "$autocorrectsAccepted | $autocorrectsUndone | $modeSwitches | $scrubGestures |\n"
+        }
+
+        /**
+         * A content URI for the log, for use with `Intent.ACTION_SEND`.
+         *
+         * Returns null when logging is off or nothing has been recorded, so a caller cannot
+         * accidentally raise a share sheet for a file that does not exist.
+         */
+        override fun shareIntentFile(): android.net.Uri? {
+            val target = file
+            if (!target.exists()) return null
+            return FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                target,
+            )
+        }
+
+        override fun clear() {
+            scope.launch { mutex.withLock { file.delete() } }
+        }
+
+        private companion object {
+            const val FILE_NAME = "fluxboard-usage.md"
+        }
+    }
+
+/**
+ * Binds the real recorder for debug builds only.
+ *
+ * The release variant has its own module supplying [NoOpUsageRecorder]. Exactly one of the
+ * two source sets is compiled per variant, so there is never a duplicate binding and never
+ * a variant with both.
+ */
+@dagger.Module
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+abstract class UsageRecorderModule {
+    @dagger.Binds
+    @Singleton
+    abstract fun bindUsageRecorder(impl: UsageLog): UsageRecorder
+}
