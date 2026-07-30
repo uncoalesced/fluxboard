@@ -5,8 +5,10 @@
          equivalent, so a user on the light palette no longer sees a dark flash before
          Compose draws, and a user on dark no longer sees a light one. -->
     <style name="Theme.StickyKeys" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#FF3D3B30</item>
-        <item name="android:statusBarColor">#FF3D3B30</item>
-        <item name="android:navigationBarColor">#FF3D3B30</item>
+        <!-- Pure black, matching the dark palette's background token. Kept in sync by hand:
+             this is the pre-Compose window, so it cannot read the Kotlin token. -->
+        <item name="android:windowBackground">#FF000000</item>
+        <item name="android:statusBarColor">#FF000000</item>
+        <item name="android:navigationBarColor">#FF000000</item>
     </style>
 </resources>

@@ -16,11 +16,16 @@ import org.junit.Test
 class KeyAccessibilityTest {
     private val allShippedKeys: List<String> =
         (
-            KeyboardLayouts.qwertyLettersLower +
-                KeyboardLayouts.qwertyLettersUpper +
+            KeyboardLayouts.letterRows(upper = false, showNumberRow = true).map { row ->
+                row.map { it.output }
+            } +
+                KeyboardLayouts.letterRows(upper = true, showNumberRow = true).map { row ->
+                    row.map { it.output }
+                } +
                 KeyboardLayouts.symbolsPrimary +
                 KeyboardLayouts.symbolsShifted
         ).flatten()
+            .filterNot { it == KeyboardLayouts.SPACER }
             .distinct()
 
     @Test
@@ -37,6 +42,7 @@ class KeyAccessibilityTest {
                 .rows
                 .flatten()
                 .map { it.output }
+                .filterNot { it == KeyboardLayouts.SPACER }
                 .filter { accessibleKeyLabel(it).isBlank() }
         assertTrue("Keys with unusable spoken labels: $blank", blank.isEmpty())
     }
