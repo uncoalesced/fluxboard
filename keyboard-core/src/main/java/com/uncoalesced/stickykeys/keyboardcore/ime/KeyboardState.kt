@@ -11,6 +11,15 @@ enum class KeyboardMode {
 
 enum class AppMode {
     TYPING,
+
+    /**
+     * The unified sticker + emoji picker, reached in one tap from the emoji key.
+     *
+     * Distinct from [STICKERS], which is Phase 16's dedicated sticker-only panel. Both
+     * exist while the question of retiring the older shell is open; see MainIMEView.
+     */
+    EMOJI_PICKER,
     STICKERS,
     CLIPBOARD,
+    TEXT_EDIT,
 }
