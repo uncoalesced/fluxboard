@@ -125,6 +125,13 @@ fun AppNavGraph(initialImageUri: String? = null) {
             composable("theme_editor") {
                 com.uncoalesced.stickykeys.ui.screens.ThemeEditorScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    onOpenPreview = { navController.navigate("keyboard_preview") },
+                )
+            }
+
+            composable("keyboard_preview") {
+                com.uncoalesced.stickykeys.ui.screens.KeyboardPreviewScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
 
