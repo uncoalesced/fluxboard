@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,9 +22,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyboardLayoutConfig
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutValidationResult
+import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -264,27 +267,32 @@ fun LayoutEditorScreen(
                                         ).clickable { viewModel.selectKey(keyDef.id) },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                val label =
-                                    keyDef.displayLabel ?: when (keyDef.output) {
-                                        "SHIFT" -> "Sh"
-                                        "DEL" -> "Del"
-                                        "SYMBOLS" -> "?12"
-                                        "STICKERS" -> "St"
-                                        "ENTER" -> "Ent"
-                                        "SPACE" -> "___"
-                                        else -> keyDef.output
+                                // Same table the live keyboard draws from. This used to be its
+                                // own "Sh"/"Del"/"Ent" abbreviations, so a layout being edited
+                                // never looked like the keyboard it was producing.
+                                val tint =
+                                    if (isSelected) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
                                     }
-                                Text(
-                                    text = label,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center,
-                                    color =
-                                        if (isSelected) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
-                                )
+                                when (val glyph = keyGlyph(keyDef.output, keyDef.displayLabel)) {
+                                    is KeyGlyph.Icon ->
+                                        Icon(
+                                            painter = painterResource(glyph.res),
+                                            contentDescription = glyph.description,
+                                            tint = tint,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    is KeyGlyph.Label ->
+                                        Text(
+                                            text = glyph.text,
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            textAlign = TextAlign.Center,
+                                            color = tint,
+                                        )
+                                }
                             }
                         }
                     }
