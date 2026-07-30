@@ -29,8 +29,8 @@ android {
         applicationId = "com.uncoalesced.stickykeys"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "v0.1.0-ALPHA"
+        versionCode = 2
+        versionName = "v0.1.1-ALPHA"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -56,6 +56,8 @@ android {
     }
 
     buildTypes {
+        // Tester diagnostics are excluded from this build type by source set, not by a
+        // flag -- see keyboard-core/src/release and verifyNoUsageLoggingInRelease below.
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -170,13 +172,90 @@ val verifyRoomKeepRules by tasks.registering {
     }
 }
 
+/** The class that must never reach a stable build. Named once, used by the check below. */
+private val usageLogClass = "com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageLog"
+
+/**
+ * Fails the release build if the tester usage log survives into it.
+ *
+ * The gate is a source set, not a flag: the recording implementation lives in
+ * `keyboard-core/src/debug` and only a no-op lives in `src/release`, so a stable or F-Droid
+ * build never compiles it.
+ *
+ * The first design used `BuildConfig.USAGE_LOGGING` instead, and this task is what proved it
+ * did not work -- the class is constructor-injected into TypingViewModel, so Hilt's generated
+ * factories referenced it unconditionally and R8 kept it whatever the flag said. A runtime
+ * boolean cannot make a class stop existing.
+ *
+ * Checked against R8's mapping output rather than the DEX. An earlier version scanned the
+ * DEX for the class name and passed even when the guarantee was deliberately broken, because
+ * release builds are obfuscated and that string cannot appear either way. It proved nothing.
+ * This version has been confirmed to fail when the class does survive.
+ */
+
+val verifyNoUsageLoggingInRelease by tasks.registering {
+    group = "verification"
+    description = "Asserts the alpha usage-log class is absent from the release APK."
+    outputs.upToDateWhen { false }
+
+    doLast {
+        val mapping =
+            layout.buildDirectory
+                .file("outputs/mapping/release/mapping.txt")
+                .get()
+                .asFile
+        if (!mapping.exists()) {
+            logger.lifecycle("verifyNoUsageLoggingInRelease: no mapping.txt -- skipped.")
+            return@doLast
+        }
+
+        // mapping.txt, not the DEX.
+        //
+        // The first version of this check scanned the release DEX for the string
+        // "keyboardcore/diagnostics/UsageLog" and passed -- including when the gate was
+        // deliberately flipped back on, which is how it was caught. R8 obfuscates release
+        // class names, so that string cannot appear in a minified DEX whether the class
+        // survived or not, and the check proved nothing at all.
+        //
+        // mapping.txt lists every class R8 *kept*, under its original name. Absence from it
+        // is real evidence of removal.
+        val survived =
+            mapping.useLines { lines ->
+                lines.any { line ->
+                    !line.startsWith(" ") && line.startsWith(usageLogClass)
+                }
+            }
+
+        if (survived) {
+            throw GradleException(
+                buildString {
+                    appendLine("$usageLogClass survived into the release build.")
+                    appendLine()
+                    appendLine(
+                        "The alpha/beta usage log must not exist in a stable or F-Droid build.",
+                    )
+                    appendLine(
+                        "The recording implementation must stay in keyboard-core/src/debug " +
+                            "only, with src/release supplying NoOpUsageRecorder. Check that " +
+                            "nothing in src/main references UsageLog by its concrete type " +
+                            "instead of the UsageRecorder interface.",
+                    )
+                },
+            )
+        }
+        logger.lifecycle(
+            "verifyNoUsageLoggingInRelease: $usageLogClass absent from the release build.",
+        )
+    }
+}
+
 tasks.matching { it.name == "assembleRelease" }.configureEach {
-    finalizedBy(verifyRoomKeepRules)
+    finalizedBy(verifyRoomKeepRules, verifyNoUsageLoggingInRelease)
 }
 
 // assembleRelease emits app-release.apk, which says nothing about what is inside it.
 // This copies it out under a name that is unambiguous when handing it to someone.
-val releaseVersionName = "v0.1.0-ALPHA"
+val releaseVersionName = "v0.1.1-ALPHA"
 
 tasks.register<Copy>("packageReleaseArtifact") {
     group = "distribution"
