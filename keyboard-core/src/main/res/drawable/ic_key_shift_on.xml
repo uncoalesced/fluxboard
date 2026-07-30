@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- Shift, latched for one character: same silhouette as the unlatched icon, filled. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,3.6 L20.4,12.4 L16,12.4 L16,19.4 L8,19.4 L8,12.4 L3.6,12.4 Z" />
+</vector>
