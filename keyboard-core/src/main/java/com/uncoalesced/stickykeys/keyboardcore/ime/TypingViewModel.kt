@@ -4,6 +4,7 @@ package com.uncoalesced.stickykeys.keyboardcore.ime
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
 import com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyboardLayoutConfig
@@ -31,6 +32,7 @@ class TypingViewModel
         private val layoutManager: LayoutManager,
         private val hapticsManager: HapticsManager,
         private val incognitoState: IncognitoState,
+        private val usageLog: UsageRecorder,
     ) : ViewModel() {
         private val _suggestions = MutableStateFlow<List<String>>(emptyList())
         val suggestions: StateFlow<List<String>> = _suggestions
@@ -51,6 +53,9 @@ class TypingViewModel
         val activeTheme: StateFlow<KeyboardTheme?> = themeManager.activeTheme
 
         val activeLayout: StateFlow<KeyboardLayoutConfig> = layoutManager.activeLayout
+
+        /** Whether the always-visible digit row is drawn above the letters. */
+        val showNumberRow: StateFlow<Boolean> = keyboardPreferences.showNumberRow
 
         private var currentWord = ""
 
@@ -107,6 +112,9 @@ class TypingViewModel
 
         fun performKeyPressHaptic() {
             hapticsManager.performKeyPressHaptic()
+            // Counted here rather than in onKeyPressed: this fires for every key including
+            // shift, symbols and enter, which is what "keystrokes" means to a tester.
+            usageLog.onKeystroke()
         }
 
         fun onKeyPressed(char: String) {
@@ -128,6 +136,7 @@ class TypingViewModel
         }
 
         fun onDelete(): Boolean {
+            usageLog.onBackspace()
             generation++
             atSentenceStart = false
             publishAutoCapitalize()
@@ -170,6 +179,7 @@ class TypingViewModel
             original: String,
             corrected: String,
         ) {
+            usageLog.onAutocorrectAccepted()
             _undoState.value = UndoAction(original, corrected)
             currentWord = ""
             _suggestions.value = emptyList()
@@ -181,6 +191,7 @@ class TypingViewModel
         }
 
         fun onUndoApplied() {
+            usageLog.onAutocorrectUndone()
             _undoState.value = null
         }
 
