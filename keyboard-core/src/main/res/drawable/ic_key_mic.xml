@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Engineered by uncoalesced -->
-<!-- Voice input placeholder. Drawn now, wired to a "coming soon" stub -- there is no speech
-     engine in this project and adding one is a separate decision, not a side effect of
+<!-- Voice input placeholder. Drawn now, wired to a "coming soon" stub. There is no speech
+     engine in this project; adding one is a separate decision, not a side effect of
      drawing its icon. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
