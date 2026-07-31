@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -34,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -163,12 +166,12 @@ fun TypingKeyboardView(
         remember(keyboardController, typingViewModel) {
             { direction: Int, withHaptic: Boolean ->
                 if (withHaptic) typingViewModel.performKeyPressHaptic()
-                keyboardController.sendEditingKey(
-                    if (direction > 0) {
-                        android.view.KeyEvent.KEYCODE_DPAD_RIGHT
-                    } else {
-                        android.view.KeyEvent.KEYCODE_DPAD_LEFT
-                    },
+                // moveCursor, never a DPAD key event. An arrow the editor cannot consume --
+                // which is exactly what a scrub run to either end of the text produces -- is
+                // handed to the host window's focus search, and the text field loses focus.
+                // That is why the drag worked but releasing it left the field.
+                keyboardController.moveCursor(
+                    if (direction > 0) CursorMove.RIGHT else CursorMove.LEFT,
                 )
                 // Whatever word was being tracked is no longer under the caret, so the
                 // autocorrect buffer has to be dropped -- otherwise the next space would
@@ -176,6 +179,17 @@ fun TypingKeyboardView(
                 typingViewModel.onWordFinished()
             }
         }
+
+    // A different field is now focused, possibly in a different app. Every latch is
+    // session-scoped: a caps lock set while writing one message must not still be on when the
+    // user taps into a search box somewhere else, and neither must the symbols page.
+    val inputSession by typingViewModel.inputSession.collectAsState()
+    LaunchedEffect(inputSession) {
+        modeState.value =
+            if (shouldAutoCapitalize) KeyboardMode.LETTERS_UPPER else KeyboardMode.LETTERS_LOWER
+        quickExpanded = false
+        comingSoon = null
+    }
 
     LaunchedEffect(shouldAutoCapitalize) {
         if (shouldAutoCapitalize && modeState.value == KeyboardMode.LETTERS_LOWER) {
@@ -376,6 +390,10 @@ fun TypingKeyboardView(
                                 modifier =
                                     Modifier
                                         .size(28.dp)
+                                        // Drawn at 28dp to fit the 40dp strip; the touch
+                                        // target is expanded to the 48dp minimum without
+                                        // changing what is drawn.
+                                        .minimumInteractiveComponentSize()
                                         .clickable(role = Role.Button) {
                                             comingSoon = "Voice input"
                                         }.semantics {
@@ -454,6 +472,7 @@ internal fun KeyboardKey(
     val spokenState = accessibleKeyState(keyOutput, mode)
     val longPress = remember(keyOutput, hint) { longPressFor(keyOutput, hint) }
     val keyStyle = StickyKeysTheme.keyStyle
+    val pressed = remember { mutableStateOf(false) }
 
     // Shift latching between off, on and caps lock is the one key colour that changes while
     // the user is looking at it; snapping straight to the accent reads as a glitch.
@@ -462,10 +481,27 @@ internal fun KeyboardKey(
     // so a mode change starts ~80 animations at once; a spring keeps each of them producing
     // frames while it settles, for a colour change nobody is watching past the first 100ms.
     // A fixed 110ms tween ends when the eye says it has.
+    // Press feedback. Replacing `clickable` with a raw pointer state machine also removed the
+    // indication it was supplying, so keys were the only interactive surface in the app with
+    // no visual response to touch -- every Material button still had one through
+    // LocalIndication. Lifting the fill toward the accent is legible on both light and dark
+    // palettes and, unlike a ripple, cannot be missed on a key the finger is covering.
+    val accent = StickyKeysTheme.colors.primary
+    val pressTarget =
+        if (pressed.value) {
+            // Blended rather than composited: the fill is usually opaque, so compositing the
+            // accent behind it would change nothing. Alpha is carried over from the original
+            // so a deliberately translucent key stays translucent while pressed.
+            lerp(background, accent, PRESS_BLEND).copy(alpha = background.alpha)
+        } else {
+            background
+        }
     val animatedBackground by
         animateColorAsState(
-            background,
-            animationSpec = tween(KEY_COLOR_ANIM_MS),
+            pressTarget,
+            // Down has to be immediate or the feedback arrives after the character does.
+            // Release keeps the tween so the key fades back rather than snapping.
+            animationSpec = tween(if (pressed.value) 0 else KEY_COLOR_ANIM_MS),
             label = "key-background",
         )
     val animatedForeground by
@@ -509,6 +545,7 @@ internal fun KeyboardKey(
                     cellWidthPx = alternateCellWidthPx,
                     keyBounds = { bounds.value },
                     onCommit = onKeyPress,
+                    pressed = pressed,
                     onScrub = onScrub,
                 )
                 // pointerInput replaces `clickable`, which also supplied the button role and
@@ -552,6 +589,23 @@ internal fun KeyboardKey(
                         .padding(start = 5.dp, top = 2.dp)
                         .clearAndSetSemantics { },
             )
+        } else if (longPress is LongPress.Alternates) {
+            // A key can carry alternates without carrying a hint glyph -- the punctuation keys
+            // do, from PUNCTUATION_ALTERNATES rather than from the layout. Those had a hold
+            // behaviour with nothing on screen to suggest it, so it was only ever found by
+            // accident. A dot rather than the first alternate: the strip holds up to six
+            // characters and printing one of them would imply it is the only one.
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 4.dp, top = 4.dp)
+                        .size(LONG_PRESS_DOT)
+                        .background(
+                            animatedForeground.copy(alpha = HINT_ALPHA),
+                            CircleShape,
+                        ).clearAndSetSemantics { },
+            )
         }
         KeyGlyphContent(
             glyph = glyph,
@@ -566,6 +620,9 @@ internal fun KeyboardKey(
 /** Key colour transition length. Short enough that 80 concurrent ones stay cheap. */
 private const val KEY_COLOR_ANIM_MS = 110
 
+/** How far a pressed key moves toward the accent. Visible under a fingertip, not garish. */
+private const val PRESS_BLEND = 0.3f
+
 /** Corner radius shared by every key, matching the reference's rounded caps. */
 private val KEY_CORNER_RADIUS = 6.dp
 private val KEY_ICON_SIZE = 22.dp
@@ -573,6 +630,9 @@ private val HINT_ICON_SIZE = 13.dp
 
 /** Corner hints are present but secondary; full-strength they compete with the letter. */
 private const val HINT_ALPHA = 0.45f
+
+/** The hold-available marker on keys whose alternates have no printable hint. */
+private val LONG_PRESS_DOT = 3.dp
 
 /** Draws either case of [KeyGlyph] so no call site has to branch on it. */
 @Composable
@@ -645,6 +705,22 @@ internal fun handleKeyPress(
         "ENTER" -> {
             viewModel.onWordFinished()
             controller.sendEnter()
+            // Enter both finishes what was typed and starts something new -- a sent message,
+            // or a fresh line. Latched shift and caps lock used to survive that, so the next
+            // message began in whatever case the last one ended in, and a caps lock set for
+            // one word stayed on across everything after it. Symbol pages are dropped for the
+            // same reason: nobody starts a new message on the symbols page on purpose.
+            viewModel.onSentenceStarted()
+            // Read the flag rather than leaving this to the auto-capitalize effect: that
+            // effect only re-runs when its key *changes*, so if the flag was already true
+            // nothing would fire and the board would sit in lower case at a sentence start.
+            setMode(
+                if (viewModel.shouldAutoCapitalize.value) {
+                    KeyboardMode.LETTERS_UPPER
+                } else {
+                    KeyboardMode.LETTERS_LOWER
+                },
+            )
         }
         "SPACE" -> {
             val typedWord = viewModel.getCurrentWord()

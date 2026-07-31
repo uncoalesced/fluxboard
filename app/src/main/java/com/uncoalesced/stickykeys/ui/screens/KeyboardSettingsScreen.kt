@@ -95,6 +95,13 @@ class KeyboardSettingsViewModel
 
         fun setShowNumberRow(show: Boolean) = preferences.setShowNumberRow(show)
 
+        val keyboardHeightPercent = preferences.keyboardHeightPercent
+        val keyboardBottomPaddingDp = preferences.keyboardBottomPaddingDp
+
+        fun setKeyboardHeightPercent(percent: Int) = preferences.setKeyboardHeightPercent(percent)
+
+        fun setKeyboardBottomPaddingDp(dp: Int) = preferences.setKeyboardBottomPaddingDp(dp)
+
         fun setAutoCapitalize(enabled: Boolean) = preferences.setAutoCapitalize(enabled)
 
         fun setAutoCorrect(enabled: Boolean) = preferences.setAutoCorrect(enabled)
@@ -136,6 +143,8 @@ fun KeyboardSettingsScreen(
             val autoCap by viewModel.autoCapitalizeEnabled.collectAsState()
             val autoCorrect by viewModel.autoCorrectEnabled.collectAsState()
             val showNumberRow by viewModel.showNumberRow.collectAsState()
+            val keyboardHeight by viewModel.keyboardHeightPercent.collectAsState()
+            val keyboardBottomPadding by viewModel.keyboardBottomPaddingDp.collectAsState()
 
             val activeThemeId by viewModel.activeThemeId.collectAsState()
             val activeLayoutId by viewModel.activeLayoutId.collectAsState()
@@ -222,6 +231,89 @@ fun KeyboardSettingsScreen(
                         checked = showNumberRow,
                         onCheckedChange = { viewModel.setShowNumberRow(it) },
                     )
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                // Keyboard size
+                Text(
+                    stringResource(R.string.text_keyboard_size),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_keyboard_height),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_keyboard_height_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        "$keyboardHeight%",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                val minHeight = KeyboardPreferences.MIN_KEYBOARD_HEIGHT_PERCENT
+                val maxHeight = KeyboardPreferences.MAX_KEYBOARD_HEIGHT_PERCENT
+                Slider(
+                    value = keyboardHeight.toFloat(),
+                    onValueChange = { viewModel.setKeyboardHeightPercent(it.toInt()) },
+                    valueRange = minHeight.toFloat()..maxHeight.toFloat(),
+                    // Five-point steps: fine enough to find a comfortable height, coarse
+                    // enough that the slider lands on a round number every time.
+                    steps = (maxHeight - minHeight) / 5 - 1,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_keyboard_bottom_padding),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_keyboard_bottom_padding_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        "${keyboardBottomPadding}dp",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Slider(
+                    value = keyboardBottomPadding.toFloat(),
+                    onValueChange = { viewModel.setKeyboardBottomPaddingDp(it.toInt()) },
+                    valueRange = 0f..KeyboardPreferences.MAX_BOTTOM_PADDING_DP.toFloat(),
+                    steps = KeyboardPreferences.MAX_BOTTOM_PADDING_DP / 2 - 1,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+
+                TextButton(
+                    onClick = {
+                        viewModel.setKeyboardHeightPercent(
+                            KeyboardPreferences.DEFAULT_KEYBOARD_HEIGHT_PERCENT,
+                        )
+                        viewModel.setKeyboardBottomPaddingDp(
+                            KeyboardPreferences.DEFAULT_BOTTOM_PADDING_DP,
+                        )
+                    },
+                ) {
+                    Text(stringResource(R.string.text_reset_to_default))
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 

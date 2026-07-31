@@ -29,8 +29,8 @@ android {
         applicationId = "com.uncoalesced.stickykeys"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "v0.1.1-ALPHA"
+        versionCode = 3
+        versionName = "v0.1.2-ALPHA"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -255,7 +255,7 @@ tasks.matching { it.name == "assembleRelease" }.configureEach {
 
 // assembleRelease emits app-release.apk, which says nothing about what is inside it.
 // This copies it out under a name that is unambiguous when handing it to someone.
-val releaseVersionName = "v0.1.1-ALPHA"
+val releaseVersionName = "v0.1.2-ALPHA"
 
 tasks.register<Copy>("packageReleaseArtifact") {
     group = "distribution"

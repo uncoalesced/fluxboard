@@ -57,6 +57,10 @@ class TypingViewModel
         /** Whether the always-visible digit row is drawn above the letters. */
         val showNumberRow: StateFlow<Boolean> = keyboardPreferences.showNumberRow
 
+        /** Panel sizing, chosen by the user rather than fixed. See `ImePanelHeight`. */
+        val keyboardHeightPercent: StateFlow<Int> = keyboardPreferences.keyboardHeightPercent
+        val keyboardBottomPaddingDp: StateFlow<Int> = keyboardPreferences.keyboardBottomPaddingDp
+
         private var currentWord = ""
 
         init {
@@ -75,6 +79,17 @@ class TypingViewModel
         /** True when the next letter should be capitalized, tracked locally (no IPC). */
         private var atSentenceStart = true
 
+        /**
+         * Bumped once per input session, so the view can tell "a different field is now
+         * focused" from an ordinary recomposition.
+         *
+         * The keyboard's latch state lives in the view, not here, and nothing was telling the
+         * view a new session had begun -- so a caps lock left on in one app was still on in
+         * the next field the user tapped, in a different app.
+         */
+        private val _inputSession = MutableStateFlow(0)
+        val inputSession: StateFlow<Int> = _inputSession
+
         /** Called from the IME when a new input session starts. [initialCapsMode] comes
          *  from EditorInfo.initialCapsMode -- non-zero means the field wants a capital. */
         fun onInputStarted(initialCapsMode: Int) {
@@ -84,6 +99,7 @@ class TypingViewModel
             generation++
             atSentenceStart = initialCapsMode != 0
             publishAutoCapitalize()
+            _inputSession.value += 1
         }
 
         fun isCurrent(token: Int): Boolean = token == generation
@@ -138,13 +154,19 @@ class TypingViewModel
         fun onDelete(): Boolean {
             usageLog.onBackspace()
             generation++
-            atSentenceStart = false
-            publishAutoCapitalize()
             if (currentWord.isNotEmpty()) {
                 currentWord = currentWord.dropLast(1)
+                // Deleting back to nothing puts the caret where a sentence would start again,
+                // so capitalization has to come back with it. Forcing this false
+                // unconditionally meant clearing a message and retyping it produced a
+                // lower-case first letter every time.
+                atSentenceStart = currentWord.isEmpty()
+                publishAutoCapitalize()
                 updateSuggestions()
                 return true // handled internally
             }
+            atSentenceStart = true
+            publishAutoCapitalize()
             return false // let controller handle delete
         }
 
@@ -157,9 +179,30 @@ class TypingViewModel
             currentWord = ""
             _suggestions.value = emptyList()
             _undoState.value = null
-            atSentenceStart = false
+            // atSentenceStart is deliberately left alone. A space does not begin a word, it
+            // ends one, so it carries whatever the preceding character decided: after "." it
+            // must stay true. Clearing it here was why the letter following a full stop was
+            // never capitalized -- the period set the flag and the space that always follows
+            // it immediately cleared it again, so auto-capitalize only ever fired on the very
+            // first word of a field.
             publishAutoCapitalize()
             return ++generation
+        }
+
+        /**
+         * A new sentence begins: the message was sent, or a newline was inserted.
+         *
+         * Distinct from [onWordFinished], which only ends a word. Enter both commits and
+         * starts fresh, and without this the shift state carried over from the message just
+         * sent into the one being started.
+         */
+        fun onSentenceStarted() {
+            currentWord = ""
+            _suggestions.value = emptyList()
+            _undoState.value = null
+            generation++
+            atSentenceStart = true
+            publishAutoCapitalize()
         }
 
         /** Learns a word the user kept as-is (no correction applied). */

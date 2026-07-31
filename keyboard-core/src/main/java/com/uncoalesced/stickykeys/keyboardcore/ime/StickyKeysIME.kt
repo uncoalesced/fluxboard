@@ -5,6 +5,7 @@ import android.content.ClipDescription
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -78,6 +79,16 @@ class StickyKeysIME :
 
     @Inject
     lateinit var usageLog: com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
+
+    /**
+     * Where the caret is, mirrored from [onUpdateSelection].
+     *
+     * Held rather than queried so [moveCursor] costs no binder round-trip in the common case;
+     * re-seeded from `EditorInfo` at the start of every input session, because a new field
+     * never reports its initial selection through onUpdateSelection.
+     */
+    private var selStart = 0
+    private var selEnd = 0
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
@@ -237,6 +248,11 @@ class StickyKeysIME :
         // whenever the host is busy. LatinIME and FlorisBoard seed-and-track for the
         // same reason. From here on the state is tracked locally in TypingViewModel.
         val info = editorInfo ?: currentInputEditorInfo
+        // A fresh field reports its caret here and nowhere else -- onUpdateSelection only
+        // fires on subsequent moves -- so without this the first cursor move of every session
+        // would be computed against a stale position from the previous field.
+        selStart = (info?.initialSelStart ?: 0).coerceAtLeast(0)
+        selEnd = (info?.initialSelEnd ?: 0).coerceAtLeast(selStart)
         typingViewModel().onInputStarted(initialCapsMode = info?.initialCapsMode ?: 0)
     }
 
@@ -284,6 +300,11 @@ class StickyKeysIME :
             candidatesStart,
             candidatesEnd,
         )
+        // The framework tells us where the caret is whenever it moves, including moves the
+        // user made by tapping in the host app. Tracking it here is what lets moveCursor
+        // compute a target without an IPC round-trip per step.
+        selStart = newSelStart
+        selEnd = newSelEnd
         // No getCursorCapsMode() call here on purpose -- see onStartInputView.
     }
 
@@ -338,58 +359,174 @@ class StickyKeysIME :
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
     }
 
+    /**
+     * What the Enter key does, decided from the field rather than assumed.
+     *
+     * Four defects lived in the previous version, and between them they account for Enter
+     * behaving differently in every app:
+     *
+     * 1. `currentInputEditorInfo ?: return` meant Enter did **nothing at all** in any field
+     *    that had not published an EditorInfo yet -- a real state during the first frames of
+     *    a newly focused field, and permanent in a few hosts.
+     * 2. `IME_ACTION_UNSPECIFIED` is 0 and `IME_ACTION_NONE` is 1, so the old
+     *    `actionId != IME_ACTION_NONE` test treated *unspecified* as a real action and called
+     *    `performEditorAction(0)`. Most editors ignore that, so Enter silently did nothing;
+     *    a few treat it as Done and dismissed the keyboard. Unspecified is the default for
+     *    plain text fields, which is why this was so widespread.
+     * 3. Multi-line fields were never checked. A note or a message composer that also carries
+     *    an action would send instead of inserting a line break.
+     * 4. `performEditorAction` returns whether the editor handled it, and that was discarded,
+     *    so a refusal left the keypress with no effect rather than falling back.
+     */
     override fun sendEnter() {
-        val editorInfo = currentInputEditorInfo ?: return
-        if (editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0) {
-            currentInputConnection?.sendKeyEvent(
-                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER),
-            )
-            currentInputConnection?.sendKeyEvent(
-                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER),
-            )
-        } else {
-            handleEditorAction()
+        val ic = currentInputConnection ?: return
+        val info = currentInputEditorInfo
+
+        if (info == null) {
+            sendRawEnter(ic)
+            return
+        }
+
+        // A field that accepts line breaks always gets one. Its action, if it declares any,
+        // belongs to a button in the host's own UI -- not to the return key.
+        val multiLine =
+            (info.inputType and android.text.InputType.TYPE_MASK_CLASS) ==
+                android.text.InputType.TYPE_CLASS_TEXT &&
+                (
+                    info.inputType and (
+                        android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                            android.text.InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE
+                    )
+                ) != 0
+
+        val suppressed = (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
+
+        if (multiLine || suppressed) {
+            sendRawEnter(ic)
+            return
+        }
+        performActionOrEnter(ic, info)
+    }
+
+    /**
+     * Runs the field's declared action, ignoring multi-line and the no-action flag.
+     *
+     * Separate from [sendEnter] because the two callers want different things: the return key
+     * has to respect a field that wants a literal newline, while a Send/Search affordance is
+     * an explicit request for the action itself.
+     */
+    override fun handleEditorAction() {
+        val ic = currentInputConnection ?: return
+        val info = currentInputEditorInfo
+        if (info == null) {
+            sendRawEnter(ic)
+            return
+        }
+        performActionOrEnter(ic, info)
+    }
+
+    private fun performActionOrEnter(
+        ic: android.view.inputmethod.InputConnection,
+        info: EditorInfo,
+    ) {
+        val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
+        val actionable =
+            action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED
+        // The return value matters: an editor that declines the action leaves the keypress
+        // with no effect unless something else happens, which reads as a dead Enter key.
+        if (!actionable || !ic.performEditorAction(action)) {
+            sendRawEnter(ic)
         }
     }
 
-    override fun handleEditorAction() {
-        val actionId = currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION)
-        if (actionId != null && actionId != EditorInfo.IME_ACTION_NONE) {
-            currentInputConnection?.performEditorAction(actionId)
-        } else {
-            currentInputConnection?.sendKeyEvent(
-                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER),
-            )
-            currentInputConnection?.sendKeyEvent(
-                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER),
-            )
-        }
+    /**
+     * A literal Enter keypress.
+     *
+     * Built with real timestamps and the soft-keyboard flags rather than the two-argument
+     * `KeyEvent` constructor, which leaves `downTime`/`eventTime` at zero. Several editors
+     * treat a zero-timestamp event as stale and drop it, and `FLAG_SOFT_KEYBOARD` is how a
+     * host distinguishes an on-screen keyboard from a physical one -- some suppress their
+     * hardware-keyboard shortcut handling on the strength of it.
+     */
+    private fun sendRawEnter(ic: android.view.inputmethod.InputConnection) {
+        val now = android.os.SystemClock.uptimeMillis()
+        val flags = KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
+        ic.sendKeyEvent(
+            KeyEvent(
+                now,
+                now,
+                KeyEvent.ACTION_DOWN,
+                KeyEvent.KEYCODE_ENTER,
+                0,
+                0,
+                KeyCharacterMap.VIRTUAL_KEYBOARD,
+                0,
+                flags,
+            ),
+        )
+        ic.sendKeyEvent(
+            KeyEvent(
+                now,
+                now,
+                KeyEvent.ACTION_UP,
+                KeyEvent.KEYCODE_ENTER,
+                0,
+                0,
+                KeyCharacterMap.VIRTUAL_KEYBOARD,
+                0,
+                flags,
+            ),
+        )
     }
 
     override fun switchMode(mode: AppMode) {
         // Mode state is mostly handled internally in MainIMEView
     }
 
-    override fun sendEditingKey(
-        keyCode: Int,
-        shift: Boolean,
-        ctrl: Boolean,
+    /**
+     * Moves the caret entirely inside the InputConnection.
+     *
+     * This replaces `sendKeyEvent(KEYCODE_DPAD_*)`, which was the focus-escape bug. Android
+     * routes a DPAD key event to the focused view first and, when that view does not consume
+     * it, to the window's focus search -- so an arrow sent while the caret is already at the
+     * end of the text stops being a caret movement and becomes "move focus to the next view",
+     * landing somewhere else in the host app. A scrub that ran off the end of a message
+     * therefore ended with the text field no longer focused. Nothing about scoping the gesture
+     * to this view hierarchy could have prevented that: the event is delivered to the host
+     * process on purpose, and only never producing one fixes it.
+     *
+     * Positions come from [selStart]/[selEnd], which the framework keeps current through
+     * [onUpdateSelection], so the common case costs no IPC at all. The surrounding text is
+     * requested only where the target genuinely depends on it, and always with a bounded
+     * length -- an unbounded `getExtractedText` per scrub step would pull the whole field
+     * across a binder transaction dozens of times a second.
+     */
+    override fun moveCursor(
+        move: CursorMove,
+        extend: Boolean,
     ) {
         val ic = currentInputConnection ?: return
-        var meta = 0
-        if (shift) meta = meta or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
-        if (ctrl) meta = meta or KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        val caret = if (extend) selEnd else maxOf(selStart, selEnd)
+        val anchor = if (extend) selStart else caret
 
-        // Built by hand rather than via the two-argument KeyEvent constructor, which has no
-        // metaState parameter -- without one, a held Select would move the caret instead of
-        // extending the selection.
-        val now = android.os.SystemClock.uptimeMillis()
-        ic.sendKeyEvent(
-            KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta),
-        )
-        ic.sendKeyEvent(
-            KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, meta),
-        )
+        // One character either side is enough for the two moves that make up a scrub, which is
+        // the only path that runs at speed. The wider read is taken only for moves that
+        // genuinely depend on where the line boundaries are.
+        val scan = if (move == CursorMove.LEFT || move == CursorMove.RIGHT) 1 else MAX_SCAN
+        val before = ic.getTextBeforeCursor(scan, 0)?.toString() ?: return
+        val after = ic.getTextAfterCursor(scan, 0)?.toString() ?: return
+
+        val target = cursorTargetFor(before, after, caret, move)?.coerceAtLeast(0) ?: return
+
+        if (extend) {
+            ic.setSelection(anchor, target)
+            selStart = anchor
+            selEnd = target
+        } else {
+            ic.setSelection(target, target)
+            selStart = target
+            selEnd = target
+        }
     }
 
     override fun performEditAction(actionId: Int) {
@@ -418,11 +555,20 @@ class StickyKeysIME :
         val editorInfo = currentInputEditorInfo ?: return
         val inputConnection = currentInputConnection ?: return
 
-        val mimeType = sticker.mimeType
-        val supportedMimeTypes = EditorInfoCompat.getContentMimeTypes(editorInfo)
-        val isSupported = supportedMimeTypes.any { ClipDescription.compareMimeTypes(mimeType, it) }
-        if (!isSupported) {
-            // Target app does not declare support for this MIME type
+        // The type the *content* actually is, from the resolver -- which now answers, because
+        // the provider reads the file header. The value recorded in Room is used only as a
+        // fallback: a sticker imported before a conversion, or edited outside the app, can
+        // disagree with what is on disk, and the receiving app will believe the bytes.
+        val mimeType =
+            contentResolver.getType(uri) ?: sticker.mimeType
+
+        val declared = EditorInfoCompat.getContentMimeTypes(editorInfo)
+        val accepted = declared.firstOrNull { ClipDescription.compareMimeTypes(mimeType, it) }
+        if (accepted == null) {
+            // The field genuinely does not take this content. Say so rather than doing
+            // nothing: a tap that produces no response at all is indistinguishable from the
+            // keyboard being broken, which is how this reported as "stickers do not work".
+            hapticsManager.performKeyPressHaptic()
             return
         }
 
@@ -436,12 +582,41 @@ class StickyKeysIME :
             grantUriPermission(editorInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        InputConnectionCompat.commitContent(
-            inputConnection,
-            editorInfo,
-            contentInfo,
-            flags,
-            null,
-        )
+        // Belt and braces on the permission grant. INPUT_CONTENT_GRANT_READ_URI_PERMISSION is
+        // the sanctioned route and is what the flag above asks for, but it grants to the
+        // *IME target* as the framework understands it -- and an app whose text field lives in
+        // one process while its media import runs in another (both of these do) can end up
+        // reading the URI from a component the implicit grant never covered. An explicit grant
+        // to the editor's package costs nothing and closes that gap.
+        runCatching {
+            grantUriPermission(editorInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        val committed =
+            InputConnectionCompat.commitContent(
+                inputConnection,
+                editorInfo,
+                contentInfo,
+                flags,
+                null,
+            )
+        if (!committed) {
+            // The editor declared the type and then refused the content anyway. Nothing more
+            // can be done through the InputConnection, and silently swallowing it is what
+            // made this look like the sticker feature simply not existing.
+            hapticsManager.performKeyPressHaptic()
+        }
+    }
+
+    private companion object {
+        /**
+         * Upper bound on how much surrounding text a single cursor move will pull across IPC.
+         *
+         * Line-relative moves genuinely need the text, but an unbounded request would copy
+         * the whole field through a binder transaction -- and a large one throws
+         * `TransactionTooLargeException` rather than merely being slow. Two thousand
+         * characters covers any realistic line while staying far inside that limit.
+         */
+        const val MAX_SCAN = 2000
     }
 }

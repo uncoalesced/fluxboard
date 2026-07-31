@@ -24,18 +24,23 @@ interface KeyboardController {
     fun switchMode(mode: AppMode)
 
     /**
-     * Sends a raw editing key with optional modifiers, for the text-editing panel.
+     * Moves the caret, or extends the selection to the new position when [extend] is set.
      *
-     * Modifiers are what make one method enough for the whole panel: shift held across an
-     * arrow extends the selection instead of moving the caret, and ctrl turns
-     * `MOVE_HOME`/`MOVE_END` from line-wise into document-wise. Doing this with
-     * `InputConnection.setSelection` instead would need the full text just to compute an
-     * offset, and would still get soft-wrapped lines wrong.
+     * Deliberately **not** `sendKeyEvent(KEYCODE_DPAD_*)`, which is what this replaces. A
+     * DPAD key event is a focus-navigation event first and a caret movement second: the host
+     * editor consumes it only while there is text to move through, and the moment there is
+     * not -- caret already at the end, or a field that does not handle arrows -- it falls
+     * through to the host window's focus search and moves focus to some other view entirely.
+     * That is how a space-bar scrub could end with the text field no longer focused and an
+     * unrelated part of the host app lit up, and it is not fixable by scoping the gesture:
+     * the event leaves this process by design.
+     *
+     * Every movement here goes through the InputConnection instead, which cannot address
+     * anything outside the editor it belongs to.
      */
-    fun sendEditingKey(
-        keyCode: Int,
-        shift: Boolean = false,
-        ctrl: Boolean = false,
+    fun moveCursor(
+        move: CursorMove,
+        extend: Boolean = false,
     )
 
     /**

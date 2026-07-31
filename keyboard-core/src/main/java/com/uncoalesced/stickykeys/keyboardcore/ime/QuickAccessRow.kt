@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -83,6 +84,10 @@ internal fun QuickAccessToggle(
         modifier =
             modifier
                 .size(32.dp)
+                // Drawn small enough for the 40dp strip, touchable at the 48dp minimum.
+                // Every small control on the keyboard is standardized this way rather than
+                // each picking its own compromise between fitting and being hittable.
+                .minimumInteractiveComponentSize()
                 .background(palette.surfaceVariant, RoundedCornerShape(16.dp))
                 .clickable(onClick = onToggle)
                 .semantics {
@@ -129,6 +134,7 @@ internal fun QuickAccessRow(
                     modifier =
                         Modifier
                             .size(36.dp)
+                            .minimumInteractiveComponentSize()
                             .clickable { onAction(action) }
                             .semantics {
                                 role = Role.Button
