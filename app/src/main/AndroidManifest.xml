@@ -7,6 +7,27 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Reading the gallery exists for one feature: "Extract Screenshot", which finds the
+         newest screenshot on its own so turning one into a sticker costs a single tap rather
+         than a trip through the picker. Requested at that button, never at launch.
+
+         Three declarations because the platform renamed this twice, not because three kinds
+         of access are wanted:
+           - READ_MEDIA_IMAGES is the modern, images-only permission (API 33+). Notably it
+             does NOT cover video or audio; the video import path deliberately still uses the
+             photo picker, which needs no permission at all.
+           - READ_MEDIA_VISUAL_USER_SELECTED (API 34+) is strictly *narrower*: it lets a user
+             hand over only the pictures they choose. Declaring it is what makes "Select
+             photos" appear alongside "Allow all", so nobody has to open their whole library
+             to use one screenshot.
+           - READ_EXTERNAL_STORAGE is the pre-API-33 spelling of the same thing, capped so it
+             is never requested on a release that has the granular permissions. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <application
         android:name=".StickyKeysApplication"
         android:allowBackup="true"
