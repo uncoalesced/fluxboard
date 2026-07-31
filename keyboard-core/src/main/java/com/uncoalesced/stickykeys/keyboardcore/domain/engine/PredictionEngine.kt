@@ -22,6 +22,38 @@ private const val PERSONAL_WEIGHT = 5f
 private const val BASE_WEIGHT = 1f
 private const val MAX_SUGGESTIONS = 3
 
+/**
+ * Edit costs, on a scale where one ordinary substitution is [COST_SUBSTITUTE].
+ *
+ * Uniform costs make every one-edit candidate a tie, which hands the decision to raw
+ * dictionary frequency and reliably picks the commoner word over the one the user's finger
+ * actually explains. Ordering these by how often each mistake really happens is what makes
+ * "vall" resolve to "call" rather than "all", and "gine" to "gone" rather than "line".
+ *
+ * A dropped or doubled letter sits between the two substitution costs on purpose: it is more
+ * likely than hitting a key on the other side of the board, and less likely than catching the
+ * neighbour of the key aimed at.
+ */
+private const val COST_ADJACENT_SUBSTITUTE = 2
+private const val COST_GAP = 3
+private const val COST_TRANSPOSE = 3
+private const val COST_SUBSTITUTE = 4
+
+/** Two ordinary edits. Beyond this the candidate is not a plausible reading of the input. */
+private const val MAX_EDIT_COST = COST_SUBSTITUTE * 2
+
+/** A correction has to be at least this credible after its edit penalty to be applied. */
+private const val MIN_CORRECTION_SCORE = 20f
+
+/** Shortest run-on worth trying to split: two three-letter words plus the junk key. */
+private const val MIN_SPLIT_LENGTH = 7
+
+/** Neither half of a split may be shorter than this, or "a" and "I" match everywhere. */
+private const val MIN_SPLIT_PART = 3
+
+/** Both halves of a split must be this common, so a split never invents a rare pairing. */
+private const val MIN_SPLIT_FREQUENCY = 40
+
 data class Suggestion(
     val word: String,
     val score: Float,
@@ -109,6 +141,9 @@ class PredictionEngine
             withContext(Dispatchers.IO) {
                 if (word.isBlank() || word.length > 30) return@withContext
                 val normalized = word.lowercase().trim()
+                // A split correction ("thank you") is two words, and storing it as one would
+                // put a phrase into the prefix trie that no prefix lookup can ever match.
+                if (normalized.any { it.isWhitespace() }) return@withContext
 
                 val existing = personalDao.getWord(normalized)
                 val now = System.currentTimeMillis()
@@ -239,7 +274,8 @@ class PredictionEngine
         suspend fun getAutoCorrection(typedWord: String): String? =
             withContext(Dispatchers.IO) {
                 val normalized = typedWord.lowercase().trim()
-                if (normalized.length < 3) return@withContext null // Too short to safely autocorrect
+                // Too short to safely autocorrect.
+                if (normalized.length < 3) return@withContext null
 
                 // Words the user has typed at least twice are treated as deliberate and are
                 // never corrected. A single occurrence is not enough -- otherwise every
@@ -247,46 +283,170 @@ class PredictionEngine
                 val personalEntry = personalDao.getWord(normalized)
                 if (personalEntry != null && personalEntry.frequency >= 2) return@withContext null
 
-                // Search the base trie for candidates within maxErrors edits. The typed word
-                // itself competes as its own distance-0 candidate, so a correction only fires
-                // when a nearby word beats what the user actually typed under the
-                // distance-penalized score. This deliberately replaces an absolute
-                // is-in-dictionary veto, which let junk dictionary entries (e.g. a terminal
-                // "thw") suppress obvious corrections like "thw" to "the".
-                val candidates = mutableListOf<Pair<Suggestion, Int>>()
-                val buf = reader() ?: return@withContext null
-
-                // Same reasoning as getSuggestions: never let a bad offset kill the process.
-                try {
-                    val initialRow = IntArray(normalized.length + 1) { it }
-                    dfsEditDistance(buf, 4, "", normalized, initialRow, null, null, 2, candidates)
-                } catch (e: Exception) {
-                    return@withContext null
-                }
-
-                val best =
-                    candidates
-                        .filter { it.first.score > 10f } // minimum frequency threshold
-                        .maxByOrNull { it.first.score / (it.second + 1) } // distance-penalized score
+                val corrected =
+                    splitOnMispressedSpace(normalized)
+                        ?: nearestWord(normalized)
                         ?: return@withContext null
 
-                // The typed word won: it is credible enough as-is, leave it alone.
-                if (best.first.word == normalized) return@withContext null
-                // Correction must itself clear a minimum credibility bar.
-                if (best.first.score / (best.second + 1) <= 20f) return@withContext null
-                return@withContext best.first.word
+                // Restore the shape the user typed. Auto-capitalize means the first word of
+                // every message arrives with a capital, so returning the dictionary's lowercase
+                // form would silently un-capitalize the start of most sentences it fixed.
+                return@withContext matchCase(typedWord.trim(), corrected)
+            }
+
+        /** The best single-word correction, or null when nothing beats what was typed. */
+        private fun nearestWord(normalized: String): String? {
+            // Search the base trie for candidates within [MAX_EDIT_COST]. The typed word
+            // itself competes as its own zero-cost candidate, so a correction only fires
+            // when a nearby word beats what the user actually typed under the
+            // cost-penalized score. This deliberately replaces an absolute
+            // is-in-dictionary veto, which let junk dictionary entries (e.g. a terminal
+            // "thw") suppress obvious corrections like "thw" to "the".
+            val candidates = mutableListOf<Pair<Suggestion, Int>>()
+            val buf = reader() ?: return null
+
+            // Same reasoning as getSuggestions: never let a bad offset kill the process.
+            try {
+                val initialRow = IntArray(normalized.length + 1) { it * COST_GAP }
+                dfsEditDistance(
+                    buf,
+                    4,
+                    "",
+                    normalized,
+                    initialRow,
+                    null,
+                    null,
+                    MAX_EDIT_COST,
+                    candidates,
+                )
+            } catch (e: Exception) {
+                return null
+            }
+
+            val best =
+                candidates
+                    .filter { it.first.score > 10f } // minimum frequency threshold
+                    .maxByOrNull { it.first.score / penaltyFor(it.second) }
+                    ?: return null
+
+            // The typed word won: it is credible enough as-is, leave it alone.
+            if (best.first.word == normalized) return null
+            // Correction must itself clear a minimum credibility bar.
+            if (best.first.score / penaltyFor(best.second) <= MIN_CORRECTION_SCORE) return null
+            return best.first.word
+        }
+
+        /**
+         * Divisor applied to a candidate's frequency, so a further-away word has to be
+         * proportionally more common to win.
+         *
+         * Expressed in whole edits rather than raw cost units, which keeps this the same curve
+         * it was before edit costs became weighted -- one edit still halves a candidate's
+         * score. Only the *ordering within* a given number of edits changed.
+         */
+        private fun penaltyFor(cost: Int): Float = 1f + cost.toFloat() / COST_SUBSTITUTE
+
+        /**
+         * Splits a run-on caused by hitting a key beside the space bar instead of the space.
+         *
+         * Tried before the edit-distance search because the two answer different questions: a
+         * trie walk looks for one word close to what was typed, and there is none -- "thankbyou"
+         * is not a near-miss of any single word. Only both halves being real, common words is
+         * evidence enough to act on, which is why the frequency bar is applied to each.
+         */
+        private fun splitOnMispressedSpace(normalized: String): String? {
+            if (normalized.length < MIN_SPLIT_LENGTH) return null
+            if (normalized.any { !it.isLetter() }) return null
+
+            var best: Pair<String, Float>? = null
+            for (i in MIN_SPLIT_PART until normalized.length - MIN_SPLIT_PART) {
+                if (normalized[i] !in KeyProximity.spaceNeighbours) continue
+                val left = normalized.substring(0, i)
+                val right = normalized.substring(i + 1)
+                val leftFreq = frequencyOf(left) ?: continue
+                val rightFreq = frequencyOf(right) ?: continue
+                if (leftFreq < MIN_SPLIT_FREQUENCY || rightFreq < MIN_SPLIT_FREQUENCY) continue
+                // Rank by the weaker half: a split is only as believable as its least
+                // convincing side, and scoring on the sum lets one very common word carry a
+                // fragment that happens to be a rare dictionary entry.
+                val score = minOf(leftFreq, rightFreq).toFloat()
+                if (best == null || score > best!!.second) {
+                    best = "$left $right" to score
+                }
+            }
+            // The whole string being a real word outranks any split of it: "carbon" must not
+            // become "car on".
+            if (best != null && frequencyOf(normalized) != null) return null
+            return best?.first
+        }
+
+        /** Frequency of an exact dictionary word, or null when it is not a terminal node. */
+        private fun frequencyOf(word: String): Int? {
+            val buf = reader() ?: return null
+            return try {
+                var offset = 4 // after the FLCT magic
+                for (char in word) {
+                    buf.position(offset)
+                    buf.get() // frequency
+                    buf.get() // terminal flag
+                    val childCount = buf.get().toInt() and 0xFF
+                    var next = -1
+                    for (i in 0 until childCount) {
+                        val c1 = buf.get().toInt() and 0xFF
+                        val c2 = buf.get().toInt() and 0xFF
+                        val childChar = ((c1 shl 8) or c2).toChar()
+                        val childOffset = buf.getInt()
+                        if (childChar == char) {
+                            next = childOffset
+                            break
+                        }
+                    }
+                    if (next < 0) return null
+                    offset = next
+                }
+                buf.position(offset)
+                val freq = buf.get().toInt() and 0xFF
+                val isTerminal = buf.get().toInt() and 0xFF
+                if (isTerminal == 1) freq else null
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        /**
+         * Gives [replacement] the capitalization of [original].
+         *
+         * Only two shapes are carried over, because only two are ever deliberate: an initial
+         * capital (sentence start, which auto-capitalize produces on its own) and all caps.
+         * Anything else is treated as lower case rather than guessed at.
+         */
+        private fun matchCase(
+            original: String,
+            replacement: String,
+        ): String =
+            when {
+                original.length > 1 && original.all { !it.isLetter() || it.isUpperCase() } ->
+                    replacement.uppercase()
+                original.firstOrNull()?.isUpperCase() == true ->
+                    replacement.replaceFirstChar { it.uppercase() }
+                else -> replacement
             }
 
         /**
-         * Walks the trie carrying one Levenshtein row per node, with the
+         * Walks the trie carrying one weighted-edit row per node, with the
          * Damerau/optimal-string-alignment extension for adjacent transpositions.
          *
-         * Transposition has to be a distance-1 edit or the whole feature misses the most
+         * Transposition has to cost one edit or the whole feature misses the most
          * common class of keyboard typo: "teh", "hte", "adn" and "recieve" are all two
-         * letters in the wrong order. Under plain Levenshtein each of those is distance 2
-         * from its target but distance 1 from some unrelated word, so "teh" corrected to
-         * "ten". Scoring that edit at 1 needs the row from two levels up ([prevRow]) and
+         * letters in the wrong order. Under plain Levenshtein each of those is two edits
+         * from its target but one from some unrelated word, so "teh" corrected to
+         * "ten". Scoring that edit as one needs the row from two levels up ([prevRow]) and
          * the character that produced [currentRow] ([prevChar]); both are null at the root.
+         *
+         * Costs are weighted rather than uniform -- see [COST_ADJACENT_SUBSTITUTE]. The row
+         * arrays stay integers: the weights are small whole numbers on a scale where one
+         * ordinary edit is [COST_SUBSTITUTE], so the dynamic programming is unchanged and
+         * only the constants differ.
          */
         private fun dfsEditDistance(
             buf: ByteBuffer,
@@ -323,12 +483,26 @@ class PredictionEngine
 
             for ((childChar, childOffset) in children) {
                 val nextRow = IntArray(targetWord.length + 1)
-                nextRow[0] = currentRow[0] + 1
+                nextRow[0] = currentRow[0] + COST_GAP
                 for (i in 1..targetWord.length) {
-                    val insertCost = nextRow[i - 1] + 1
-                    val deleteCost = currentRow[i] + 1
-                    val subCost = currentRow[i - 1] + if (targetWord[i - 1] == childChar) 0 else 1
-                    var cost = minOf(insertCost, deleteCost, subCost)
+                    val typed = targetWord[i - 1]
+                    val insertCost = nextRow[i - 1] + COST_GAP
+                    val deleteCost = currentRow[i] + COST_GAP
+                    val substitution =
+                        when {
+                            typed == childChar -> 0
+                            // A key physically under the intended one is the likeliest
+                            // mistake there is, and must outrank both dropping a letter and
+                            // hitting something across the board. Without this the choice
+                            // between two same-distance candidates falls back to raw
+                            // frequency, which picks the commoner word every time -- "vall"
+                            // became "all" rather than "call".
+                            KeyProximity.areAdjacent(typed, childChar) ->
+                                COST_ADJACENT_SUBSTITUTE
+                            else -> COST_SUBSTITUTE
+                        }
+                    var cost =
+                        minOf(insertCost, deleteCost, currentRow[i - 1] + substitution)
 
                     // Adjacent transposition: the candidate ends "prevChar, childChar"
                     // where the target has those two the other way round.
@@ -338,7 +512,7 @@ class PredictionEngine
                         targetWord[i - 1] == prevChar &&
                         targetWord[i - 2] == childChar
                     ) {
-                        cost = minOf(cost, prevRow[i - 2] + 1)
+                        cost = minOf(cost, prevRow[i - 2] + COST_TRANSPOSE)
                     }
 
                     nextRow[i] = cost

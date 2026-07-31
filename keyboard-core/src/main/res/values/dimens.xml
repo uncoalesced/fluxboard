@@ -4,6 +4,10 @@
     <!-- Height the IME content aims for. Every mode uses this one value so switching
          between typing, stickers and clipboard never resizes the window. -->
     <dimen name="ime_panel_height">280dp</dimen>
+    <!-- The digit row brings its own height rather than taking it from the letters.
+         Drawn inside the shared panel height it cost every key a fifth of its size the
+         moment the setting was switched on. -->
+    <dimen name="ime_number_row_height">48dp</dimen>
     <!-- The suggestion strip is always present, never conditionally absent, so the
          window height does not change as suggestions come and go. -->
     <dimen name="suggestion_strip_height">40dp</dimen>

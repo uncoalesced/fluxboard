@@ -276,10 +276,9 @@ private class NoOpController : KeyboardController {
 
     override fun switchMode(mode: AppMode) = Unit
 
-    override fun sendEditingKey(
-        keyCode: Int,
-        shift: Boolean,
-        ctrl: Boolean,
+    override fun moveCursor(
+        move: CursorMove,
+        extend: Boolean,
     ) = Unit
 
     override fun performEditAction(actionId: Int) = Unit
