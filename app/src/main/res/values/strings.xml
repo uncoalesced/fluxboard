@@ -38,6 +38,12 @@
     <string name="text_auto_correction">Auto-Correction</string>
     <string name="text_number_row">Number row</string>
     <string name="text_number_row_summary">Always show 1-0 above the letters. The corner symbols on each key are reached by holding it, and are unaffected by this.</string>
+    <string name="text_keyboard_size">Keyboard size</string>
+    <string name="text_keyboard_height">Height</string>
+    <string name="text_keyboard_height_summary">Scales the whole keyboard. The number row adds its own height on top of this, so turning it on no longer shrinks the letter keys.</string>
+    <string name="text_keyboard_bottom_padding">Space below keys</string>
+    <string name="text_keyboard_bottom_padding_summary">Gap held between the bottom row and the gesture bar. Raising it grows the keyboard rather than shrinking the keys.</string>
+    <string name="text_reset_to_default">Reset to default</string>
     <string name="text_appearance">Appearance</string>
     <string name="text_app_theme">App Theme</string>
     <string name="text_theme_system">System</string>
@@ -70,6 +76,9 @@
     <string name="text_delete">Delete</string>
     <string name="text_import_video">Import Video</string>
     <string name="text_extract_screenshot">Extract Screenshot</string>
+    <string name="text_no_screenshot_found">No screenshot found</string>
+    <string name="text_no_screenshot_found_body">FluxBoard cannot read your gallery, so it cannot pick your latest screenshot on its own. Choosing the image yourself works the same way and keeps the app from needing access to your whole photo library.</string>
+    <string name="text_choose_an_image">Choose an image</string>
     <string name="text_all">All</string>
     <string name="text_favourites">★ Favourites</string>
     <string name="text_choose_how_to_process_your_selected_photos">Import them as they are, or edit the first one to crop and erase its background:</string>

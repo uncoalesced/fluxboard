@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -93,6 +94,10 @@ internal fun EmojiPickerView(
                 modifier =
                     Modifier
                         .size(34.dp)
+                        // The strip is 40dp tall, so the drawn size cannot be 48. This
+                        // expands the *touch* area to the minimum without changing the
+                        // layout, which is what the guideline actually asks for.
+                        .minimumInteractiveComponentSize()
                         .clickable(role = Role.Button, onClick = onBackToKeyboard)
                         .semantics { contentDescription = "Back to keyboard" },
                 contentAlignment = Alignment.Center,
@@ -106,7 +111,7 @@ internal fun EmojiPickerView(
             }
 
             LazyRow(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -144,6 +149,34 @@ internal fun EmojiPickerView(
                         )
                     }
                 }
+            }
+
+            // The way out, at the strip's trailing edge.
+            //
+            // The leading arrow was already here and was still reported as "no way back" --
+            // a bare chevron next to a scrolling row of category names does not read as
+            // "leave this panel", and it sits where a scroll gesture starts. "ABC" is the
+            // label every keyboard uses for exactly this, and putting it opposite the arrow
+            // means the exit is the one control that never scrolls out of reach.
+            Box(
+                modifier =
+                    Modifier
+                        .padding(start = 4.dp, end = 4.dp)
+                        .minimumInteractiveComponentSize()
+                        .background(
+                            StickyKeysTheme.colors.surfaceVariant,
+                            RoundedCornerShape(6.dp),
+                        ).clickable(role = Role.Button, onClick = onBackToKeyboard)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .semantics { contentDescription = "Back to letters" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = ABC_TAB,
+                    maxLines = 1,
+                    color = StickyKeysTheme.colors.onSurfaceVariant,
+                    style = StickyKeysTheme.typography.labelMedium,
+                )
             }
         }
 
@@ -185,6 +218,9 @@ internal fun EmojiPickerView(
 }
 
 private const val STICKERS_TAB = "Stickers"
+
+/** The universal label for "back to the letters", on every keyboard that has this panel. */
+private const val ABC_TAB = "ABC"
 
 @Composable
 private fun StickerTabGrid(

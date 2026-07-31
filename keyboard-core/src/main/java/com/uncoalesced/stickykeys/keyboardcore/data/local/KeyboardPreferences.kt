@@ -47,6 +47,10 @@ class KeyboardPreferences
                     "show_number_row" ->
                         _showNumberRow.value =
                             prefs.getBoolean("show_number_row", true)
+                    "keyboard_height_percent" ->
+                        _keyboardHeightPercent.value = readHeightPercent()
+                    "keyboard_bottom_padding_dp" ->
+                        _keyboardBottomPaddingDp.value = readBottomPadding()
                 }
             }
 
@@ -99,6 +103,37 @@ class KeyboardPreferences
         private val _showNumberRow = MutableStateFlow(prefs.getBoolean("show_number_row", true))
         val showNumberRow: StateFlow<Boolean> = _showNumberRow.asStateFlow()
 
+        /**
+         * Overall keyboard height, as a percentage of the shipped default.
+         *
+         * The panel used to be one fixed dimension for everyone, which made the number row a
+         * forced trade: turning it on divided the same height across five rows instead of
+         * four, so every key lost a fifth of its height and the board became noticeably harder
+         * to hit. Thumb length and screen size vary far too much for one number to be right,
+         * so this is the user's call rather than a compromise chosen for them.
+         */
+        private val _keyboardHeightPercent = MutableStateFlow(readHeightPercent())
+        val keyboardHeightPercent: StateFlow<Int> = _keyboardHeightPercent.asStateFlow()
+
+        /**
+         * Extra space between the bottom key row and the gesture bar, in dp.
+         *
+         * Grows the window rather than shrinking the panel, so raising it never costs key
+         * height. The default matches the value tuned on device.
+         */
+        private val _keyboardBottomPaddingDp = MutableStateFlow(readBottomPadding())
+        val keyboardBottomPaddingDp: StateFlow<Int> = _keyboardBottomPaddingDp.asStateFlow()
+
+        private fun readHeightPercent(): Int =
+            prefs
+                .getInt("keyboard_height_percent", DEFAULT_KEYBOARD_HEIGHT_PERCENT)
+                .coerceIn(MIN_KEYBOARD_HEIGHT_PERCENT, MAX_KEYBOARD_HEIGHT_PERCENT)
+
+        private fun readBottomPadding(): Int =
+            prefs
+                .getInt("keyboard_bottom_padding_dp", DEFAULT_BOTTOM_PADDING_DP)
+                .coerceIn(0, MAX_BOTTOM_PADDING_DP)
+
         init {
             prefs.registerOnSharedPreferenceChangeListener(listener)
         }
@@ -130,5 +165,35 @@ class KeyboardPreferences
         /** [intensity] is a slider percentage, 0-100. Zero is valid and means silent. */
         fun setHapticsIntensity(intensity: Int) {
             prefs.edit().putInt("haptics_intensity", intensity.coerceIn(0, 100)).apply()
+        }
+
+        /** [percent] scales the whole panel. 100 is the shipped height. */
+        fun setKeyboardHeightPercent(percent: Int) {
+            prefs
+                .edit()
+                .putInt(
+                    "keyboard_height_percent",
+                    percent.coerceIn(MIN_KEYBOARD_HEIGHT_PERCENT, MAX_KEYBOARD_HEIGHT_PERCENT),
+                ).apply()
+        }
+
+        /** [dp] is the gap held below the bottom key row, above the gesture bar. */
+        fun setKeyboardBottomPaddingDp(dp: Int) {
+            prefs
+                .edit()
+                .putInt("keyboard_bottom_padding_dp", dp.coerceIn(0, MAX_BOTTOM_PADDING_DP))
+                .apply()
+        }
+
+        companion object {
+            const val DEFAULT_KEYBOARD_HEIGHT_PERCENT = 100
+
+            /** Below this the keys are too short to hit; above it the host app disappears. */
+            const val MIN_KEYBOARD_HEIGHT_PERCENT = 70
+            const val MAX_KEYBOARD_HEIGHT_PERCENT = 150
+
+            /** Tuned on device; the gesture-bar inset alone leaves the bottom row flush. */
+            const val DEFAULT_BOTTOM_PADDING_DP = 12
+            const val MAX_BOTTOM_PADDING_DP = 48
         }
     }

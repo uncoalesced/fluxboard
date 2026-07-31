@@ -1,7 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
-import android.view.KeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -32,11 +31,14 @@ import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 /**
  * Cursor movement, selection and clipboard actions, without leaving the keyboard.
  *
- * Every action goes through the host editor -- arrow keys with modifiers, and
- * `performContextMenuAction` for select-all/copy/paste -- rather than being reimplemented
- * against the text. That keeps the host app's own undo stack, rich text and any overridden
- * paste behaviour working, and avoids needing to pull the full field contents across IPC
- * just to compute an offset.
+ * Clipboard actions go through the host editor via `performContextMenuAction`, so its own undo
+ * stack, rich text and any overridden paste behaviour keep working.
+ *
+ * Movement deliberately does **not** go through arrow key events. A DPAD key event that the
+ * editor cannot consume -- caret already at the end, or a field that ignores arrows -- falls
+ * through to the host window's focus search and moves focus out of the text field entirely.
+ * [KeyboardController.moveCursor] addresses the InputConnection instead, which cannot reach
+ * outside the editor it belongs to.
  */
 @Composable
 internal fun TextEditPanel(
@@ -49,7 +51,7 @@ internal fun TextEditPanel(
     // on the same surface, so a chord is not physically available the way it is on hardware.
     var selecting by remember { mutableStateOf(false) }
 
-    fun move(keyCode: Int) = controller.sendEditingKey(keyCode, shift = selecting)
+    fun move(direction: CursorMove) = controller.moveCursor(direction, extend = selecting)
 
     Column(
         modifier =
@@ -90,32 +92,24 @@ internal fun TextEditPanel(
             Column(modifier = Modifier.weight(2f)) {
                 Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     EditChip("Start", palette, Modifier.weight(1f)) {
-                        controller.sendEditingKey(
-                            KeyEvent.KEYCODE_MOVE_HOME,
-                            shift = selecting,
-                            ctrl = true,
-                        )
+                        move(CursorMove.DOC_START)
                     }
                     EditChip("Up", palette, Modifier.weight(1f)) {
-                        move(KeyEvent.KEYCODE_DPAD_UP)
+                        move(CursorMove.UP)
                     }
                     EditChip("End", palette, Modifier.weight(1f)) {
-                        controller.sendEditingKey(
-                            KeyEvent.KEYCODE_MOVE_END,
-                            shift = selecting,
-                            ctrl = true,
-                        )
+                        move(CursorMove.DOC_END)
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                     EditChip("Left", palette, Modifier.weight(1f)) {
-                        move(KeyEvent.KEYCODE_DPAD_LEFT)
+                        move(CursorMove.LEFT)
                     }
                     EditChip("Down", palette, Modifier.weight(1f)) {
-                        move(KeyEvent.KEYCODE_DPAD_DOWN)
+                        move(CursorMove.DOWN)
                     }
                     EditChip("Right", palette, Modifier.weight(1f)) {
-                        move(KeyEvent.KEYCODE_DPAD_RIGHT)
+                        move(CursorMove.RIGHT)
                     }
                 }
             }

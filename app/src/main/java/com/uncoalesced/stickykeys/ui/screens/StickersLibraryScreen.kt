@@ -272,6 +272,10 @@ fun StickersLibraryScreen(
             uri?.let { onVideoPicked(it.toString()) }
         }
 
+    // Set when the screenshot lookup finds nothing, so the failure is visible rather than the
+    // button appearing dead. See the dialog at the bottom of this screen.
+    var screenshotUnavailable by remember { mutableStateOf(false) }
+
     when (val current = state) {
         is StickersUiState.Loading -> LoadingScreen()
         is StickersUiState.Success -> {
@@ -306,6 +310,14 @@ fun StickersLibraryScreen(
                                         )
                                 if (screenshotUri != null) {
                                     onImagePicked(screenshotUri.toString())
+                                } else {
+                                    // Never fail silently. This lookup returns null on every
+                                    // device running API 33+ -- reading MediaStore for images
+                                    // this app did not create needs READ_MEDIA_IMAGES, which
+                                    // is deliberately not declared. Before this branch existed
+                                    // the button simply did nothing, with no way to tell that
+                                    // from the feature being broken.
+                                    screenshotUnavailable = true
                                 }
                             },
                             containerColor = StickyKeysTheme.colors.secondary,
@@ -336,6 +348,12 @@ fun StickersLibraryScreen(
                             .fillMaxSize()
                             .padding(paddingValues),
                 ) {
+                    // Smart-cast once rather than re-casting at each use: the repeated
+                    // `current.currentTab as TabFilter.CategoryFilter` was both unreadable and
+                    // the reason two of these lines could not be wrapped inside the limit.
+                    val activeCategoryId =
+                        (current.currentTab as? TabFilter.CategoryFilter)?.category?.id
+
                     // Category & Filter Tabs
                     ScrollableTabRow(
                         selectedTabIndex =
@@ -345,8 +363,7 @@ fun StickersLibraryScreen(
                                 is TabFilter.CategoryFilter ->
                                     2 +
                                         current.categories.indexOfFirst {
-                                            it.id ==
-                                                (current.currentTab as TabFilter.CategoryFilter).category.id
+                                            it.id == activeCategoryId
                                         }
                             }.coerceAtLeast(0),
                         edgePadding = StickyKeysTheme.spacing.sm,
@@ -364,10 +381,7 @@ fun StickersLibraryScreen(
                         )
                         current.categories.forEach { category ->
                             Tab(
-                                selected =
-                                    current.currentTab is TabFilter.CategoryFilter &&
-                                        (current.currentTab as TabFilter.CategoryFilter).category.id ==
-                                        category.id,
+                                selected = activeCategoryId == category.id,
                                 onClick = {
                                     viewModel.selectTab(
                                         TabFilter.CategoryFilter(category),
@@ -511,6 +525,29 @@ fun StickersLibraryScreen(
                         }
                     },
                     confirmButton = {},
+                )
+            }
+
+            if (screenshotUnavailable) {
+                AlertDialog(
+                    onDismissRequest = { screenshotUnavailable = false },
+                    title = { Text(stringResource(R.string.text_no_screenshot_found)) },
+                    text = { Text(stringResource(R.string.text_no_screenshot_found_body)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            screenshotUnavailable = false
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                ),
+                            )
+                        }) { Text(stringResource(R.string.text_choose_an_image)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { screenshotUnavailable = false }) {
+                            Text(stringResource(R.string.text_close))
+                        }
+                    },
                 )
             }
         }

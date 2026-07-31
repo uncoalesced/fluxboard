@@ -4,6 +4,7 @@ package com.uncoalesced.stickykeys.keyboardcore.ime
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -296,71 +297,86 @@ internal fun Modifier.keyGestures(
     cellWidthPx: Float,
     keyBounds: () -> Rect,
     onCommit: (String) -> Unit,
+    pressed: MutableState<Boolean>,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
 ): Modifier =
     this.pointerInput(keyOutput, longPress, alternates, cellWidthPx) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-
-            // Scrubbing is decided before the long-press clock, not after it. Gating it on
-            // the hold threshold would mean the cursor sat still for the first 350ms of a
-            // drag, which reads as the gesture being broken rather than deliberate.
-            if (longPress is LongPress.Scrub) {
-                runScrub(
-                    activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
-                    stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
-                    onScrub = onScrub,
-                    onTap = { onCommit(keyOutput) },
-                )
-                return@awaitEachGesture
-            }
-
-            // null  -> the threshold elapsed, this is a hold
-            // true  -> released before the threshold, an ordinary tap
-            // false -> the gesture was cancelled out from under us
-            val early =
-                withTimeoutOrNull(LONG_PRESS_MS) {
-                    waitForUpOrCancellation() != null
+            // Replacing `clickable` also removed the indication it supplied, so keys had no
+            // press feedback of any kind while every other control in the app did. A
+            // MutableState rather than a callback: an instance is stable and remembered per
+            // key, where a lambda parameter would be reallocated on each recomposition and
+            // take the whole grid out of skipping.
+            pressed.value = true
+            try {
+                // Scrubbing is decided before the long-press clock, not after it. Gating it on
+                // the hold threshold would mean the cursor sat still for the first 350ms of a
+                // drag, which reads as the gesture being broken rather than deliberate.
+                if (longPress is LongPress.Scrub) {
+                    runScrub(
+                        activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
+                        stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
+                        onScrub = onScrub,
+                        onTap = { onCommit(keyOutput) },
+                    )
+                    return@awaitEachGesture
                 }
 
-            when {
-                early == true -> onCommit(keyOutput)
-                early == false -> Unit
-                longPress is LongPress.None -> {
-                    // Held, but this key has no hold behaviour: still a keystroke on release,
-                    // otherwise resting a moment on a letter would silently swallow it.
-                    if (waitForUpOrCancellation() != null) onCommit(keyOutput)
-                }
-                longPress is LongPress.Repeat -> {
-                    var step = 0
-                    while (true) {
-                        onCommit(keyOutput)
-                        val ended =
-                            withTimeoutOrNull(repeatIntervalAt(step)) {
-                                waitForUpOrCancellation()
-                            }
-                        if (ended != null) break
-                        step++
+                // null  -> the threshold elapsed, this is a hold
+                // true  -> released before the threshold, an ordinary tap
+                // false -> the gesture was cancelled out from under us
+                val early =
+                    withTimeoutOrNull(LONG_PRESS_MS) {
+                        waitForUpOrCancellation() != null
                     }
-                }
-                longPress is LongPress.Alternates -> {
-                    alternates.show(longPress.options, keyBounds(), cellWidthPx)
-                    val origin = keyBounds().left
-                    var committed = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull()
-                        if (change == null) break
-                        alternates.moveTo(origin + change.position.x)
-                        if (!change.pressed) {
-                            committed = true
-                            break
+
+                when {
+                    early == true -> onCommit(keyOutput)
+                    early == false -> Unit
+                    longPress is LongPress.None -> {
+                        // Held, but this key has no hold behaviour: still a keystroke on
+                        // release, otherwise resting a moment on a letter would silently
+                        // swallow it.
+                        if (waitForUpOrCancellation() != null) onCommit(keyOutput)
+                    }
+                    longPress is LongPress.Repeat -> {
+                        var step = 0
+                        while (true) {
+                            onCommit(keyOutput)
+                            val ended =
+                                withTimeoutOrNull(repeatIntervalAt(step)) {
+                                    waitForUpOrCancellation()
+                                }
+                            if (ended != null) break
+                            step++
                         }
                     }
-                    val picked = if (committed) alternates.consume() else null
-                    alternates.hide()
-                    if (picked != null) onCommit(picked)
+                    longPress is LongPress.Alternates -> {
+                        alternates.show(longPress.options, keyBounds(), cellWidthPx)
+                        val origin = keyBounds().left
+                        var committed = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull()
+                            if (change == null) break
+                            alternates.moveTo(origin + change.position.x)
+                            if (!change.pressed) {
+                                committed = true
+                                break
+                            }
+                        }
+                        val picked = if (committed) alternates.consume() else null
+                        alternates.hide()
+                        if (picked != null) onCommit(picked)
+                    }
                 }
+            } finally {
+                // finally, not after the when: every branch above can leave early -- the
+                // scrub returns, a cancelled gesture falls through, and any of them can be
+                // cancelled by the composition going away mid-press. A key stuck in its
+                // pressed colour is worse than no feedback at all.
+                pressed.value = false
             }
         }
     }
