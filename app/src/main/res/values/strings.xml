@@ -77,8 +77,11 @@
     <string name="text_import_video">Import Video</string>
     <string name="text_extract_screenshot">Extract Screenshot</string>
     <string name="text_no_screenshot_found">No screenshot found</string>
-    <string name="text_no_screenshot_found_body">FluxBoard cannot read your gallery, so it cannot pick your latest screenshot on its own. Choosing the image yourself works the same way and keeps the app from needing access to your whole photo library.</string>
+    <string name="text_no_screenshot_found_body">There are no screenshots in your gallery yet. You can pick any image instead.</string>
+    <string name="text_no_screenshot_found_partial">No screenshot among the photos you shared with FluxBoard. Pick one directly, or allow access to more photos from Settings.</string>
     <string name="text_choose_an_image">Choose an image</string>
+    <string name="text_gallery_access_needed">Gallery access needed</string>
+    <string name="text_gallery_access_needed_body">Finding your latest screenshot on its own needs permission to read your photos. FluxBoard uses it for nothing else, and never sends anything anywhere. You can also just pick the image yourself, which needs no permission at all.</string>
     <string name="text_all">All</string>
     <string name="text_favourites">★ Favourites</string>
     <string name="text_choose_how_to_process_your_selected_photos">Import them as they are, or edit the first one to crop and erase its background:</string>
