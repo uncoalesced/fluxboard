@@ -50,6 +50,9 @@ internal fun rememberInterceptingController(
         object : KeyboardController {
             override fun commitText(text: String) = delegate.commitText(text)
 
+            override fun textBeforeCursor(maxChars: Int): String =
+                delegate.textBeforeCursor(maxChars)
+
             override fun replaceTextBeforeCursor(
                 charCount: Int,
                 replacement: String,
