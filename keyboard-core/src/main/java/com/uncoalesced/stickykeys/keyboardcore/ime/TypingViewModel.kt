@@ -143,12 +143,25 @@ class TypingViewModel
             updateSuggestions()
         }
 
-        /** Non-letter character committed directly (punctuation, digits, symbols). */
-        fun onSymbolCommitted(text: String) {
-            generation++
+        /**
+         * A non-letter character was committed directly (punctuation, digits, symbols).
+         *
+         * Clears the in-progress word and returns the input token to validate against later,
+         * exactly like [onSpacePressed], and for the same reason: it deliberately does **not**
+         * learn the word. It used to be paired with a preceding [onWordFinished], which learned
+         * whatever had been typed the instant a full stop arrived -- so a misspelling ending in
+         * punctuation was committed to the personal dictionary before anything had a chance to
+         * decide whether it needed correcting. The caller now makes that call once the
+         * correction lookup resolves.
+         */
+        fun onSymbolCommitted(text: String): Int {
+            currentWord = ""
+            _suggestions.value = emptyList()
+            _undoState.value = null
             // "." "!" "?" open a new sentence; anything else just continues.
-            atSentenceStart = text.any { it == '.' || it == '!' || it == '?' }
+            atSentenceStart = text.any { it in SENTENCE_ENDINGS }
             publishAutoCapitalize()
+            return ++generation
         }
 
         fun onDelete(): Boolean {
@@ -247,6 +260,48 @@ class TypingViewModel
             }
         }
 
+        /**
+         * Drops the in-progress word without learning it.
+         *
+         * Distinct from [onWordFinished], and the distinction is the whole point. A word is
+         * only evidence of how the user writes if they finished writing it; a half-typed one
+         * that the caret then moved away from is not. The space-bar scrub called
+         * [onWordFinished] on *every step* of the drag, so scrubbing out of the middle of a
+         * word taught the personal dictionary the fragment under the caret at that moment.
+         * Those fragments then compete in suggestions, and once one has been seen twice
+         * `PredictionEngine` treats it as deliberate and permanently refuses to autocorrect it
+         * -- so the damage accumulates silently and outlives the gesture that caused it.
+         */
+        fun onWordAbandoned() {
+            currentWord = ""
+            _suggestions.value = emptyList()
+        }
+
+        /**
+         * Re-derives the word under the caret from what the editor actually contains.
+         *
+         * Called only when something other than this keyboard changed the text or moved the
+         * caret -- see `StickyKeysIME.onUpdateSelection`, which uses a predicted caret to tell
+         * the two apart so that this never runs on the keystroke path.
+         *
+         * [currentWord] is otherwise a local mirror built by appending on each key press, which
+         * is correct exactly while this keyboard is the only editor. After a caret tap, a
+         * paste, or a selection replaced by the host, it describes text that is no longer
+         * there, and the suggestion strip sizes a deletion from its length.
+         */
+        fun onEditorContextChanged(textBeforeCursor: String) {
+            currentWord = wordUnderCaret(textBeforeCursor)
+            // Anything in flight was computed against text that has since moved.
+            generation++
+            _undoState.value = null
+            // Capitalization comes from the same source rather than being left at whatever the
+            // last keystroke decided: a caret moved into the middle of a sentence must not
+            // leave the board latched to upper case.
+            atSentenceStart = startsNewSentence(textBeforeCursor)
+            publishAutoCapitalize()
+            updateSuggestions()
+        }
+
         fun onSuggestionSelected(suggestion: String) {
             currentWord = ""
             _suggestions.value = emptyList()
@@ -265,3 +320,49 @@ class TypingViewModel
             }
         }
     }
+
+/**
+ * The word the caret is sitting at the end of, given the text before it.
+ *
+ * Pure, and separate from the ViewModel, because it is the length used to size a destructive
+ * edit: the suggestion strip replaces exactly this many characters of the user's text. An
+ * off-by-one here does not show up as a wrong suggestion, it shows up as a letter of the
+ * previous word being eaten, so it is worth being able to assert without a keyboard.
+ *
+ * Letters and interior apostrophes only, matching what the keyboard's own tracker accumulates
+ * (`onKeyPressed` is called for letters and nothing else). Apostrophes count because "don't"
+ * and "it's" are common enough that treating them as two words would make a suggestion tap
+ * replace just the "t".
+ */
+internal fun wordUnderCaret(textBeforeCursor: String): String =
+    textBeforeCursor
+        .takeLastWhile { it.isLetter() || it == '\'' }
+        // A leading apostrophe is a quotation mark, not part of the word. Keeping it would
+        // add one to the replacement length and swallow the quote the user typed.
+        .dropWhile { it == '\'' }
+
+/**
+ * Whether the caret sits where a new sentence begins.
+ *
+ * Same reasoning as [wordUnderCaret]: derived from the editor rather than from what the last
+ * keystroke happened to set, so moving the caret into the middle of existing text does not
+ * leave auto-capitalize armed.
+ */
+internal fun startsNewSentence(textBeforeCursor: String): Boolean {
+    val trimmed = textBeforeCursor.trimEnd { it == ' ' }
+    if (trimmed.isEmpty()) return true
+    return trimmed.last() in SENTENCE_ENDINGS || trimmed.last() == '\n'
+}
+
+/** Marks that close a sentence, so the next letter is capitalized. */
+internal const val SENTENCE_ENDINGS = ".!?"
+
+/**
+ * How much text is read back when re-deriving the word under the caret.
+ *
+ * One constant, referenced by both the IME service and the typing view, because the two sides
+ * must agree: the service uses it to resync the tracker and the view uses it to size a
+ * replacement, and a mismatch would silently truncate long words on one path only. Small on
+ * purpose -- this crosses a binder transaction, and only the current word is wanted.
+ */
+internal const val WORD_CONTEXT_CHARS = 48
