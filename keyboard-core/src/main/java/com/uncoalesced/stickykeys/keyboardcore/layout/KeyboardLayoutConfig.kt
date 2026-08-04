@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.layout
 
+import com.uncoalesced.stickykeys.keyboardcore.ime.KeyboardLayouts
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -63,27 +64,48 @@ data class KeyboardLayoutConfig(
     val id: String,
     val name: String,
     val rows: List<List<KeyDefinition>>,
+    /**
+     * Symbols page 1. Defaults to the shipped page, so a layout saved before this field
+     * existed keeps working and keeps receiving improvements to the shipped pages.
+     */
+    val symbolRows: List<List<KeyDefinition>> = KeyboardLayouts.symbolsPrimaryRows,
+    /** Symbols page 2, reached by the `SYMBOLS_SHIFT` key. Same defaulting as [symbolRows]. */
+    val symbolShiftedRows: List<List<KeyDefinition>> = KeyboardLayouts.symbolsShiftedRows,
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
         json.put("id", id)
         json.put("name", name)
-        val rowsArray = JSONArray()
-        for (row in rows) {
-            val rowArray = JSONArray()
-            for (key in row) {
-                rowArray.put(key.toJson())
-            }
-            rowsArray.put(rowArray)
+        json.put("rows", rowsToJson(rows))
+        // Written only when the user has actually changed them. Always writing would freeze
+        // today's symbol pages into every custom layout, so a user who only reordered a couple
+        // of letters would never see a shipped symbol-page fix again.
+        if (symbolRows != KeyboardLayouts.symbolsPrimaryRows) {
+            json.put("symbolRows", rowsToJson(symbolRows))
         }
-        json.put("rows", rowsArray)
+        if (symbolShiftedRows != KeyboardLayouts.symbolsShiftedRows) {
+            json.put("symbolShiftedRows", rowsToJson(symbolShiftedRows))
+        }
         return json
     }
 
+    /** Every page in this layout, so callers can validate or scan all of them uniformly. */
+    fun pages(): List<List<List<KeyDefinition>>> = listOf(rows, symbolRows, symbolShiftedRows)
+
     companion object {
-        fun fromJson(jsonStr: String): KeyboardLayoutConfig {
-            val json = JSONObject(jsonStr)
-            val rowsArray = json.getJSONArray("rows")
+        private fun rowsToJson(rows: List<List<KeyDefinition>>): JSONArray {
+            val rowsArray = JSONArray()
+            for (row in rows) {
+                val rowArray = JSONArray()
+                for (key in row) {
+                    rowArray.put(key.toJson())
+                }
+                rowsArray.put(rowArray)
+            }
+            return rowsArray
+        }
+
+        private fun rowsFromJson(rowsArray: JSONArray): List<List<KeyDefinition>> {
             val rows = mutableListOf<List<KeyDefinition>>()
             for (i in 0 until rowsArray.length()) {
                 val rowArray = rowsArray.getJSONArray(i)
@@ -93,10 +115,25 @@ data class KeyboardLayoutConfig(
                 }
                 rows.add(row)
             }
+            return rows
+        }
+
+        fun fromJson(jsonStr: String): KeyboardLayoutConfig {
+            val json = JSONObject(jsonStr)
             return KeyboardLayoutConfig(
                 id = json.getString("id"),
                 name = json.getString("name"),
-                rows = rows,
+                rows = rowsFromJson(json.getJSONArray("rows")),
+                // Absent from every layout written before symbol pages were part of a layout
+                // at all, including any a tester already has on disk. Those must load as the
+                // shipped pages rather than as an empty symbols plane -- the same defaulting
+                // KeyStyle.fromJson uses for themes predating per-key styling.
+                symbolRows =
+                    json.optJSONArray("symbolRows")?.let { rowsFromJson(it) }
+                        ?: KeyboardLayouts.symbolsPrimaryRows,
+                symbolShiftedRows =
+                    json.optJSONArray("symbolShiftedRows")?.let { rowsFromJson(it) }
+                        ?: KeyboardLayouts.symbolsShiftedRows,
             )
         }
 
