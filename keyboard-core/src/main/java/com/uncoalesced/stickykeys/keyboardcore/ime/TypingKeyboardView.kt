@@ -58,7 +58,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
-import com.uncoalesced.stickykeys.keyboardcore.layout.KeyboardLayoutConfig
 import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
@@ -119,14 +118,22 @@ fun TypingKeyboardView(
                 // Prepended at render time rather than baked into the layout, so toggling the
                 // setting does not rewrite the user's saved layout -- and so the symbol pages,
                 // whose own first row is already digits, never get a duplicate.
+                //
+                // While shift is armed the row shows each digit's shifted symbol, matching the
+                // reference and every hardware keyboard. Substituted rather than transformed,
+                // so the symbols are real keys: pressing one consumes a one-shot shift through
+                // the same branch as any other key, with no special case for the digit row.
+                val digits =
+                    if (isUpper) KeyboardLayouts.shiftedNumberRow else KeyboardLayouts.numberRow
                 KeyboardRows(
-                    if (showNumberRow) listOf(KeyboardLayouts.numberRow) + letters else letters,
+                    if (showNumberRow) listOf(digits) + letters else letters,
                 )
             } else {
-                val legacyRows = KeyboardLayouts.getLayoutForMode(mode)
-                KeyboardRows(
-                    KeyboardLayoutConfig.fromLegacyLayout("_temp", "_temp", legacyRows).rows,
-                )
+                // Read from the layout, not from a hardcoded table converted on the fly. The
+                // symbol pages used to live outside KeyboardLayoutConfig entirely, which is
+                // the single reason they could not be remapped, weighted, or given the corner
+                // hints and long-press alternates the letter pages have had all along.
+                KeyboardRows(KeyboardLayouts.symbolRowsForMode(mode, activeLayoutConfig))
             }
         }
 
@@ -176,7 +183,32 @@ fun TypingKeyboardView(
                 // Whatever word was being tracked is no longer under the caret, so the
                 // autocorrect buffer has to be dropped -- otherwise the next space would
                 // rewrite text somewhere else entirely.
-                typingViewModel.onWordFinished()
+                //
+                // Abandoned, not finished. This runs once per caret step, and onWordFinished
+                // *learns* what it clears, so scrubbing out of the middle of a word was
+                // writing the fragment under the caret into the personal dictionary -- where,
+                // after two sightings, PredictionEngine starts treating it as a word the user
+                // means and stops correcting it.
+                typingViewModel.onWordAbandoned()
+            }
+        }
+
+    // Hoisted rather than built at the call site, for both of the reasons this file already
+    // hoists handlers: an unmemoized lambda per suggestion is a fresh instance on every
+    // recomposition, and the body is long enough that inlining it eight levels deep inside the
+    // strip pushed it past the line limit with nothing but indentation.
+    //
+    // The span is read from the editor, not from the keyboard's own running copy of the word.
+    // That copy is a local mirror, correct only while this keyboard is the sole editor -- after
+    // a caret tap or a paste, its length deleted the wrong span of the user's text. The read
+    // and the replace happen in one synchronous step, so nothing can be typed in between and
+    // shift what gets deleted.
+    val onSuggestionTap =
+        remember(keyboardController, typingViewModel) {
+            { suggestion: String ->
+                val span = currentWordSpan(keyboardController)
+                keyboardController.replaceTextBeforeCursor(span, "$suggestion ")
+                typingViewModel.onSuggestionSelected(suggestion)
             }
         }
 
@@ -365,16 +397,7 @@ fun TypingKeyboardView(
                                                         contentDescription =
                                                             "Suggestion: $suggestion"
                                                     }.clickable(role = Role.Button) {
-                                                        // Read the length and apply the swap in the same
-                                                        // synchronous step, so nothing can be typed in
-                                                        // between and shift what gets deleted.
-                                                        keyboardController.replaceTextBeforeCursor(
-                                                            typingViewModel.getCurrentWord().length,
-                                                            "$suggestion ",
-                                                        )
-                                                        typingViewModel.onSuggestionSelected(
-                                                            suggestion,
-                                                        )
+                                                        onSuggestionTap(suggestion)
                                                     }.padding(8.dp),
                                             color = StickyKeysTheme.colors.onSurface,
                                             style = StickyKeysTheme.typography.labelLarge,
@@ -747,15 +770,63 @@ internal fun handleKeyPress(
             val isLetter = keyLabel.length == 1 && keyLabel.first().isLetter()
             if (isLetter) {
                 viewModel.onKeyPressed(keyLabel)
+                controller.commitText(keyLabel)
             } else {
-                viewModel.onWordFinished()
-                viewModel.onSymbolCommitted(keyLabel)
+                val typedWord = viewModel.getCurrentWord()
+                // Committed first and synchronously, for the same reason the space bar is:
+                // waiting on the correction lookup here would let a following key land before
+                // this one and invert what the user typed.
+                controller.commitText(keyLabel)
+                val token = viewModel.onSymbolCommitted(keyLabel)
+
+                if (typedWord.isNotBlank() && endsAWord(keyLabel)) {
+                    // Autocorrect used to fire on the space bar and nowhere else, so anyone
+                    // who ends sentences with punctuation -- which is everyone -- saw it work
+                    // on some words and not others with no discernible pattern.
+                    coroutineScope.launch {
+                        val corrected = viewModel.getAutoCorrectionFor(typedWord)
+                        if (corrected != null && viewModel.isCurrent(token)) {
+                            // Replace "<typed><punctuation>" in one round-trip, so the
+                            // punctuation the user just saw appear never flickers.
+                            controller.replaceTextBeforeCursor(
+                                typedWord.length + keyLabel.length,
+                                corrected + keyLabel,
+                            )
+                            viewModel.onAutoCorrected(typedWord, corrected)
+                        } else {
+                            viewModel.onWordAccepted(typedWord)
+                        }
+                    }
+                } else {
+                    viewModel.onWordAccepted(typedWord)
+                }
             }
 
-            controller.commitText(keyLabel)
             if (currentMode == KeyboardMode.LETTERS_UPPER) {
                 setMode(KeyboardMode.LETTERS_LOWER)
             }
         }
     }
 }
+
+/**
+ * Whether committing [keyLabel] means the word before it is finished.
+ *
+ * Only marks that genuinely close a word. The apostrophe is excluded because it sits *inside*
+ * words ("don't"), and the hyphen because a hyphenated compound is still being typed --
+ * correcting on either would fire halfway through a word the user had not finished.
+ */
+internal fun endsAWord(keyLabel: String): Boolean =
+    keyLabel.length == 1 && keyLabel[0] in WORD_TERMINATORS
+
+/** Punctuation after which the preceding word is complete and worth checking. */
+private const val WORD_TERMINATORS = ".,!?;:"
+
+/**
+ * How many characters the word under the caret occupies, read from the editor.
+ *
+ * Used to size a *destructive* edit, so it deliberately does not trust the keyboard's own
+ * running copy of the word: see `KeyboardController.textBeforeCursor`.
+ */
+internal fun currentWordSpan(controller: KeyboardController): Int =
+    wordUnderCaret(controller.textBeforeCursor(WORD_CONTEXT_CHARS)).length
