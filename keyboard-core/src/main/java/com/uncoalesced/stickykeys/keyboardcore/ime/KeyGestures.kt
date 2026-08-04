@@ -120,6 +120,35 @@ private val PUNCTUATION_ALTERNATES =
     )
 
 /**
+ * What holding a digit on the number row offers.
+ *
+ * The first entry is always the digit's shifted symbol, and that is not a stylistic choice: it
+ * is what the corner hint advertises, and it is what a TalkBack long-press commits. Breaking
+ * that would make the superscript on the key a promise the hold does not keep, which is the
+ * failure `longPressFor` is written to avoid.
+ *
+ * After it come the superscript and then the vulgar fractions with that digit as their
+ * numerator, ascending by value. Six entries is the practical maximum for the 40dp strip on a
+ * narrow phone, which is exactly what `1` uses.
+ *
+ * The `1` and `2` rows are Joel's confirmed spec. The rest follow the same rule and are an
+ * unconfirmed proposal -- changing them is an edit to this table and nothing else.
+ */
+private val DIGIT_ALTERNATES =
+    mapOf(
+        "0" to listOf(")", "⁰"),
+        "1" to listOf("!", "¹", "⅛", "¼", "⅓", "½"),
+        "2" to listOf("@", "²", "⅔"),
+        "3" to listOf("#", "³", "⅜", "⅗", "¾"),
+        "4" to listOf("$", "⁴", "⅘"),
+        "5" to listOf("%", "⁵", "⅝", "⅚"),
+        "6" to listOf("^", "⁶"),
+        "7" to listOf("&", "⁷", "⅞"),
+        "8" to listOf("*", "⁸"),
+        "9" to listOf("(", "⁹"),
+    )
+
+/**
  * The hold behaviour for a key.
  *
  * Driven by the layout's own [hint] rather than a table keyed on letters. A hardcoded map
@@ -138,6 +167,10 @@ internal fun longPressFor(
     if (keyOutput == "SPACE") return LongPress.Scrub
     if (keyOutput == "DEL") return LongPress.Repeat
     PUNCTUATION_ALTERNATES[keyOutput]?.let { return LongPress.Alternates(it) }
+    // Checked before the hint fallback, which would otherwise offer the shifted symbol alone
+    // and drop the superscript and fractions. The two agree by construction: the table's first
+    // entry is the same character the hint carries.
+    DIGIT_ALTERNATES[keyOutput]?.let { return LongPress.Alternates(it) }
     if (hint != null && hint.length == 1) return LongPress.Alternates(listOf(hint))
     return LongPress.None
 }
