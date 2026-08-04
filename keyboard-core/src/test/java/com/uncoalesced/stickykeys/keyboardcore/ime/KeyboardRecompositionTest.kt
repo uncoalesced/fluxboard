@@ -263,6 +263,8 @@ class KeyboardRecompositionTest {
 private class NoOpController : KeyboardController {
     override fun commitText(text: String) = Unit
 
+    override fun textBeforeCursor(maxChars: Int): String = ""
+
     override fun replaceTextBeforeCursor(
         charCount: Int,
         replacement: String,
