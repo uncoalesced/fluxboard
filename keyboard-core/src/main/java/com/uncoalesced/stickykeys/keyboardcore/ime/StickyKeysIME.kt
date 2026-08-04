@@ -254,6 +254,11 @@ class StickyKeysIME :
         selStart = (info?.initialSelStart ?: 0).coerceAtLeast(0)
         selEnd = (info?.initialSelEnd ?: 0).coerceAtLeast(selStart)
         typingViewModel().onInputStarted(initialCapsMode = info?.initialCapsMode ?: 0)
+        // A field can be focused with the caret already inside a word -- editing an existing
+        // draft, or a search box being corrected. onInputStarted clears the word tracker, so
+        // without this the first suggestion tap in such a field would size its replacement
+        // against an empty word. One read per session, not per keystroke.
+        typingViewModel().onEditorContextChanged(textBeforeCursor(WORD_CONTEXT_CHARS))
     }
 
     private fun typingViewModel(): TypingViewModel =
@@ -303,8 +308,23 @@ class StickyKeysIME :
         // The framework tells us where the caret is whenever it moves, including moves the
         // user made by tapping in the host app. Tracking it here is what lets moveCursor
         // compute a target without an IPC round-trip per step.
+        //
+        // It also answers a second question the typing model needs: was this move ours?
+        // TypingViewModel keeps a running copy of the word being typed, appended to on each
+        // key and shortened on each backspace, because reading the field per keystroke would
+        // be a blocking IPC into the host. That copy is only correct while this keyboard is
+        // the sole editor. Tapping into the middle of a word, pasting, selecting and retyping,
+        // or an autofill write all leave it describing text that is no longer there -- and the
+        // suggestion strip then deletes `word.length` characters of whatever *is* there.
+        //
+        // Every edit made here predicts its own caret, so a mismatch means something else
+        // moved it. Only then is the field re-read, which keeps this off the keystroke path.
+        val external = newSelStart != selStart || newSelEnd != selEnd
         selStart = newSelStart
         selEnd = newSelEnd
+        if (external) {
+            typingViewModel().onEditorContextChanged(textBeforeCursor(WORD_CONTEXT_CHARS))
+        }
         // No getCursorCapsMode() call here on purpose -- see onStartInputView.
     }
 
@@ -334,7 +354,12 @@ class StickyKeysIME :
     }
 
     override fun commitText(text: String) {
-        currentInputConnection?.commitText(text, 1)
+        val ic = currentInputConnection ?: return
+        ic.commitText(text, 1)
+        // A commit replaces any selection, so the caret lands at the selection's start plus
+        // what was inserted. Predicting it here is what lets onUpdateSelection tell this
+        // keyboard's own edits apart from the user's -- see there for why that matters.
+        predictCaret(minOf(selStart, selEnd) + text.length)
     }
 
     override fun replaceTextBeforeCursor(
@@ -352,11 +377,34 @@ class StickyKeysIME :
         } finally {
             ic.endBatchEdit()
         }
+        val caret = minOf(selStart, selEnd)
+        predictCaret((caret - charCount).coerceAtLeast(0) + replacement.length)
     }
 
     override fun sendDelete() {
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
         currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+        // Backspace over a selection deletes the selection; otherwise one character back.
+        predictCaret(
+            if (selStart != selEnd) minOf(selStart, selEnd) else (selEnd - 1).coerceAtLeast(0),
+        )
+    }
+
+    override fun textBeforeCursor(maxChars: Int): String =
+        currentInputConnection?.getTextBeforeCursor(maxChars, 0)?.toString() ?: ""
+
+    /**
+     * Records where this keyboard's own edit should have left the caret.
+     *
+     * Not an optimization -- it is the discriminator. `onUpdateSelection` fires for every
+     * change including the ones made here, so without a prediction to compare against, either
+     * every keystroke looks like an external edit (and re-reading the field on each one is the
+     * blocking-IPC-per-key that this codebase forbids) or none of them do (and a caret the
+     * user moved by hand is never noticed at all).
+     */
+    private fun predictCaret(position: Int) {
+        selStart = position
+        selEnd = position
     }
 
     /**
