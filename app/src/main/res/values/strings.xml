@@ -58,8 +58,14 @@
     <string name="text_vibration_strength">Vibration Strength</string>
     <string name="text_privacy_data">Privacy &amp; Data</string>
     <string name="text_clear_clipboard_history">Clear Clipboard History</string>
-    <string name="text_are_you_sure_you_want_to_delete_all_saved_clipboard_history_this_action_is_irreversible">Are you sure you want to delete all saved clipboard history? This action is irreversible.</string>
+    <string name="text_clear_clipboard_confirm">Are you sure you want to delete all saved clipboard history? This action is irreversible.</string>
     <string name="text_clear">Clear</string>
+    <string name="text_troubleshooting">Troubleshooting</string>
+    <string name="text_reset_keyboard_appearance">Reset Keyboard Appearance</string>
+    <string name="text_reset_appearance_summary">If the keyboard stops drawing its keys, or a theme or layout leaves it unusable, this returns it to the shipped defaults.</string>
+    <string name="text_reset_appearance_confirm">This deletes every custom theme, keyboard background and custom layout, and switches back to the default dark theme and QWERTY. Your other keyboard settings are not changed. This cannot be undone.</string>
+    <string name="text_reset">Reset</string>
+    <string name="text_appearance_reset">Keyboard appearance reset to defaults</string>
     <string name="text_layout_editor">Layout Editor</string>
     <string name="text_move_left">Move Left</string>
     <string name="text_move_right">Move Right</string>
