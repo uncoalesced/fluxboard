@@ -5,6 +5,26 @@ interface KeyboardController {
     fun commitText(text: String)
 
     /**
+     * Up to [maxChars] characters immediately before the cursor, as the editor actually has
+     * them. Empty when there is no input connection.
+     *
+     * The keyboard keeps its own running copy of the word being typed, because asking the host
+     * for it on every keystroke would be a blocking IPC per key. That copy is correct only
+     * while this keyboard is the only thing editing the field -- the moment the user taps into
+     * the middle of a word, pastes, or moves the caret, it describes text that is no longer
+     * there. Anything that *deletes* on the strength of it (the suggestion strip replaces
+     * `word.length` characters) will then delete the wrong span of the user's text, which is
+     * worse than simply suggesting the wrong word.
+     *
+     * So this exists for the two cases the running copy cannot serve: re-deriving the word
+     * after an edit this keyboard did not make, and sizing a replacement at the instant it is
+     * applied. It must never be called per keystroke -- [maxChars] is bounded for the same
+     * reason `moveCursor` bounds its scan, since an unbounded read pulls the whole field
+     * across a binder transaction.
+     */
+    fun textBeforeCursor(maxChars: Int): String
+
+    /**
      * Atomically replaces [charCount] characters immediately before the cursor with
      * [replacement], in a single InputConnection round-trip. Preferred over looping
      * [sendDelete]: one IPC instead of two per character, and the host editor cannot
