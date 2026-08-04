@@ -195,6 +195,30 @@ class ThemeManager
             }
         }
 
+        /**
+         * Discards every custom theme and background and returns to the shipped dark preset.
+         *
+         * The other half of the recovery path from a keyboard that renders itself unusable.
+         * [resolveActive] and [KeyboardTheme.sanitized] are both defences against *reaching*
+         * that state; this is the way out once a device is already in it, and it deliberately
+         * does not depend on knowing which theme was at fault -- the whole reason the
+         * blank-canvas report was filed as unrecoverable is that the bad state outlives
+         * force-stop, cache clearing and reboot, so there was nothing the user could do
+         * short of uninstalling.
+         *
+         * Deletes rather than quarantines. `.corrupt` files go too: they are the single most
+         * likely cause of the state being escaped from, and leaving them lets a later load
+         * find them again.
+         */
+        suspend fun resetToDefaults() {
+            withContext(Dispatchers.IO) {
+                customThemesDir.listFiles()?.forEach { runCatching { it.delete() } }
+                backgroundsDir.listFiles()?.forEach { runCatching { it.delete() } }
+                keyboardPreferences.setActiveThemeId(KeyboardTheme.FALLBACK_DARK_ID)
+                loadThemes()
+            }
+        }
+
         suspend fun saveThemeBackgroundImage(
             inputStream: java.io.InputStream,
             themeId: String,
