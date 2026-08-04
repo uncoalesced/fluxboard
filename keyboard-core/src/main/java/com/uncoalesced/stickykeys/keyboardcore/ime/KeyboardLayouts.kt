@@ -34,14 +34,50 @@ object KeyboardLayouts {
     ) = KeyDefinition(id = "spacer_$name", output = SPACER, weight = weight)
 
     /**
+     * Each digit paired with the symbol shift produces from it, in row order.
+     *
+     * One table, used three ways: the corner hint on the unshifted key, the key itself while
+     * shift is armed, and the first entry of the digit's long-press strip. They have to agree
+     * -- a hint that advertises one character while the hold produces another is the exact
+     * thing `KeyGestures` warns about -- so they come from here rather than from three lists
+     * that would drift.
+     */
+    val digitShiftPairs: List<Pair<String, String>> =
+        listOf(
+            "1" to "!",
+            "2" to "@",
+            "3" to "#",
+            "4" to "$",
+            "5" to "%",
+            "6" to "^",
+            "7" to "&",
+            "8" to "*",
+            "9" to "(",
+            "0" to ")",
+        )
+
+    /**
      * The optional always-visible digit row.
      *
-     * Separate from the corner hints on purpose: the hints carry symbols (`%`, `@`, `_`), so
-     * a user who wants digits without holding anything is not served by them at all. Kept as
-     * its own row so the toggle is a list concatenation rather than a second layout.
+     * Separate from the letter keys' corner hints on purpose: those carry symbols (`%`, `@`,
+     * `_`), so a user who wants digits without holding anything is not served by them at all.
+     * Kept as its own row so the toggle is a list concatenation rather than a second layout.
+     *
+     * The hint is the shifted symbol, which is also what a hold commits by default -- see
+     * `KeyGestures.DIGIT_ALTERNATES` for the rest of the strip.
      */
     val numberRow: List<KeyDefinition> =
-        listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0").map { key(it) }
+        digitShiftPairs.map { (digit, shifted) -> key(digit, hint = shifted) }
+
+    /**
+     * The digit row while shift is armed.
+     *
+     * Substituted for [numberRow] rather than transformed in place, so the shifted symbols are
+     * real keys with their own ids rather than a rendering trick. One-shot shift is consumed by
+     * pressing one of them exactly as it is by any other non-special key, with no extra code.
+     */
+    val shiftedNumberRow: List<KeyDefinition> =
+        digitShiftPairs.map { (_, shifted) -> key(shifted) }
 
     private val topRow =
         listOf(
@@ -122,26 +158,73 @@ object KeyboardLayouts {
         return if (showNumberRow) listOf(numberRow) + body else body
     }
 
-    // Symbol pages remain in the legacy string form; they carry no hints or indents.
-    val symbolsPrimary =
+    /**
+     * The action row shared by both symbol pages.
+     *
+     * One deliberate deviation from the reference: it draws no emoji key here, and this keeps
+     * one. Following the reference would mean a user on the symbols page has to return to the
+     * letters before they can reach emoji at all, which works against the direct-emoji-access
+     * goal the backlog is built around. Confirmed as a deviation rather than an oversight.
+     */
+    private val symbolActionRow =
         listOf(
-            listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
-            listOf("@", "#", "$", "%", "&", "-", "+", "(", ")"),
-            listOf("SYMBOLS_SHIFT", "*", "\"", "'", ":", ";", "!", "?", "DEL"),
-            listOf("ABC", "STICKERS", ",", "SPACE", ".", "ENTER"),
+            key("ABC", weight = 1.5f),
+            key("STICKERS"),
+            key(","),
+            key("SPACE", weight = 4f),
+            key("."),
+            key("ENTER", weight = 1.5f),
         )
 
-    val symbolsShifted =
+    /**
+     * Symbols page 1, from the supplied reference.
+     *
+     * Three things here are the reference's choices rather than carried over from what this
+     * page used to hold, and each is a deliberate difference worth knowing about:
+     *
+     * - `/` is present, on row 3. It previously existed nowhere on either symbol page and was
+     *   reachable only by holding the `m` key, which is why it read as missing entirely.
+     * - `$` is *not* here; the reference puts `£` in that slot and reaches `$` through the
+     *   shifted number row instead.
+     * - the emoji key is absent from this page, where the letters page keeps it.
+     *
+     * No corner hints: the reference draws none on this page.
+     */
+    val symbolsPrimaryRows: List<List<KeyDefinition>> =
         listOf(
-            listOf("~", "`", "|", "•", "√", "π", "÷", "×", "{", "}"),
-            listOf("£", "¢", "€", "º", "^", "_", "=", "[", "]"),
-            listOf("SYMBOLS_SHIFT", "™", "®", "©", "¶", "\\", "<", ">", "DEL"),
-            listOf("ABC", "STICKERS", ",", "SPACE", ".", "ENTER"),
+            listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0").map { key(it) },
+            listOf("@", "#", "£", "&", "_", "-", "(", ")", "=", "%").map { key(it) },
+            listOf(key("SYMBOLS_SHIFT", weight = 1.5f)) +
+                listOf("\"", "*", "'", ":", "/", "!", "?", "+").map { key(it) } +
+                listOf(key("DEL", weight = 1.5f)),
+            symbolActionRow,
         )
 
-    fun getLayoutForMode(mode: KeyboardMode): List<List<String>> =
+    /**
+     * Symbols page 2, carried over unchanged.
+     *
+     * No reference has ever been supplied for this page, so it is migrated to the key-definition
+     * form verbatim rather than redesigned. `CLAUDE.md` records the standing instruction not to
+     * invent a layout for the symbol pages; page 1 above is now covered by a reference and this
+     * one still is not.
+     */
+    val symbolsShiftedRows: List<List<KeyDefinition>> =
+        listOf(
+            listOf("~", "`", "|", "•", "√", "π", "÷", "×", "{", "}")
+                .map { key(it) },
+            listOf("£", "¢", "€", "º", "^", "_", "=", "[", "]").map { key(it) },
+            listOf(key("SYMBOLS_SHIFT", weight = 1.5f)) +
+                listOf("™", "®", "©", "¶", "\\", "<", ">").map { key(it) } +
+                listOf(key("DEL", weight = 1.5f)),
+            symbolActionRow,
+        )
+
+    fun symbolRowsForMode(
+        mode: KeyboardMode,
+        config: com.uncoalesced.stickykeys.keyboardcore.layout.KeyboardLayoutConfig,
+    ): List<List<KeyDefinition>> =
         when (mode) {
-            KeyboardMode.SYMBOLS_SHIFTED -> symbolsShifted
-            else -> symbolsPrimary
+            KeyboardMode.SYMBOLS_SHIFTED -> config.symbolShiftedRows
+            else -> config.symbolRows
         }
 }
