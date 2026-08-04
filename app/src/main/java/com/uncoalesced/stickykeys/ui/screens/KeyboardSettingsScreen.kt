@@ -120,6 +120,22 @@ class KeyboardSettingsViewModel
             }
         }
 
+        /**
+         * The escape hatch from a keyboard that has rendered itself unusable.
+         *
+         * Both halves in one action on purpose: a user in this state cannot read their
+         * keyboard, so they cannot be asked to work out whether it was the theme or the
+         * layout that did it. Preferences that cannot blank a keyboard -- height, bottom
+         * padding, haptics, the number row -- are deliberately left alone, so this is not a
+         * general "reset all settings" that quietly throws away unrelated choices.
+         */
+        fun resetKeyboardAppearance() {
+            viewModelScope.launch {
+                themeManager.resetToDefaults()
+                layoutManager.resetToDefaults()
+            }
+        }
+
         /** Compile-time false in release; the settings section is omitted entirely then. */
         val usageLoggingEnabled: Boolean get() = usageLog.enabled
 
@@ -156,6 +172,7 @@ fun KeyboardSettingsScreen(
             val availableLayouts by viewModel.layoutManager.availableLayouts.collectAsState()
 
             var showClearClipboardDialog by remember { mutableStateOf(false) }
+            var showResetAppearanceDialog by remember { mutableStateOf(false) }
             val context = LocalContext.current
 
             Column(
@@ -501,13 +518,7 @@ fun KeyboardSettingsScreen(
                     AlertDialog(
                         onDismissRequest = { showClearClipboardDialog = false },
                         title = { Text(stringResource(R.string.text_clear_clipboard_history)) },
-                        text = {
-                            Text(
-                                stringResource(
-                                    R.string.text_are_you_sure_you_want_to_delete_all_saved_clipboard_history_this_action_is_irreversible,
-                                ),
-                            )
-                        },
+                        text = { Text(stringResource(R.string.text_clear_clipboard_confirm)) },
                         confirmButton = {
                             TextButton(
                                 onClick = {
@@ -523,6 +534,79 @@ fun KeyboardSettingsScreen(
                         },
                         dismissButton = {
                             TextButton(onClick = { showClearClipboardDialog = false }) {
+                                Text(stringResource(R.string.text_cancel))
+                            }
+                        },
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                // Troubleshooting
+                //
+                // This exists because of a specific reported failure: a keyboard whose keys
+                // stopped being drawn while still responding to touch, with no way back short
+                // of uninstalling and reinstalling. The active theme id and layout id live in
+                // SharedPreferences and the files themselves in filesDir, so that state
+                // survives force-stop, cache clearing and reboot -- and the user is left with
+                // a keyboard they cannot read and no control they can find to fix it, because
+                // every control for fixing it is on a keyboard they cannot read.
+                //
+                // Deliberately not gated on diagnosing the cause. Whatever a saved theme or
+                // layout does to the renderer, throwing both away returns the user to a
+                // keyboard that is known to draw.
+                Text(
+                    stringResource(R.string.text_troubleshooting),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.text_reset_appearance_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = { showResetAppearanceDialog = true }) {
+                    Text(stringResource(R.string.text_reset_keyboard_appearance))
+                }
+
+                // Resolved in composable scope rather than with context.getString inside the
+                // click handler: a LocalContext read is not invalidated by a Configuration
+                // change, so the toast could show a stale-locale string after the user
+                // switches language.
+                val appearanceResetMessage = stringResource(R.string.text_appearance_reset)
+
+                if (showResetAppearanceDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showResetAppearanceDialog = false },
+                        title = {
+                            Text(stringResource(R.string.text_reset_keyboard_appearance))
+                        },
+                        text = {
+                            Text(stringResource(R.string.text_reset_appearance_confirm))
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.resetKeyboardAppearance()
+                                    showResetAppearanceDialog = false
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            appearanceResetMessage,
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                },
+                            ) {
+                                Text(
+                                    stringResource(R.string.text_reset),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showResetAppearanceDialog = false }) {
                                 Text(stringResource(R.string.text_cancel))
                             }
                         },
