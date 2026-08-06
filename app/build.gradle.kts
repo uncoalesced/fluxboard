@@ -255,7 +255,15 @@ tasks.matching { it.name == "assembleRelease" }.configureEach {
 
 // assembleRelease emits app-release.apk, which says nothing about what is inside it.
 // This copies it out under a name that is unambiguous when handing it to someone.
-val releaseVersionName = "v0.1.2-ALPHA"
+//
+// Read from defaultConfig rather than repeated as a literal. It was a literal, and it did
+// exactly what a second copy of a value always does: versionName went to v0.1.4-ALPHA and this
+// stayed at v0.1.2-ALPHA, so the artifact built for the v0.1.4 tag was handed over named
+// v0.1.2. The APK was correct inside; only the name on the box was wrong, which is the version
+// of this failure most likely to be believed.
+val releaseVersionName: String =
+    android.defaultConfig.versionName
+        ?: error("versionName is not set; the release artifact would be named after nothing.")
 
 tasks.register<Copy>("packageReleaseArtifact") {
     group = "distribution"
