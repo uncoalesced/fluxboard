@@ -157,7 +157,11 @@ class SymbolPageLayoutTest {
             KeyboardLayouts.symbolsPrimaryRows.map { row -> row.map { it.output } }
 
         assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"), rows[0])
-        assertEquals(listOf("@", "#", "£", "&", "_", "-", "(", ")", "=", "%"), rows[1])
+        // The reference draws a currency slot in position 3. It carries "$" rather than the
+        // reference's "£": the other currencies are reachable by holding it, so committing the
+        // page to one of them was the avoidable choice. "£" is not carried into the
+        // alternates -- it is dropped outright.
+        assertEquals(listOf("@", "#", "$", "&", "_", "-", "(", ")", "=", "%"), rows[1])
         assertEquals(
             listOf("SYMBOLS_SHIFT", "\"", "*", "'", ":", "/", "!", "?", "+", "DEL"),
             rows[2],
@@ -165,6 +169,37 @@ class SymbolPageLayoutTest {
         // STICKERS is a deliberate deviation from the reference, which draws no emoji key
         // here. Keeping it preserves one-tap emoji access from the symbols page.
         assertEquals(listOf("ABC", "STICKERS", ",", "SPACE", ".", "ENTER"), rows[3])
+    }
+
+    @Test
+    fun `the currency key opens on the dollar sign it already shows`() {
+        val currency =
+            KeyboardLayouts.symbolsPrimaryRows.flatten().first { it.output == "$" }
+        val held =
+            com.uncoalesced.stickykeys.keyboardcore.ime.longPressFor(
+                currency.output,
+                currency.hint,
+                currency.alternates,
+                currency.alternatesDefaultIndex,
+            ) as com.uncoalesced.stickykeys.keyboardcore.ime.LongPress.Alternates
+
+        assertEquals(listOf("€", "¥", "$", "¢", "₹"), held.options)
+        // Holding without moving must give back the character already printed on the key.
+        // Committing the first cell instead would turn every accidental hold into a euro.
+        assertEquals("$", held.options[held.defaultIndex])
+        assertFalse("the pound sign was dropped, not moved", "£" in held.options)
+    }
+
+    @Test
+    fun `the currency key and digit four never share a strip`() {
+        // Both type "$". Under a table keyed on output, one would have inherited the other's
+        // alternates -- the currency key would have offered fractions, or digit 4 would have
+        // offered currencies. They are attached per key, so neither can happen.
+        val digitFour = KeyboardLayouts.numberRow.first { it.output == "4" }
+        val currency = KeyboardLayouts.symbolsPrimaryRows.flatten().first { it.output == "$" }
+
+        assertEquals(listOf("⁴", "⅘"), digitFour.alternates)
+        assertEquals(listOf("€", "¥", "$", "¢", "₹"), currency.alternates)
     }
 
     @Test

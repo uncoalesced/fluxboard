@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,10 +21,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -59,6 +65,11 @@ internal data class QuickAction(
  * one action a user reaches for mid-sentence, and burying it behind a disclosure toggle
  * would cost two taps every time. Grammar sits here because, unlike the reference's pencil,
  * it is a real planned feature.
+ *
+ * Seven is the ceiling, and it is arithmetic rather than taste. Every small control here is
+ * expanded to the 48dp accessibility minimum, so seven fills 336dp of a 360dp phone and an
+ * eighth would have to overlap its neighbour's touch target. That is the reason the media
+ * transport is its own row above rather than three more icons in this one.
  */
 internal val quickActions =
     listOf(
@@ -67,6 +78,7 @@ internal val quickActions =
         QuickAction("grammar", R.drawable.ic_quick_grammar, "Grammar check", comingSoon = true),
         QuickAction("clipboard", R.drawable.ic_key_clipboard, "Clipboard history"),
         QuickAction("textedit", R.drawable.ic_quick_text_edit, "Text editing"),
+        QuickAction("private", R.drawable.ic_quick_private, "Private mode"),
         QuickAction("switchime", R.drawable.ic_quick_switch_keyboard, "Switch keyboard"),
     )
 
@@ -106,12 +118,24 @@ internal fun QuickAccessToggle(
     }
 }
 
-/** The revealed icon row. Collapses to zero height so it costs nothing when closed. */
+/**
+ * The revealed rows. Collapses to zero height so they cost nothing when closed.
+ *
+ * Two rows, not one: media transport above, actions below. Both live outside the fixed-height
+ * panel and grow the window upward, so neither ever takes height from the keys.
+ *
+ * [privateMode] tints the privacy action instead of swapping its icon. A padlock that opens
+ * and closes would be a second, quieter statement of the same fact the lit indicator in the
+ * suggestion strip already makes, and the two are easy to leave disagreeing.
+ */
 @Composable
 internal fun QuickAccessRow(
     expanded: Boolean,
     palette: StickyKeysColors,
+    privateMode: Boolean,
     onAction: (QuickAction) -> Unit,
+    onMedia: (MediaTransport.Action) -> Unit,
+    isMediaPlaying: () -> Boolean,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -120,44 +144,138 @@ internal fun QuickAccessRow(
         exit = shrinkVertically(),
         modifier = modifier,
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(QUICK_ROW_HEIGHT)
-                    .background(palette.surface),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            quickActions.forEach { action ->
-                Box(
-                    modifier =
-                        Modifier
-                            .size(36.dp)
-                            .minimumInteractiveComponentSize()
-                            .clickable { onAction(action) }
-                            .semantics {
-                                role = Role.Button
-                                contentDescription =
-                                    if (action.comingSoon) {
-                                        "${action.label}, coming soon"
-                                    } else {
-                                        action.label
+        Column(modifier = Modifier.fillMaxWidth()) {
+            MediaRow(palette = palette, onMedia = onMedia, isMediaPlaying = isMediaPlaying)
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(QUICK_ROW_HEIGHT)
+                        .background(palette.surface),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                quickActions.forEach { action ->
+                    val on = action.id == "private" && privateMode
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(36.dp)
+                                .minimumInteractiveComponentSize()
+                                .background(
+                                    if (on) palette.primary else Color.Transparent,
+                                    RoundedCornerShape(18.dp),
+                                ).clickable { onAction(action) }
+                                .semantics {
+                                    role = Role.Button
+                                    contentDescription =
+                                        if (action.comingSoon) {
+                                            "${action.label}, coming soon"
+                                        } else {
+                                            action.label
+                                        }
+                                    if (action.id == "private") {
+                                        // Announced, not merely coloured. A toggle whose only
+                                        // state cue is a fill is invisible to a screen reader,
+                                        // and this is the one control here where not knowing
+                                        // its state is a privacy question rather than a
+                                        // cosmetic one.
+                                        stateDescription = if (on) "On" else "Off"
                                     }
-                            },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(action.icon),
-                        contentDescription = null,
-                        tint = palette.onSurface,
-                        modifier = Modifier.size(22.dp),
-                    )
+                                },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(action.icon),
+                            contentDescription = null,
+                            tint = if (on) palette.onPrimary else palette.onSurface,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * Play/pause and skip for whatever the platform considers the active media session.
+ *
+ * Always drawn while the toolbar is open, never gated on something already playing. Gating it
+ * looked tidier and breaks the most ordinary case there is: pause a track, and the row that
+ * would let you resume it has disappeared, because the signal it was gated on is exactly the
+ * thing pausing turned off.
+ *
+ * Three buttons at 44dp rather than seven at 36dp, because there is room for them and skip is
+ * a control people hit while walking.
+ */
+@Composable
+private fun MediaRow(
+    palette: StickyKeysColors,
+    onMedia: (MediaTransport.Action) -> Unit,
+    isMediaPlaying: () -> Boolean,
+) {
+    // Re-read on each press rather than polled. There is no callback to subscribe to without
+    // the notification-listener permission, and a timer ticking inside an IME to keep a glyph
+    // fresh would cost battery in every session for a row most of them never open.
+    var playing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { playing = isMediaPlaying() }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(QUICK_ROW_HEIGHT)
+                .background(palette.surfaceVariant),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        mediaButtons.forEach { (action, label) ->
+            val isPlayPause = action == MediaTransport.Action.PLAY_PAUSE
+            val icon =
+                when {
+                    !isPlayPause && action == MediaTransport.Action.PREVIOUS ->
+                        R.drawable.ic_media_previous
+                    !isPlayPause -> R.drawable.ic_media_next
+                    playing -> R.drawable.ic_media_pause
+                    else -> R.drawable.ic_media_play
+                }
+            Box(
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .minimumInteractiveComponentSize()
+                        .clickable {
+                            onMedia(action)
+                            // The player needs a moment to react before isMusicActive changes,
+                            // so flip the glyph on the press. If the guess is wrong the next
+                            // open of the toolbar re-reads and corrects it.
+                            if (isPlayPause) playing = !playing
+                        }.semantics {
+                            role = Role.Button
+                            contentDescription =
+                                if (isPlayPause && playing) "Pause" else label
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    tint = palette.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Ordered as they are drawn: back, play/pause, forward. */
+private val mediaButtons =
+    listOf(
+        MediaTransport.Action.PREVIOUS to "Previous track",
+        MediaTransport.Action.PLAY_PAUSE to "Play",
+        MediaTransport.Action.NEXT to "Next track",
+    )
 
 /**
  * The "coming soon" notice, drawn inside the keyboard.

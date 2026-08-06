@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -84,7 +85,6 @@ internal fun rememberInterceptingController(
 fun MainIMEView(
     keyboardController: KeyboardController,
     typingViewModel: TypingViewModel,
-    stickerIMEViewModel: StickerIMEViewModel,
     clipboardIMEViewModel: ClipboardIMEViewModel,
     emojiPickerViewModel: EmojiPickerViewModel,
     fileManager: StickerFileManager,
@@ -96,21 +96,46 @@ fun MainIMEView(
 
     val interceptingController = rememberInterceptingController(keyboardController, appModeState)
 
+    // A new field means the keyboard, whatever panel was open over the last one.
+    //
+    // Every other latch is already session-scoped -- shift, caps lock, the symbols page, the
+    // quick-access row -- and the app mode was the one that was not. Observed on device:
+    // opening clipboard history and then tapping a different text field left the clipboard
+    // panel sitting over the new field, with no way to type into it until the user found their
+    // way back. Keyed on the session counter rather than on the mode so that switching panels
+    // by hand is untouched.
+    val inputSession by typingViewModel.inputSession.collectAsState()
+    LaunchedEffect(inputSession) {
+        appModeState.value = AppMode.TYPING
+    }
+
     // Sizing is read once, here, and published to every mode. rememberImePanelHeight() is
     // called from five different views and none of them should have to know about preferences
     // to be the right height.
     val heightPercent by typingViewModel.keyboardHeightPercent.collectAsState()
     val bottomPaddingDp by typingViewModel.keyboardBottomPaddingDp.collectAsState()
     val numberRowShown by typingViewModel.showNumberRow.collectAsState()
+    val keySizePercent by typingViewModel.keySizePercent.collectAsState()
     val panelMetrics =
-        remember(heightPercent, bottomPaddingDp, numberRowShown, currentAppMode) {
+        remember(heightPercent, bottomPaddingDp, numberRowShown, keySizePercent) {
             ImePanelMetrics(
                 heightScale = heightPercent / 100f,
+                keyScale = keySizePercent / 100f,
                 bottomPadding = bottomPaddingDp.dp,
-                // Only the typing view draws the digit row, so only it needs the extra
-                // height. Adding it everywhere would make the emoji picker taller than the
-                // keyboard it replaces, and every mode switch would resize the window.
-                showNumberRow = numberRowShown && currentAppMode == AppMode.TYPING,
+                // Not gated on the mode, and that is the fix rather than an oversight.
+                //
+                // This used to read `numberRowShown && currentAppMode == AppMode.TYPING`, whose
+                // comment claimed it stopped a mode switch resizing the window. Measured on
+                // device, it caused exactly that: with the number row on -- the default --
+                // typing was 956px and the emoji picker, clipboard and text-edit panels were
+                // 830px, a 126px jump on every switch, which is precisely
+                // `ime_number_row_height`. Opening the picker shrank the IME window and closing
+                // it grew it back, shoving the host app's content down and up each time.
+                //
+                // The other modes now get the same height whether or not they draw a digit row,
+                // which is what `dimens.xml` says the value is for: one number, every mode, so
+                // switching changes what is drawn and never how tall the window is.
+                showNumberRow = numberRowShown,
             )
         }
 
@@ -163,10 +188,17 @@ fun MainIMEView(
                             )
                         }
                         AppMode.EMOJI_PICKER -> {
+                            // The emoji key lands on Recent, not on whatever tab was left
+                            // selected last time. Keyed on entering the mode rather than on
+                            // composition, so scrolling within the picker does not reset it.
+                            LaunchedEffect(Unit) { emojiPickerViewModel.openAtDefaultTab() }
                             EmojiPickerView(
                                 viewModel = emojiPickerViewModel,
                                 fileManager = fileManager,
                                 onEmojiClick = { glyph ->
+                                    // Recorded before the commit so the Recent tab is already
+                                    // correct if the user reopens the picker immediately.
+                                    emojiPickerViewModel.onEmojiUsed(glyph)
                                     // Committed as plain text; the platform's emoji font draws
                                     // it. Deliberately no mode switch afterwards -- picking one
                                     // emoji is almost always followed by picking another.
@@ -180,22 +212,6 @@ fun MainIMEView(
                                     interceptingController.switchMode(AppMode.TYPING)
                                 },
                                 modifier = Modifier.height(rememberImePanelHeight()),
-                            )
-                        }
-                        // Phase 16's dedicated sticker-only panel. No key routes here any more --
-                        // the emoji key and the quick-access grid both open EMOJI_PICKER. Kept
-                        // reachable in code pending a decision on retiring it; see the report.
-                        AppMode.STICKERS -> {
-                            StickerIMEView(
-                                viewModel = stickerIMEViewModel,
-                                fileManager = fileManager,
-                                onStickerClick = {
-                                    onStickerClick(it)
-                                    interceptingController.switchMode(AppMode.TYPING)
-                                },
-                                onBackToKeyboard = {
-                                    interceptingController.switchMode(AppMode.TYPING)
-                                },
                             )
                         }
                         AppMode.TEXT_EDIT -> {

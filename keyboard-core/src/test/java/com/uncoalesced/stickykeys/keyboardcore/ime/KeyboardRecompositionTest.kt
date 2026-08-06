@@ -82,7 +82,8 @@ class KeyboardRecompositionTest {
             background = background,
             foreground = foreground,
             alternates = alternates,
-            alternateCellWidthPx = 100f,
+            preferredCellWidthPx = 100f,
+            availableWidthPx = 1080f,
             onKeyPress = onKeyPress,
         )
     }

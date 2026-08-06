@@ -35,9 +35,17 @@ internal sealed interface LongPress {
     /** Fire the key's own output over and over, faster the longer it is held. Backspace. */
     data object Repeat : LongPress
 
-    /** Show a pick-one strip above the key. Punctuation alternates, top-row digits. */
+    /**
+     * Show a pick-one strip above the key. Punctuation alternates, top-row digits.
+     *
+     * [defaultIndex] is the cell selected when the strip opens, and therefore what a release
+     * without any sideways drag commits. It is 0 almost everywhere; the currency key is the
+     * exception, because the character its own face shows sits in the middle of the run of
+     * currencies rather than at the start.
+     */
     data class Alternates(
         val options: List<String>,
+        val defaultIndex: Int = 0,
     ) : LongPress
 
     /** Drag sideways to walk the caret instead of typing. The space bar. */
@@ -54,6 +62,15 @@ internal sealed interface LongPress {
  * typed would be worse than either.
  */
 internal const val SCRUB_ACTIVATION_DP = 18f
+
+/**
+ * How far the finger must travel before it starts choosing cells in an alternates strip.
+ *
+ * Well below one cell, because this is not a selection threshold -- it only has to absorb the
+ * jitter of a stationary finger so that a hold-and-release keeps the strip's default cell.
+ * Past it, every cell including the first stays reachable by dragging back.
+ */
+internal const val ALTERNATE_DRAG_SLOP_DP = 6f
 
 /** Finger travel per caret step at the start of a scrub. */
 private const val SCRUB_STEP_START_DP = 14f
@@ -122,31 +139,75 @@ private val PUNCTUATION_ALTERNATES =
 /**
  * What holding a digit on the number row offers.
  *
- * The first entry is always the digit's shifted symbol, and that is not a stylistic choice: it
- * is what the corner hint advertises, and it is what a TalkBack long-press commits. Breaking
- * that would make the superscript on the key a promise the hold does not keep, which is the
- * failure `longPressFor` is written to avoid.
+ * **The shifted symbol is deliberately not here.** It used to lead every strip, on the
+ * reasoning that the corner hint promised it. But the same character is already directly
+ * reachable by arming shift, which swaps the whole row to real shifted-symbol keys, so the
+ * cell was a second route to something one tap away and it pushed the content the strip
+ * exists for down the row. The corner hint stays as information -- it still tells the user
+ * what shift will produce -- it simply is no longer what the hold commits.
  *
- * After it come the superscript and then the vulgar fractions with that digit as their
- * numerator, ascending by value. Six entries is the practical maximum for the 40dp strip on a
- * narrow phone, which is exactly what `1` uses.
+ * A release without any sideways drag therefore now commits the superscript, which is index 0.
  *
- * The `1` and `2` rows are Joel's confirmed spec. The rest follow the same rule and are an
- * unconfirmed proposal -- changing them is an edit to this table and nothing else.
+ * Ordering is superscript, then the vulgar fractions with that digit as numerator ascending by
+ * value, then any superscript letter that belongs with it. There is no length ceiling: the
+ * strip sizes its own cells to fit (see [alternateCellWidthPx]).
+ *
+ * `1` and `5` are Joel's confirmed spec, quoted rather than derived -- note that `1` is a
+ * *curated* subset of the nine numerator-1 fractions, so it cannot be generated. The rest are
+ * complete numerator-N sets and are a proposal pending confirmation; changing them is an edit
+ * to this table and nothing else.
+ *
+ * Attached to the keys themselves rather than consulted here -- see [KeyDefinition.alternates]
+ * for why an output-keyed table was the wrong shape.
  */
-private val DIGIT_ALTERNATES =
+internal val DIGIT_ALTERNATES =
     mapOf(
-        "0" to listOf(")", "⁰"),
-        "1" to listOf("!", "¹", "⅛", "¼", "⅓", "½"),
-        "2" to listOf("@", "²", "⅔"),
-        "3" to listOf("#", "³", "⅜", "⅗", "¾"),
-        "4" to listOf("$", "⁴", "⅘"),
-        "5" to listOf("%", "⁵", "⅝", "⅚"),
-        "6" to listOf("^", "⁶"),
-        "7" to listOf("&", "⁷", "⅞"),
-        "8" to listOf("*", "⁸"),
-        "9" to listOf("(", "⁹"),
+        "0" to listOf("⁰"),
+        "1" to listOf("¹", "⅛", "¼", "⅓", "½", "ⁱ"),
+        "2" to listOf("²", "⅔", "⅖"),
+        "3" to listOf("³", "¾", "⅗", "⅜"),
+        "4" to listOf("⁴", "⅘"),
+        "5" to listOf("⁵", "⅝", "⅚", "ⁿ"),
+        "6" to listOf("⁶"),
+        "7" to listOf("⁷", "⅞"),
+        "8" to listOf("⁸"),
+        "9" to listOf("⁹"),
     )
+
+/**
+ * The currency key's alternates, and the cell selected when the strip opens.
+ *
+ * Held separately from [DIGIT_ALTERNATES] on purpose. `$` is also digit 4's shifted symbol, so
+ * anything keyed on the character alone would have applied one of these tables to the other's
+ * key. They are attached to their own [KeyDefinition]s instead and never meet.
+ *
+ * `$` sits at index 2 because the list reads in a conventional order rather than starting with
+ * the key's own face -- so the default cell has to be named rather than assumed to be first.
+ */
+internal val CURRENCY_ALTERNATES = listOf("€", "¥", "$", "¢", "₹")
+internal const val CURRENCY_DEFAULT_INDEX = 2
+
+/**
+ * Width of one alternates cell, shrunk when the strip would otherwise run off the screen.
+ *
+ * The strip used to assume every cell could have its full preferred width, and the only thing
+ * standing between that and an unreachable cell was a hard six-entry ceiling asserted in a
+ * test. Remove the ceiling without this and a long strip is clipped at the screen edge: the
+ * cells past the edge are drawn nowhere and, because selection is computed from the same cell
+ * width, they cannot be selected either.
+ *
+ * Pure so the arithmetic is assertable without a screen -- which matters, because the failure
+ * it prevents is invisible until someone tries the last cell of a long strip on a narrow phone.
+ */
+internal fun alternateCellWidthPx(
+    optionCount: Int,
+    availableWidthPx: Float,
+    preferredWidthPx: Float,
+): Float {
+    if (optionCount <= 0) return preferredWidthPx
+    val fits = availableWidthPx / optionCount
+    return minOf(preferredWidthPx, fits).coerceAtLeast(1f)
+}
 
 /**
  * The hold behaviour for a key.
@@ -163,14 +224,22 @@ private val DIGIT_ALTERNATES =
 internal fun longPressFor(
     keyOutput: String,
     hint: String? = null,
+    alternates: List<String>? = null,
+    alternatesDefaultIndex: Int = 0,
 ): LongPress {
     if (keyOutput == "SPACE") return LongPress.Scrub
     if (keyOutput == "DEL") return LongPress.Repeat
+    // The key's own alternates win over every shared table. This is what keeps two keys that
+    // type the same character from inheriting each other's hold behaviour -- the digit row and
+    // the symbols page both carry "1", and the currency key types the same "$" as digit 4's
+    // shifted symbol.
+    if (alternates != null && alternates.isNotEmpty()) {
+        return LongPress.Alternates(
+            alternates,
+            alternatesDefaultIndex.coerceIn(0, alternates.lastIndex),
+        )
+    }
     PUNCTUATION_ALTERNATES[keyOutput]?.let { return LongPress.Alternates(it) }
-    // Checked before the hint fallback, which would otherwise offer the shifted symbol alone
-    // and drop the superscript and fractions. The two agree by construction: the table's first
-    // entry is the same character the hint carries.
-    DIGIT_ALTERNATES[keyOutput]?.let { return LongPress.Alternates(it) }
     if (hint != null && hint.length == 1) return LongPress.Alternates(listOf(hint))
     return LongPress.None
 }
@@ -276,7 +345,15 @@ internal class KeyAlternatesState {
     var selectedIndex by mutableIntStateOf(0)
         private set
 
-    private var cellWidthPx = 1f
+    /**
+     * The width one cell was actually given, which is not always the preferred width.
+     *
+     * Read by the strip when it draws. Drawing from the shared constant while selecting from
+     * this value is how a long strip ends up highlighting a different cell than the one under
+     * the finger, so both sides take the same number from here.
+     */
+    var cellWidthPx by androidx.compose.runtime.mutableFloatStateOf(1f)
+        private set
 
     val visible: Boolean get() = anchor != null
 
@@ -284,11 +361,14 @@ internal class KeyAlternatesState {
         options: List<String>,
         anchor: Rect,
         cellWidthPx: Float,
+        defaultIndex: Int = 0,
     ) {
         this.options = options
         this.anchor = anchor
         this.cellWidthPx = cellWidthPx.coerceAtLeast(1f)
-        this.selectedIndex = 0
+        // Not always zero. A release with no drag commits whatever is selected here, so this
+        // is what decides the "just hold it" character.
+        this.selectedIndex = defaultIndex.coerceIn(0, maxOf(0, options.lastIndex))
     }
 
     /** Track the finger across the strip. [x] is in root coordinates. */
@@ -386,14 +466,41 @@ internal fun Modifier.keyGestures(
                         }
                     }
                     longPress is LongPress.Alternates -> {
-                        alternates.show(longPress.options, keyBounds(), cellWidthPx)
+                        alternates.show(
+                            longPress.options,
+                            keyBounds(),
+                            cellWidthPx,
+                            longPress.defaultIndex,
+                        )
                         val origin = keyBounds().left
                         var committed = false
+                        // The finger has to actually move before it starts choosing cells.
+                        //
+                        // This loop used to call moveTo on every pointer event, and the
+                        // release is a pointer event -- it carries the finger's position,
+                        // which for a hold-and-release has never left the key. So the very
+                        // first thing that reached moveTo overwrote defaultIndex with the cell
+                        // under the finger, and a plain hold could only ever commit whichever
+                        // cell the key sits over.
+                        //
+                        // Invisible on every digit, because their defaultIndex is 0 and cell 0
+                        // is the one under the finger, so both answers agree. The currency key
+                        // is the single case where they differ, and it was wrong: the strip
+                        // drew "$" highlighted and committed "€". Worse, the TalkBack path
+                        // commits options[defaultIndex] directly, so touch and screen reader
+                        // produced different characters from the same key -- the exact
+                        // inconsistency defaultIndex exists to prevent.
+                        val startX = down.position.x
+                        val slopPx = ALTERNATE_DRAG_SLOP_DP.dp.toPx()
+                        var tracking = false
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull()
                             if (change == null) break
-                            alternates.moveTo(origin + change.position.x)
+                            if (!tracking && abs(change.position.x - startX) > slopPx) {
+                                tracking = true
+                            }
+                            if (tracking) alternates.moveTo(origin + change.position.x)
                             if (!change.pressed) {
                                 committed = true
                                 break

@@ -92,6 +92,16 @@ class KeyboardSettingsViewModel
         val hapticsIntensity = preferences.hapticsIntensity
 
         val showNumberRow = preferences.showNumberRow
+        val keySizePercent = preferences.keySizePercent
+        val doubleSpacePeriod = preferences.doubleSpacePeriodEnabled
+        val privateMode = preferences.privateModeEnabled
+
+        fun setKeySizePercent(percent: Int) = preferences.setKeySizePercent(percent)
+
+        fun setDoubleSpacePeriod(enabled: Boolean) = preferences.setDoubleSpacePeriod(enabled)
+
+        /** Mirrors the toggle in the keyboard's own quick-access row; one stored flag. */
+        fun setPrivateMode(enabled: Boolean) = preferences.setPrivateMode(enabled)
 
         fun setShowNumberRow(show: Boolean) = preferences.setShowNumberRow(show)
 
@@ -159,6 +169,9 @@ fun KeyboardSettingsScreen(
             val autoCap by viewModel.autoCapitalizeEnabled.collectAsState()
             val autoCorrect by viewModel.autoCorrectEnabled.collectAsState()
             val showNumberRow by viewModel.showNumberRow.collectAsState()
+            val keySizePercent by viewModel.keySizePercent.collectAsState()
+            val doubleSpacePeriod by viewModel.doubleSpacePeriod.collectAsState()
+            val privateMode by viewModel.privateMode.collectAsState()
             val keyboardHeight by viewModel.keyboardHeightPercent.collectAsState()
             val keyboardBottomPadding by viewModel.keyboardBottomPaddingDp.collectAsState()
 
@@ -290,6 +303,84 @@ fun KeyboardSettingsScreen(
                     steps = (maxHeight - minHeight) / 5 - 1,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
+
+                // Key size, deliberately its own control rather than a second name for the
+                // height slider. Height decides how much screen the keyboard occupies; this
+                // decides how much of that space is key rather than gap. Someone who wants a
+                // tall keyboard with generous gaps and someone who wants a short one with fat
+                // keys are asking for different things, and one slider cannot serve both.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_key_size),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_key_size_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        "$keySizePercent%",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                val minKey = KeyboardPreferences.MIN_KEY_SIZE_PERCENT
+                val maxKey = KeyboardPreferences.MAX_KEY_SIZE_PERCENT
+                Slider(
+                    value = keySizePercent.toFloat(),
+                    onValueChange = { viewModel.setKeySizePercent(it.toInt()) },
+                    valueRange = minKey.toFloat()..maxKey.toFloat(),
+                    steps = (maxKey - minKey) / 5 - 1,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_double_space_period),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_double_space_period_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = doubleSpacePeriod,
+                        onCheckedChange = { viewModel.setDoubleSpacePeriod(it) },
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_private_mode),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_private_mode_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = privateMode,
+                        onCheckedChange = { viewModel.setPrivateMode(it) },
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

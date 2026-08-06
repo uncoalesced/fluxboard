@@ -103,9 +103,7 @@ class StickyKeysIME :
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                if (modelClass.isAssignableFrom(StickerIMEViewModel::class.java)) {
-                    return StickerIMEViewModel(repository) as T
-                } else if (modelClass.isAssignableFrom(TypingViewModel::class.java)) {
+                if (modelClass.isAssignableFrom(TypingViewModel::class.java)) {
                     return TypingViewModel(
                         predictionEngine,
                         keyboardPreferences,
@@ -118,7 +116,11 @@ class StickyKeysIME :
                 } else if (modelClass.isAssignableFrom(ClipboardIMEViewModel::class.java)) {
                     return ClipboardIMEViewModel(clipboardDao) as T
                 } else if (modelClass.isAssignableFrom(EmojiPickerViewModel::class.java)) {
-                    return EmojiPickerViewModel(repository, emojiRepository) as T
+                    return EmojiPickerViewModel(
+                        repository,
+                        emojiRepository,
+                        keyboardPreferences,
+                    ) as T
                 }
                 throw IllegalArgumentException("Unknown ViewModel class")
             }
@@ -190,11 +192,6 @@ class StickyKeysIME :
         val view =
             ComposeView(this).apply {
                 setContent {
-                    val stickerViewModel =
-                        ViewModelProvider(
-                            this@StickyKeysIME,
-                            viewModelFactory,
-                        )[StickerIMEViewModel::class.java]
                     val typingViewModel =
                         ViewModelProvider(
                             this@StickyKeysIME,
@@ -214,7 +211,6 @@ class StickyKeysIME :
                     MainIMEView(
                         keyboardController = this@StickyKeysIME,
                         typingViewModel = typingViewModel,
-                        stickerIMEViewModel = stickerViewModel,
                         clipboardIMEViewModel = clipboardViewModel,
                         emojiPickerViewModel = emojiPickerViewModel,
                         fileManager = fileManager,
@@ -241,7 +237,6 @@ class StickyKeysIME :
         restarting: Boolean,
     ) {
         super.onStartInputView(editorInfo, restarting)
-        updateIncognito(editorInfo)
         // Seed capitalization from the field's declared initial state. Deliberately
         // NOT InputConnection.getCursorCapsMode(): that is a synchronous IPC into the
         // host app's UI thread, and calling it per keystroke freezes this keyboard
@@ -253,7 +248,13 @@ class StickyKeysIME :
         // would be computed against a stale position from the previous field.
         selStart = (info?.initialSelStart ?: 0).coerceAtLeast(0)
         selEnd = (info?.initialSelEnd ?: 0).coerceAtLeast(selStart)
-        typingViewModel().onInputStarted(initialCapsMode = info?.initialCapsMode ?: 0)
+        typingViewModel().onInputStarted(
+            initialCapsMode = info?.initialCapsMode ?: 0,
+            fieldKind = fieldKindFor(info?.inputType ?: 0),
+            noPersonalizedLearning = noPersonalizedLearning(info),
+            enterIsNewline =
+                info != null && enterInsertsNewline(info.inputType, info.imeOptions),
+        )
         // A field can be focused with the caret already inside a word -- editing an existing
         // draft, or a search box being corrected. onInputStarted clears the word tracker, so
         // without this the first suggestion tap in such a field would size its replacement
@@ -265,28 +266,30 @@ class StickyKeysIME :
         ViewModelProvider(this, viewModelFactory)[TypingViewModel::class.java]
 
     /**
-     * Phase 38: the editor asking not to be learned from is the only trigger for
-     * incognito. Deliberately no app/package heuristics -- IME_FLAG_NO_PERSONALIZED_LEARNING
-     * is the sanctioned mechanism and the flag alone drives this.
+     * Whether the host asked not to be learned from.
+     *
+     * The sanctioned mechanism, and deliberately not joined by any app/package heuristic. It
+     * used to be the *only* trigger for incognito, which was the hole the password fix closed:
+     * the flag has to be set by the host app and Android's own `TextView` does not set it for
+     * password fields. The field's own type and the user's manual switch are now folded in
+     * beside it, in `TypingViewModel.publishPrivacy` -- one combination, in one place, rather
+     * than a second copy of the decision here.
      */
-    private fun updateIncognito(editorInfo: EditorInfo?) {
-        val info = editorInfo ?: currentInputEditorInfo
-        val noLearning =
-            info != null &&
-                (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
-        incognitoState.set(noLearning)
-    }
+    private fun noPersonalizedLearning(info: EditorInfo?): Boolean =
+        info != null &&
+            (info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
-        // Scope incognito to the field actually being edited: once this input
-        // session ends the flag must not linger over unrelated clipboard copies.
-        incognitoState.set(false)
+        // Scope the host's flag and the field's type to the field actually being edited: once
+        // this input session ends they must not linger over unrelated clipboard copies. The
+        // user's manual switch deliberately survives -- see TypingViewModel.onInputFinished.
+        typingViewModel().onInputFinished()
     }
 
     override fun onFinishInput() {
         super.onFinishInput()
-        incognitoState.set(false)
+        typingViewModel().onInputFinished()
     }
 
     override fun onUpdateSelection(
@@ -340,8 +343,10 @@ class StickyKeysIME :
         // Flushed when the keyboard goes away rather than on a timer: an IME process can be
         // killed at any moment, and a session that only existed in memory would be lost.
         usageLog.onSessionEnd()
-        // Keyboard no longer shown -> not on an incognito field any more.
-        incognitoState.set(false)
+        // Keyboard no longer shown -> no field-driven incognito any more. A manual private
+        // mode stays on: clipboard capture keeps running while the keyboard is hidden, and
+        // that is precisely the window a user who threw the switch wants covered.
+        typingViewModel().onInputFinished()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
     }
@@ -437,20 +442,25 @@ class StickyKeysIME :
 
         // A field that accepts line breaks always gets one. Its action, if it declares any,
         // belongs to a button in the host's own UI -- not to the return key.
-        val multiLine =
-            (info.inputType and android.text.InputType.TYPE_MASK_CLASS) ==
-                android.text.InputType.TYPE_CLASS_TEXT &&
-                (
-                    info.inputType and (
-                        android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                            android.text.InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE
-                    )
-                ) != 0
-
-        val suppressed = (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
-
-        if (multiLine || suppressed) {
+        //
+        // The test lives in `enterInsertsNewline` rather than here because the typing model
+        // needs the same answer to decide whether Enter may learn the word it just ended, and
+        // two copies of this arithmetic would eventually disagree about the same field.
+        if (enterInsertsNewline(info.inputType, info.imeOptions)) {
             sendRawEnter(ic)
+            // A newline is this keyboard's own edit and has to say so, exactly like commitText.
+            //
+            // Without this, onUpdateSelection cannot match the caret to anything predicted and
+            // treats it as the user having edited elsewhere, so it re-reads the field and
+            // bumps the generation token -- a blocking IPC on every Enter, which is the thing
+            // this codebase avoids everywhere else. It also made the token stale immediately,
+            // which is how the fact that Enter had *ended* a word arrived after the model had
+            // already been told the text moved.
+            //
+            // If a host does something other than insert one character the prediction simply
+            // misses and the existing resync path handles it, which is the behaviour this
+            // replaces rather than a new risk.
+            predictCaret(minOf(selStart, selEnd) + 1)
             return
         }
         performActionOrEnter(ic, info)
