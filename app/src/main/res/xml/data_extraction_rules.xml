@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!--
+  Android 12+ backup scoping. `backup_rules.xml` carries the same intent for Android 11 and
+  below, and the two must be kept in step by hand: the platform reads one or the other by
+  version, never both, so a rule added to only one silently applies to only some devices.
+
+  Until this file existed, `allowBackup="true"` was declared with no scoping at all, which
+  meant the permissive default: everything in shared_prefs, databases and filesDir eligible for
+  upload. That included `keyboard_database`, which holds the learned personal dictionary and
+  the clipboard history. Both are exactly the data this project promises never leaves a device.
+
+  READ THIS BEFORE ADDING AN `exclude`. Once a scope contains any `include`, the system backs
+  up *only* what is listed and everything else is already excluded. An `exclude` naming a path
+  that was never included is not belt-and-braces, it is a no-op, and `lint` fails the build on
+  it (FullBackupContent) because writing one usually means the author believed the opposite.
+  `exclude` is only meaningful for carving a subset out of a path that IS included.
+
+  So the protection is the shape of these lists. `keyboard_database` appears in neither scope,
+  and that absence is the mechanism.
+
+  Two scopes, and the distinction is the whole design:
+
+    cloud-backup    goes to Google's servers. Small, non-sensitive configuration only.
+    device-transfer stays between two of the user's own phones. No 25MB cap and no third
+                    party, so the sticker library rides along.
+-->
+<data-extraction-rules>
+    <!--
+      disableIfNoEncryptionCapabilities is the load-bearing attribute. Android end-to-end
+      encrypts backups with a key wrapped by the device lock screen and escrowed to a Titan
+      HSM. A device with no lock screen has no such key, and the payload arrives at Google
+      decrypted. This refuses the backup outright in that case rather than quietly uploading
+      readable settings.
+
+      Omitted here and therefore never uploaded: `keyboard_database` (the learned dictionary
+      and the clipboard history, withheld on privacy grounds), and the sticker index, sticker
+      bytes and background images (withheld on size). The 25MB cloud quota does not degrade
+      gracefully - pass it and the OS stops backing the app up at all while continuing to
+      serve a stale snapshot, without telling anyone. Omitting the sticker index alongside the
+      bytes also avoids restoring a database full of rows pointing at files that were never
+      uploaded, which would present as a full library of broken thumbnails.
+    -->
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <include domain="sharedpref" path="keyboard_preferences.xml" />
+        <include domain="sharedpref" path="app_preferences.xml" />
+        <include domain="file" path="themes/" />
+        <include domain="file" path="layouts/" />
+    </cloud-backup>
+
+    <!--
+      Device-to-device transfer. No third party and no size ceiling, so the sticker library and
+      the background images come too: losing those is the most-felt part of moving phones.
+
+      `keyboard_database` is still absent. The quota is not the reason - a direct transfer
+      would be a reasonable home for the dictionary - but the clipboard history lives in the
+      same database, and moving that silently is not a decision to make on the user's behalf.
+      The pairing flow in the `transfer` module already carries both, behind an explicit
+      opt-in and a warning, which is where that choice belongs.
+    -->
+    <device-transfer>
+        <include domain="sharedpref" path="keyboard_preferences.xml" />
+        <include domain="sharedpref" path="app_preferences.xml" />
+        <include domain="file" path="themes/" />
+        <include domain="file" path="layouts/" />
+        <include domain="file" path="theme_backgrounds/" />
+        <include domain="file" path="stickers/" />
+        <include domain="file" path="stickers_thumbnails/" />
+        <include domain="database" path="stickykeys_db" />
+    </device-transfer>
+</data-extraction-rules>
