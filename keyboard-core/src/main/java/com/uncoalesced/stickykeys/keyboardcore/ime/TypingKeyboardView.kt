@@ -41,6 +41,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
@@ -89,8 +90,13 @@ fun TypingKeyboardView(
     // Recomputed only when the layout, the letter case or the number-row setting actually
     // changes. Rebuilding this list on every recomposition handed the key grid a fresh List
     // each keystroke, which is enough on its own to stop it skipping.
+    val fieldKind by typingViewModel.fieldKind.collectAsState()
+
     val keyRows =
-        remember(activeLayoutConfig, mode, showNumberRow) {
+        remember(activeLayoutConfig, mode, showNumberRow, fieldKind) {
+            if (fieldKind == FieldKind.PIN) {
+                return@remember KeyboardRows(KeyboardLayouts.pinRows)
+            }
             val isLetterMode =
                 mode == KeyboardMode.LETTERS_LOWER ||
                     mode == KeyboardMode.LETTERS_UPPER ||
@@ -140,8 +146,10 @@ fun TypingKeyboardView(
     val suggestions by typingViewModel.suggestions.collectAsState()
     val undoState by typingViewModel.undoState.collectAsState()
     val incognito by typingViewModel.incognito.collectAsState()
+    val privateMode by typingViewModel.privateMode.collectAsState()
     val shouldAutoCapitalize by typingViewModel.shouldAutoCapitalize.collectAsState()
     val activeTheme by typingViewModel.activeTheme.collectAsState()
+    val context = LocalContext.current
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -216,14 +224,35 @@ fun TypingKeyboardView(
     // session-scoped: a caps lock set while writing one message must not still be on when the
     // user taps into a search box somewhere else, and neither must the symbols page.
     val inputSession by typingViewModel.inputSession.collectAsState()
-    LaunchedEffect(inputSession) {
+    LaunchedEffect(inputSession, fieldKind) {
+        // The field's own type wins over the letter-case reset. Both of these effects used to
+        // force a LETTERS_* mode unconditionally, which is exactly what would have flipped a
+        // numeric pad back to QWERTY the instant it was shown -- a keypad that looks right in
+        // a screenshot and is gone by the time a finger reaches it.
         modeState.value =
-            if (shouldAutoCapitalize) KeyboardMode.LETTERS_UPPER else KeyboardMode.LETTERS_LOWER
+            when {
+                fieldKind == FieldKind.PIN -> KeyboardMode.PIN
+                shouldAutoCapitalize -> KeyboardMode.LETTERS_UPPER
+                else -> KeyboardMode.LETTERS_LOWER
+            }
+    }
+
+    // Panel state is scoped to the input *session*, and deliberately not to [fieldKind].
+    //
+    // These two lines used to sit in the effect above, which keys on both. That was correct
+    // while every fieldKind change meant a new field -- and stopped being correct the moment
+    // the manual privacy switch could change it in place. Observed on device: tapping the
+    // padlock flipped NORMAL to PRIVATE, which re-ran that effect and closed the toolbar out
+    // from under the finger that had just opened it, so confirming the switch had taken meant
+    // reopening the row. Keying the resets on the session alone keeps a new field clearing
+    // them without a same-field reclassification doing the same.
+    LaunchedEffect(inputSession) {
         quickExpanded = false
         comingSoon = null
     }
 
     LaunchedEffect(shouldAutoCapitalize) {
+        if (fieldKind == FieldKind.PIN) return@LaunchedEffect
         if (shouldAutoCapitalize && modeState.value == KeyboardMode.LETTERS_LOWER) {
             modeState.value = KeyboardMode.LETTERS_UPPER
         } else if (!shouldAutoCapitalize && modeState.value == KeyboardMode.LETTERS_UPPER) {
@@ -251,6 +280,7 @@ fun TypingKeyboardView(
             QuickAccessRow(
                 expanded = quickExpanded,
                 palette = StickyKeysTheme.colors,
+                privateMode = privateMode,
                 onAction = { action ->
                     typingViewModel.performKeyPressHaptic()
                     when {
@@ -260,10 +290,18 @@ fun TypingKeyboardView(
                             keyboardController.switchMode(AppMode.CLIPBOARD)
                         action.id == "textedit" ->
                             keyboardController.switchMode(AppMode.TEXT_EDIT)
+                        action.id == "private" ->
+                            typingViewModel.setPrivateMode(!privateMode)
                         action.id == "switchime" -> keyboardController.showInputMethodPicker()
                     }
-                    if (!action.comingSoon) quickExpanded = false
+                    // The privacy toggle stays put. Collapsing the row on it would hide the
+                    // control the instant it was used, so confirming the state means reopening
+                    // the toolbar -- and a privacy switch you cannot see is one you stop
+                    // trusting. Everything else here navigates away, so it collapses.
+                    if (!action.comingSoon && action.id != "private") quickExpanded = false
                 },
+                onMedia = { action -> MediaTransport.dispatch(context, action) },
+                isMediaPlaying = { MediaTransport.isPlaying(context) },
             )
 
             // Everything below here is the unchanging part: one fixed height, shared with the
@@ -339,9 +377,23 @@ fun TypingKeyboardView(
                             )
                             if (incognito) {
                                 // Status only: intentionally not clickable and not a toggle.
+                                // The toggle is a labelled control in the quick-access row, and
+                                // overloading the indicator with a hidden action would mean the
+                                // one thing on screen reporting the state could also silently
+                                // change it.
+                                //
+                                // It says which of the two it is, because they end differently:
+                                // the automatic one lifts by itself when the field changes, the
+                                // manual one only when the user turns it off, and a user who
+                                // cannot tell them apart cannot know whether to go looking.
                                 Icon(
                                     imageVector = Icons.Default.Lock,
-                                    contentDescription = "Incognito: typing is not being learned",
+                                    contentDescription =
+                                        if (privateMode) {
+                                            "Private mode on: nothing typed is being learned"
+                                        } else {
+                                            "Incognito: typing is not being learned"
+                                        },
                                     tint = StickyKeysTheme.colors.onSurfaceVariant,
                                     modifier =
                                         Modifier
@@ -484,16 +536,30 @@ internal fun KeyboardKey(
     background: Color,
     foreground: Color,
     alternates: KeyAlternatesState,
-    alternateCellWidthPx: Float,
+    preferredCellWidthPx: Float,
+    availableWidthPx: Float,
     onKeyPress: (String) -> Unit,
     modifier: Modifier = Modifier,
+    keyAlternates: List<String>? = null,
+    keyAlternatesDefaultIndex: Int = 0,
     border: Color? = null,
     haze: Color? = null,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
 ) {
     val spokenLabel = accessibleKeyLabel(keyOutput)
     val spokenState = accessibleKeyState(keyOutput, mode)
-    val longPress = remember(keyOutput, hint) { longPressFor(keyOutput, hint) }
+    val longPress =
+        remember(keyOutput, hint, keyAlternates, keyAlternatesDefaultIndex) {
+            longPressFor(keyOutput, hint, keyAlternates, keyAlternatesDefaultIndex)
+        }
+    // Sized per key rather than once for the grid: the strip's cell width depends on how many
+    // options this particular key offers, and a long strip has to shrink or its last cells
+    // land off the screen edge where they can be neither seen nor selected.
+    val alternateCellWidthPx =
+        remember(longPress, availableWidthPx, preferredCellWidthPx) {
+            val count = (longPress as? LongPress.Alternates)?.options?.size ?: 1
+            alternateCellWidthPx(count, availableWidthPx, preferredCellWidthPx)
+        }
     val keyStyle = StickyKeysTheme.keyStyle
     val pressed = remember { mutableStateOf(false) }
 
@@ -539,10 +605,15 @@ internal fun KeyboardKey(
     val bounds = remember { mutableStateOf(Rect.Zero) }
     val shape = RoundedCornerShape(KEY_CORNER_RADIUS)
 
+    // The gap around the key comes from the user's key-size preference rather than a
+    // constant: the cell is fixed by the row layout, so the only way to make a key bigger
+    // inside it is to make the gap smaller. See keyPaddingFor for the inversion.
+    val keyPadding = keyPaddingFor(LocalImePanelMetrics.current.keyScale, KEY_BASE_PADDING)
+
     Box(
         modifier =
             modifier
-                .padding(2.dp)
+                .padding(keyPadding)
                 .onGloballyPositioned { bounds.value = it.boundsInRoot() }
                 // Haze before the fill so it reads as glow behind the key rather than a
                 // wash over it. Skipped entirely when off, rather than drawn at zero alpha:
@@ -588,9 +659,14 @@ internal fun KeyboardKey(
                     val held = longPress
                     if (held is LongPress.Alternates) {
                         // A drag-to-choose strip is not operable without sight of it, so the
-                        // accessibility path commits the first alternate outright.
-                        onLongClick(label = "Type ${held.options.first()}") {
-                            onKeyPress(held.options.first())
+                        // accessibility path commits the default cell outright -- the same
+                        // character a sighted user gets by holding and releasing without
+                        // moving. Not `first()`: on the currency key the default sits in the
+                        // middle of the strip, and committing the first entry there would give
+                        // TalkBack users a different character than everyone else.
+                        val default = held.options[held.defaultIndex]
+                        onLongClick(label = "Type $default") {
+                            onKeyPress(default)
                             true
                         }
                     }
@@ -648,6 +724,9 @@ private const val PRESS_BLEND = 0.3f
 
 /** Corner radius shared by every key, matching the reference's rounded caps. */
 private val KEY_CORNER_RADIUS = 6.dp
+
+/** The gap around a key at 100% key size. Scaled by the user's preference. */
+internal val KEY_BASE_PADDING = 2.dp
 private val KEY_ICON_SIZE = 22.dp
 private val HINT_ICON_SIZE = 13.dp
 
@@ -726,7 +805,49 @@ internal fun handleKeyPress(
             controller.sendDelete()
         }
         "ENTER" -> {
-            viewModel.onWordFinished()
+            // Whether Enter may finish a word depends on what Enter *is* in this field, and
+            // the two cases are opposites rather than shades.
+            //
+            // Submit-style Enter must not learn. It deliberately does not autocorrect -- there
+            // is no safe moment, since before needs a blocking lookup and after is too late in
+            // a field that has already sent -- so learning anyway writes an unchecked word to
+            // disk. Measured on device: two sends of "teh" put it in the dictionary at
+            // frequency 2, after which autocorrect stops fixing it permanently and the
+            // suggestion strip starts offering it. In a send-on-enter chat app that is the
+            // ordinary typing path, so the damage is routine rather than exotic.
+            //
+            // Newline Enter has no send and therefore no race, so the word is genuinely
+            // finished and may be learned.
+            //
+            // The correction is *evaluated* and never *applied*. The return key does not
+            // rewrite what the user typed, in any field -- that part is settled -- but running
+            // the lookup anyway is what stops Enter teaching the dictionary a misspelling. The
+            // dictionary learns what the word should have been; the text on screen keeps what
+            // the user actually pressed, and they can see it and fix it themselves.
+            //
+            // No generation token here, unlike the space and punctuation paths. Those guard a
+            // *rewrite* against text having moved underneath it. Nothing is rewritten here, and
+            // a word the user finished stays a word they finished however much they type next.
+            if (viewModel.enterEndsAWord()) {
+                val typedWord = currentWordText(controller)
+                controller.sendEnter()
+                viewModel.onSentenceStarted()
+                if (typedWord.isNotBlank()) {
+                    coroutineScope.launch {
+                        val corrected = viewModel.getAutoCorrectionFor(typedWord)
+                        viewModel.onWordAccepted(corrected ?: typedWord)
+                    }
+                }
+                setMode(
+                    if (viewModel.shouldAutoCapitalize.value) {
+                        KeyboardMode.LETTERS_UPPER
+                    } else {
+                        KeyboardMode.LETTERS_LOWER
+                    },
+                )
+                return
+            }
+            viewModel.onWordAbandoned()
             controller.sendEnter()
             // Enter both finishes what was typed and starts something new -- a sent message,
             // or a fresh line. Latched shift and caps lock used to survive that, so the next
@@ -746,7 +867,34 @@ internal fun handleKeyPress(
             )
         }
         "SPACE" -> {
-            val typedWord = viewModel.getCurrentWord()
+            // Read from the editor, not from the running buffer, and read before the space is
+            // committed so the word is still the last thing before the caret. A field that
+            // filtered the keystrokes out reports nothing here, which is exactly right: it
+            // has no word to correct and none to learn.
+            val typedWord = currentWordText(controller)
+
+            // Two quick spaces become a full stop. Decided from the text rather than from the
+            // taps alone: the pure decision reads what is actually before the caret, so it
+            // cannot produce ".. " after a sentence that already ended, or a stray period at
+            // the start of a field. Handled before the ordinary commit because it *replaces*
+            // the space already there rather than adding to it.
+            if (viewModel.consumeDoubleSpace()) {
+                val replacement =
+                    doubleSpaceReplacement(controller.textBeforeCursor(WORD_CONTEXT_CHARS))
+                if (replacement != null) {
+                    controller.replaceTextBeforeCursor(1, replacement)
+                    viewModel.onSentenceStarted()
+                    setMode(
+                        if (viewModel.shouldAutoCapitalize.value) {
+                            KeyboardMode.LETTERS_UPPER
+                        } else {
+                            KeyboardMode.LETTERS_LOWER
+                        },
+                    )
+                    return
+                }
+            }
+
             // Commit the space FIRST, synchronously, so key order can never invert.
             // Waiting on the autocorrect lookup here used to let a following letter
             // commit before the space ("a b" arriving as "ab ").
@@ -772,7 +920,8 @@ internal fun handleKeyPress(
                 viewModel.onKeyPressed(keyLabel)
                 controller.commitText(keyLabel)
             } else {
-                val typedWord = viewModel.getCurrentWord()
+                // Editor-derived, same as the space bar and for the same reason.
+                val typedWord = currentWordText(controller)
                 // Committed first and synchronously, for the same reason the space bar is:
                 // waiting on the correction lookup here would let a following key land before
                 // this one and invert what the user typed.
@@ -823,10 +972,23 @@ internal fun endsAWord(keyLabel: String): Boolean =
 private const val WORD_TERMINATORS = ".,!?;:"
 
 /**
- * How many characters the word under the caret occupies, read from the editor.
+ * The word under the caret, as the *editor* has it.
  *
- * Used to size a *destructive* edit, so it deliberately does not trust the keyboard's own
- * running copy of the word: see `KeyboardController.textBeforeCursor`.
+ * The single source for anything that must be true of the text rather than of this keyboard's
+ * running buffer. Two things depend on that distinction, and both were bugs before they did:
+ *
+ *  - **Sizing a destructive edit.** The suggestion strip deleted `currentWord.length`
+ *    characters of whatever happened to be there, which is the wrong span after a caret tap
+ *    or a paste.
+ *  - **Learning.** A field with an input filter accepts none of what was typed and the buffer
+ *    records all of it, so `qwxzj` typed into a phone field was learned from an empty field.
+ *
+ * One editor read per word boundary, never per keystroke -- the thing this codebase forbids
+ * everywhere else.
  */
+internal fun currentWordText(controller: KeyboardController): String =
+    wordUnderCaret(controller.textBeforeCursor(WORD_CONTEXT_CHARS))
+
+/** How many characters the word under the caret occupies, read from the editor. */
 internal fun currentWordSpan(controller: KeyboardController): Int =
-    wordUnderCaret(controller.textBeforeCursor(WORD_CONTEXT_CHARS)).length
+    currentWordText(controller).length

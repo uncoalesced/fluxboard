@@ -44,6 +44,11 @@ class KeyboardPreferences
                             prefs.getBoolean("haptics_enabled", true)
                     "haptics_intensity" ->
                         _hapticsIntensity.value = readHapticsPercent()
+                    "double_space_period" ->
+                        _doubleSpacePeriodEnabled.value =
+                            prefs.getBoolean("double_space_period", true)
+                    "key_size_percent" ->
+                        _keySizePercent.value = readKeySizePercent()
                     "show_number_row" ->
                         _showNumberRow.value =
                             prefs.getBoolean("show_number_row", true)
@@ -51,6 +56,9 @@ class KeyboardPreferences
                         _keyboardHeightPercent.value = readHeightPercent()
                     "keyboard_bottom_padding_dp" ->
                         _keyboardBottomPaddingDp.value = readBottomPadding()
+                    "private_mode" ->
+                        _privateModeEnabled.value =
+                            prefs.getBoolean("private_mode", false)
                 }
             }
 
@@ -104,6 +112,28 @@ class KeyboardPreferences
         val showNumberRow: StateFlow<Boolean> = _showNumberRow.asStateFlow()
 
         /**
+         * Whether two quick spaces become a full stop and a space.
+         *
+         * A setting rather than a constant because some hosts and OEM text fields already do
+         * this themselves, which produces a doubled period, and an IME cannot detect that.
+         */
+        private val _doubleSpacePeriodEnabled =
+            MutableStateFlow(prefs.getBoolean("double_space_period", true))
+        val doubleSpacePeriodEnabled: StateFlow<Boolean> =
+            _doubleSpacePeriodEnabled.asStateFlow()
+
+        /**
+         * How large each key is drawn inside the cell the layout gives it, as a percentage.
+         *
+         * Independent of [keyboardHeightPercent] on purpose: that one changes how much of the
+         * screen the keyboard occupies, this one changes how much of that space is key rather
+         * than gap. A user who wants a big keyboard with generous gaps and one who wants a
+         * compact keyboard with fat keys are asking for different things.
+         */
+        private val _keySizePercent = MutableStateFlow(readKeySizePercent())
+        val keySizePercent: StateFlow<Int> = _keySizePercent.asStateFlow()
+
+        /**
          * Overall keyboard height, as a percentage of the shipped default.
          *
          * The panel used to be one fixed dimension for everyone, which made the number row a
@@ -123,6 +153,31 @@ class KeyboardPreferences
          */
         private val _keyboardBottomPaddingDp = MutableStateFlow(readBottomPadding())
         val keyboardBottomPaddingDp: StateFlow<Int> = _keyboardBottomPaddingDp.asStateFlow()
+
+        /**
+         * The user's manual privacy switch. Off by default.
+         *
+         * This is the half of the privacy story that no `EditorInfo` signal can reach. A
+         * password field announces itself through `inputType`, and a host that sets
+         * IME_FLAG_NO_PERSONALIZED_LEARNING announces itself through `imeOptions` -- but an
+         * ordinary message box holding a recovery phrase, a diagnosis or somebody else's
+         * address looks exactly like every other message box. There is no signal to read, so
+         * there is no honest automatic answer, and the switch is deliberately manual rather
+         * than a heuristic on package names dressed up as detection.
+         *
+         * Persisted rather than session-scoped, and that direction is chosen on purpose: a
+         * privacy switch that turns itself off when the user taps into the next field fails
+         * *open*, which is the failure that leaks. Leaving it on costs suggestions until it is
+         * turned off, and the lock in the suggestion strip stays lit the whole time saying so.
+         */
+        private val _privateModeEnabled =
+            MutableStateFlow(prefs.getBoolean("private_mode", false))
+        val privateModeEnabled: StateFlow<Boolean> = _privateModeEnabled.asStateFlow()
+
+        private fun readKeySizePercent(): Int =
+            prefs
+                .getInt("key_size_percent", DEFAULT_KEY_SIZE_PERCENT)
+                .coerceIn(MIN_KEY_SIZE_PERCENT, MAX_KEY_SIZE_PERCENT)
 
         private fun readHeightPercent(): Int =
             prefs
@@ -158,6 +213,47 @@ class KeyboardPreferences
             prefs.edit().putBoolean("haptics_enabled", enabled).apply()
         }
 
+        /**
+         * The emoji the user has actually sent, most recent first.
+         *
+         * Kept in SharedPreferences rather than Room because it is a short, ordered,
+         * whole-value list that is rewritten on every use -- a table with one row per glyph
+         * would be a migration and a DAO for something that is always read in full.
+         *
+         * Not gated on incognito: an emoji is not text the user typed, it is a picker choice,
+         * and the same reasoning that keeps clipboard capture out of a password field does not
+         * apply to tapping a smiley. Flagged here rather than assumed -- say so if that is
+         * the wrong call.
+         */
+        fun recentEmoji(): List<String> =
+            prefs
+                .getString("recent_emoji", "")
+                .orEmpty()
+                .split("")
+                .filter { it.isNotEmpty() }
+
+        fun recordEmojiUse(glyph: String) {
+            if (glyph.isEmpty()) return
+            val updated =
+                (listOf(glyph) + recentEmoji().filterNot { it == glyph })
+                    .take(MAX_RECENT_EMOJI)
+            prefs.edit().putString("recent_emoji", updated.joinToString("")).apply()
+        }
+
+        fun setDoubleSpacePeriod(enabled: Boolean) {
+            prefs.edit().putBoolean("double_space_period", enabled).apply()
+        }
+
+        /** [percent] scales the key inside its cell. 100 is the shipped size. */
+        fun setKeySizePercent(percent: Int) {
+            prefs
+                .edit()
+                .putInt(
+                    "key_size_percent",
+                    percent.coerceIn(MIN_KEY_SIZE_PERCENT, MAX_KEY_SIZE_PERCENT),
+                ).apply()
+        }
+
         fun setShowNumberRow(show: Boolean) {
             prefs.edit().putBoolean("show_number_row", show).apply()
         }
@@ -177,6 +273,11 @@ class KeyboardPreferences
                 ).apply()
         }
 
+        /** Turns the manual privacy switch on or off. See [privateModeEnabled]. */
+        fun setPrivateMode(enabled: Boolean) {
+            prefs.edit().putBoolean("private_mode", enabled).apply()
+        }
+
         /** [dp] is the gap held below the bottom key row, above the gesture bar. */
         fun setKeyboardBottomPaddingDp(dp: Int) {
             prefs
@@ -186,6 +287,19 @@ class KeyboardPreferences
         }
 
         companion object {
+            /** One screenful of the picker grid; beyond that the tab stops being "recent". */
+            const val MAX_RECENT_EMOJI = 32
+
+            const val DEFAULT_KEY_SIZE_PERCENT = 100
+
+            /**
+             * Below this the gaps swallow the key; above it neighbouring keys touch and the
+             * boundary between them stops being visible, which costs accuracy rather than
+             * adding it.
+             */
+            const val MIN_KEY_SIZE_PERCENT = 70
+            const val MAX_KEY_SIZE_PERCENT = 130
+
             const val DEFAULT_KEYBOARD_HEIGHT_PERCENT = 100
 
             /** Below this the keys are too short to hit; above it the host app disappears. */

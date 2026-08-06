@@ -59,7 +59,8 @@ class KeyboardKeySemanticsTest {
                     background = Color.DarkGray,
                     foreground = Color.White,
                     alternates = remember { KeyAlternatesState() },
-                    alternateCellWidthPx = 100f,
+                    preferredCellWidthPx = 100f,
+                    availableWidthPx = 1080f,
                     onKeyPress = onKeyPress,
                 )
             }
@@ -145,7 +146,8 @@ class KeyboardKeySemanticsTest {
                     background = Color.DarkGray,
                     foreground = Color.White,
                     alternates = remember { KeyAlternatesState() },
-                    alternateCellWidthPx = 100f,
+                    preferredCellWidthPx = 100f,
+                    availableWidthPx = 1080f,
                     onKeyPress = {},
                 )
             }

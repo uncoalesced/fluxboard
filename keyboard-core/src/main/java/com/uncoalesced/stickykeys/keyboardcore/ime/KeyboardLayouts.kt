@@ -18,11 +18,15 @@ object KeyboardLayouts {
         output: String,
         hint: String? = null,
         weight: Float = 1f,
+        alternates: List<String>? = null,
+        alternatesDefaultIndex: Int = 0,
     ) = KeyDefinition(
         id = "key_${output.lowercase().replace(" ", "_")}",
         output = output,
         weight = weight,
         hint = hint,
+        alternates = alternates,
+        alternatesDefaultIndex = alternatesDefaultIndex,
     )
 
     // Keyed by name, not by weight: two half-width spacers derived their id from the weight
@@ -63,11 +67,18 @@ object KeyboardLayouts {
      * `_`), so a user who wants digits without holding anything is not served by them at all.
      * Kept as its own row so the toggle is a list concatenation rather than a second layout.
      *
-     * The hint is the shifted symbol, which is also what a hold commits by default -- see
-     * `KeyGestures.DIGIT_ALTERNATES` for the rest of the strip.
+     * The hint shows the shifted symbol, which is what arming shift will produce. It is
+     * **not** what a hold commits: the hold strip is superscripts and fractions, and the
+     * shifted symbol was removed from it because the same character is one shift-tap away and
+     * the cell was pushing the strip's actual content along the row.
+     *
+     * The strip is attached to each key rather than looked up by output, so the digits on the
+     * symbols page -- which type the same characters -- do not inherit it.
      */
     val numberRow: List<KeyDefinition> =
-        digitShiftPairs.map { (digit, shifted) -> key(digit, hint = shifted) }
+        digitShiftPairs.map { (digit, shifted) ->
+            key(digit, hint = shifted, alternates = DIGIT_ALTERNATES[digit])
+        }
 
     /**
      * The digit row while shift is armed.
@@ -133,10 +144,34 @@ object KeyboardLayouts {
         listOf(
             key("SYMBOLS", weight = 1.5f),
             key("STICKERS"),
-            key(",", hint = "MIC"),
+            // No mic hint. It advertised voice input that this key never produced --
+            // longPressFor consults PUNCTUATION_ALTERNATES before the hint, and "," is in
+            // that map, so holding it has always given ". ? !" and never the mic. Removing
+            // the glyph leaves the behaviour untouched and stops the key promising something
+            // it does not do; the key picks up the small corner dot that marks a hold instead.
+            key(","),
             key("SPACE", weight = 4f),
             key(".", hint = ",!?"),
             key("ENTER", weight = 1.5f),
+        )
+
+    /**
+     * The digits-only pad for a numeric secret.
+     *
+     * Deliberately bare. No fraction strips, no corner hints, no letters, no symbols page --
+     * on a PIN every one of those is either input the field will reject or a route to
+     * something that should not be near a secret. The blank cell keeps `0` centred under `8`
+     * so the pad reads like every other PIN pad rather than shifting the digits left.
+     *
+     * No `alternates` anywhere on it, which matters: these keys type the same characters as the
+     * number row, and an output-keyed table would have given a PIN pad the fraction strips.
+     */
+    val pinRows: List<List<KeyDefinition>> =
+        listOf(
+            listOf("1", "2", "3").map { key(it) },
+            listOf("4", "5", "6").map { key(it) },
+            listOf("7", "8", "9").map { key(it) },
+            listOf(spacer("pin_blank", 1f), key("0"), key("DEL")),
         )
 
     /** Letter pages, with the digit row prepended when the user has asked for it. */
@@ -193,7 +228,26 @@ object KeyboardLayouts {
     val symbolsPrimaryRows: List<List<KeyDefinition>> =
         listOf(
             listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0").map { key(it) },
-            listOf("@", "#", "£", "&", "_", "-", "(", ")", "=", "%").map { key(it) },
+            listOf(
+                key("@"),
+                key("#"),
+                // The reference draws a bare currency slot here. It carries the dollar sign and
+                // reaches the others by hold, rather than committing the page to one currency:
+                // the alternates and their default cell live on this key alone, so nothing
+                // about it touches digit 4 on the number row, which types the same character.
+                key(
+                    "$",
+                    alternates = CURRENCY_ALTERNATES,
+                    alternatesDefaultIndex = CURRENCY_DEFAULT_INDEX,
+                ),
+                key("&"),
+                key("_"),
+                key("-"),
+                key("("),
+                key(")"),
+                key("="),
+                key("%"),
+            ),
             listOf(key("SYMBOLS_SHIFT", weight = 1.5f)) +
                 listOf("\"", "*", "'", ":", "/", "!", "?", "+").map { key(it) } +
                 listOf(key("DEL", weight = 1.5f)),

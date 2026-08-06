@@ -42,6 +42,9 @@ class IncognitoLearningTest {
         // Autocorrect/autocap flags are read as StateFlow values.
         io.mockk.every { prefs.autoCapitalizeEnabled } returns MutableStateFlow(true)
         io.mockk.every { prefs.autoCorrectEnabled } returns MutableStateFlow(true)
+        // A real flow, not the relaxed mock: TypingViewModel collects this one, and
+        // StateFlow.collect returns Nothing, which a relaxed mock cannot satisfy.
+        io.mockk.every { prefs.privateModeEnabled } returns MutableStateFlow(false)
         viewModel =
             TypingViewModel(
                 engine,
@@ -68,7 +71,7 @@ class IncognitoLearningTest {
 
             viewModel.onKeyPressed("h")
             viewModel.onKeyPressed("i")
-            viewModel.onWordFinished()
+            viewModel.onWordFinished("hi")
             viewModel.onSuggestionSelected("there")
             viewModel.onAutoCorrected("teh", "the")
             advanceUntilIdle()
@@ -88,7 +91,7 @@ class IncognitoLearningTest {
             viewModel.onKeyPressed("s")
             viewModel.onKeyPressed("e")
             viewModel.onKeyPressed("c")
-            viewModel.onWordFinished()
+            viewModel.onWordFinished("sec")
             viewModel.onSuggestionSelected("secret")
             viewModel.onAutoCorrected("scret", "secret")
             advanceUntilIdle()
@@ -101,7 +104,7 @@ class IncognitoLearningTest {
         runTest(dispatcher) {
             viewModel.onIncognitoChanged(true)
             viewModel.onKeyPressed("a")
-            viewModel.onWordFinished()
+            viewModel.onWordFinished("a")
             advanceUntilIdle()
             coVerify(exactly = 0) { engine.learnWord(any()) }
 
@@ -109,7 +112,7 @@ class IncognitoLearningTest {
             viewModel.onIncognitoChanged(false)
             assertFalse(viewModel.incognito.value)
             viewModel.onKeyPressed("b")
-            viewModel.onWordFinished()
+            viewModel.onWordFinished("b")
             advanceUntilIdle()
 
             coVerify(exactly = 1) { engine.learnWord("b") }
