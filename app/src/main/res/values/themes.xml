@@ -5,8 +5,8 @@
          Previously there was only one style, hardcoded to the dark Ink base, so a user
          on the light palette saw a dark flash before Compose drew. -->
     <style name="Theme.StickyKeys" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#FFF7F5EE</item>
-        <item name="android:statusBarColor">#FFF7F5EE</item>
-        <item name="android:navigationBarColor">#FFF7F5EE</item>
+        <item name="android:windowBackground">#FFE9EDDE</item>
+        <item name="android:statusBarColor">#FFE9EDDE</item>
+        <item name="android:navigationBarColor">#FFE9EDDE</item>
     </style>
 </resources>
