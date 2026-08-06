@@ -46,11 +46,20 @@ Thumbs.db
 .kotlin/
 
 # Agents & Repository Documentation
+#
+# CLAUDE.md is deliberately NOT ignored. It is the accumulated record of what has
+# already gone wrong in this repository -- the Gradle daemon traps, the ViewTree owners
+# on the decor view, the DEX scan that proves nothing, the two adb commands that unbind
+# the IME -- and every one of those entries cost a session to learn. Untracked, that
+# knowledge lived on one machine and a fresh clone rediscovered it.
+#
+# Note it imports AGENTS.md and .agent/rules/, which are still ignored below, so those
+# imports do not resolve in a fresh clone. Tracking them too is the obvious follow-up
+# and is deliberately left as a decision rather than taken here.
 .agent/
 .agents/
 .agents/skills/
 AGENTS.md
-CLAUDE.md
 ARCHITECTURE.md
 AUTHORS.md
 
