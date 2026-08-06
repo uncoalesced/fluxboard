@@ -28,9 +28,18 @@
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <!--
+        Backup is enabled but scoped. Both rule files are required and must agree: Android 12+
+        reads dataExtractionRules, Android 11 and below reads fullBackupContent, and the platform
+        consults exactly one of them per device. Declaring allowBackup with neither - which is
+        what this manifest did until now - means the permissive default, and that had the
+        learned dictionary and the clipboard history eligible for upload.
+    -->
     <application
         android:name=".StickyKeysApplication"
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
