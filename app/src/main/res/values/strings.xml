@@ -143,4 +143,13 @@
     <string name="text_trim_video_max_10s">Trim Video (Max 10s)</string>
     <string name="desc_trim_preview_frame">Trim Preview Frame</string>
     <string name="desc_keyframe">Keyframe</string>
+    <string name="text_key_size">Key Size</string>
+    <string name="text_key_size_summary">How large each key is drawn inside its space. Independent of the keyboard height.</string>
+    <string name="text_double_space_period">Double-space for period</string>
+    <string name="text_double_space_period_summary">Two quick taps of the space bar insert a full stop. Some apps do this themselves.</string>
+    <string name="text_private_mode">Private mode</string>
+    <string name="text_private_mode_summary">Nothing you type is learned, suggested, corrected or saved to clipboard history. You turn this on and off yourself: password fields are already protected automatically, but an ordinary message box looks the same whatever is in it. Stays on until you turn it off. Also on the keyboard, under the arrow.</string>
+    <string name="text_about">About</string>
+    <string name="text_source_code">Source code</string>
+    <string name="text_uncoalesced">uncoalesced</string>
 </resources>

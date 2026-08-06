@@ -44,11 +44,18 @@ class TypingViewModel
         val shouldAutoCapitalize: StateFlow<Boolean> = _shouldAutoCapitalize
 
         /**
-         * True while the focused editor sets IME_FLAG_NO_PERSONALIZED_LEARNING.
-         * Session-scoped and automatic: no user toggle, no persistence. Backed by
-         * the shared [IncognitoState] that also gates clipboard capture.
+         * True while nothing typed may be written to the dictionary or the clipboard history.
+         *
+         * Three separate things raise it and they are combined in exactly one place,
+         * [publishPrivacy]: the focused editor setting IME_FLAG_NO_PERSONALIZED_LEARNING, the
+         * field declaring itself a password or a PIN through `inputType`, and the user's own
+         * manual switch. Backed by the shared [IncognitoState] that also gates clipboard
+         * capture, so there is still only one flag in the process.
          */
         val incognito: StateFlow<Boolean> = incognitoState.active
+
+        /** Whether the manual privacy switch is on. Drawn as a toggle in the quick-access row. */
+        val privateMode: StateFlow<Boolean> = keyboardPreferences.privateModeEnabled
 
         val activeTheme: StateFlow<KeyboardTheme?> = themeManager.activeTheme
 
@@ -60,6 +67,13 @@ class TypingViewModel
         /** Panel sizing, chosen by the user rather than fixed. See `ImePanelHeight`. */
         val keyboardHeightPercent: StateFlow<Int> = keyboardPreferences.keyboardHeightPercent
         val keyboardBottomPaddingDp: StateFlow<Int> = keyboardPreferences.keyboardBottomPaddingDp
+
+        /** How large a key is drawn inside its cell. Independent of the panel height. */
+        val keySizePercent: StateFlow<Int> = keyboardPreferences.keySizePercent
+
+        /** Whether a second quick space becomes a full stop. */
+        val doubleSpacePeriodEnabled: StateFlow<Boolean> =
+            keyboardPreferences.doubleSpacePeriodEnabled
 
         private var currentWord = ""
 
@@ -90,29 +104,150 @@ class TypingViewModel
         private val _inputSession = MutableStateFlow(0)
         val inputSession: StateFlow<Int> = _inputSession
 
+        /**
+         * What kind of input is in front of the user, after the manual switch is folded in.
+         *
+         * Drives the digits-only PIN grid and, together with [incognito], everything that must
+         * not happen on a secret. Never assigned directly -- see [publishPrivacy].
+         */
+        private val _fieldKind = MutableStateFlow(FieldKind.NORMAL)
+        val fieldKind: StateFlow<FieldKind> = _fieldKind
+
+        /** What the field itself declared, before the manual switch. */
+        private var detectedFieldKind = FieldKind.NORMAL
+
+        /** Whether the host asked not to be learned from, for the current session. */
+        private var hostNoLearning = false
+
+        init {
+            // The switch can be thrown from the keyboard mid-sentence or from the settings
+            // screen, and both have to take effect without waiting for the next field focus --
+            // a privacy control that only arms itself later is one the user cannot trust.
+            viewModelScope.launch {
+                keyboardPreferences.privateModeEnabled.collect { publishPrivacy() }
+            }
+        }
+
         /** Called from the IME when a new input session starts. [initialCapsMode] comes
-         *  from EditorInfo.initialCapsMode -- non-zero means the field wants a capital. */
-        fun onInputStarted(initialCapsMode: Int) {
+         *  from EditorInfo.initialCapsMode -- non-zero means the field wants a capital.
+         *  [noPersonalizedLearning] is the host's IME_FLAG_NO_PERSONALIZED_LEARNING. */
+        fun onInputStarted(
+            initialCapsMode: Int,
+            fieldKind: FieldKind = FieldKind.NORMAL,
+            noPersonalizedLearning: Boolean = false,
+            enterIsNewline: Boolean = false,
+        ) {
             currentWord = ""
             _suggestions.value = emptyList()
             _undoState.value = null
             generation++
+            detectedFieldKind = fieldKind
+            hostNoLearning = noPersonalizedLearning
+            enterInsertsNewline = enterIsNewline
+            publishPrivacy()
             atSentenceStart = initialCapsMode != 0
             publishAutoCapitalize()
             _inputSession.value += 1
         }
 
+        /**
+         * Whether the return key inserts a newline in this field rather than submitting.
+         *
+         * Decides whether Enter is allowed to finish a word. On a submit-style field it is
+         * not: Enter deliberately does not autocorrect there, because there is no safe moment
+         * to do it -- before needs a blocking lookup, after is too late in a field that has
+         * already sent. Learning anyway meant every typo the user *sent* went into the
+         * personal dictionary unchecked, and after two sightings `PredictionEngine` treats a
+         * word as deliberate and stops correcting it. Measured on device: two sends of "teh"
+         * and the keyboard stops fixing it, permanently, and starts suggesting it.
+         *
+         * Where Enter is a newline there is no send and therefore no race, so the word is
+         * ended exactly the way the space bar ends one.
+         */
+        private var enterInsertsNewline = false
+
+        fun enterEndsAWord(): Boolean = enterInsertsNewline
+
+        /**
+         * The input session ended: the keyboard was hidden, or focus left the field.
+         *
+         * Drops what the *field* said and keeps what the *user* said. The host's flag and the
+         * field's type describe one editor and must not linger over the next one, but the
+         * manual switch is persistent by design -- clearing it here would silently disarm it
+         * every time the keyboard was dismissed, which is the exact failure it exists to avoid.
+         */
+        fun onInputFinished() {
+            detectedFieldKind = FieldKind.NORMAL
+            hostNoLearning = false
+            publishPrivacy()
+        }
+
+        /** Throws the manual privacy switch. Persisted; [publishPrivacy] runs off the flow. */
+        fun setPrivateMode(enabled: Boolean) {
+            keyboardPreferences.setPrivateMode(enabled)
+        }
+
+        /**
+         * The single place the three privacy inputs are combined.
+         *
+         * Everything downstream reads one of the two values written here and nothing
+         * recomputes the decision for itself -- which is what keeps a future third caller from
+         * arriving at a different answer than the suggestion strip did.
+         */
+        private fun publishPrivacy() {
+            val effective =
+                effectiveFieldKind(detectedFieldKind, keyboardPreferences.privateModeEnabled.value)
+            _fieldKind.value = effective
+            incognitoState.set(hostNoLearning || effective.isSensitive)
+        }
+
         fun isCurrent(token: Int): Boolean = token == generation
+
+        /** When the last space was committed, for the double-space window. */
+        private var lastSpaceAt = 0L
+
+        /**
+         * True when this space arrived quickly enough after the previous one to count as a
+         * double tap, and the feature is on.
+         *
+         * Consumes the timestamp either way, so three spaces in a row produce one substitution
+         * and then a plain space rather than a second one. The window is the platform's own
+         * double-tap timeout, so it matches every other double tap on the device and there is
+         * nothing here to tune wrongly.
+         */
+        fun consumeDoubleSpace(): Boolean {
+            val now = System.currentTimeMillis()
+            val quick = now - lastSpaceAt <= DOUBLE_TAP_WINDOW_MS
+            lastSpaceAt = if (quick) 0L else now
+            return quick && keyboardPreferences.doubleSpacePeriodEnabled.value
+        }
 
         private fun publishAutoCapitalize() {
             _shouldAutoCapitalize.value =
                 atSentenceStart &&
-                keyboardPreferences.autoCapitalizeEnabled.value
+                keyboardPreferences.autoCapitalizeEnabled.value &&
+                // Never on a credential field. `initialCapsMode` is non-zero for an empty text
+                // field whatever its variation, so a password field armed shift and the first
+                // character of the password was silently not the one the user pressed --
+                // observed on device as "correcthorse" entered as "Correcthorse". In a masked
+                // field that is invisible, which makes it worse rather than more forgivable:
+                // the user gets a failed login and no way to see why.
+                //
+                // Gated on isCredential, not isSensitive: the manual privacy switch also makes
+                // a field sensitive, and it must not stop capitalizing ordinary sentences.
+                !_fieldKind.value.isCredential
         }
 
-        /** Driven by the editor's IME_FLAG_NO_PERSONALIZED_LEARNING for the current input session. */
+        /**
+         * Driven by the editor's IME_FLAG_NO_PERSONALIZED_LEARNING for the current session.
+         *
+         * Routed through [publishPrivacy] rather than writing [IncognitoState] directly: the
+         * host's flag is now one of three inputs, and a direct write here would be undone by
+         * the next thing that recomputed the combination.
+         */
         fun onIncognitoChanged(enabled: Boolean) {
-            incognitoState.set(enabled)
+            hostNoLearning = enabled
+            publishPrivacy()
         }
 
         /**
@@ -208,14 +343,17 @@ class TypingViewModel
          * Distinct from [onWordFinished], which only ends a word. Enter both commits and
          * starts fresh, and without this the shift state carried over from the message just
          * sent into the one being started.
+         *
+         * Returns the new generation token, so a correction dispatched afterwards can check it
+         * is still the current one before rewriting anything.
          */
-        fun onSentenceStarted() {
+        fun onSentenceStarted(): Int {
             currentWord = ""
             _suggestions.value = emptyList()
             _undoState.value = null
-            generation++
             atSentenceStart = true
             publishAutoCapitalize()
+            return ++generation
         }
 
         /** Learns a word the user kept as-is (no correction applied). */
@@ -227,6 +365,10 @@ class TypingViewModel
 
         /** Autocorrect lookup against an explicit word, so it cannot race [currentWord]. */
         suspend fun getAutoCorrectionFor(word: String): String? {
+            // Never on a secret, for two separate reasons: the lookup itself puts the password
+            // through the dictionary, and a correction that fired would silently rewrite what
+            // the user typed into a field where they cannot see it to check.
+            if (_fieldKind.value.isSensitive) return null
             if (word.isBlank() || !keyboardPreferences.autoCorrectEnabled.value) return null
             return predictionEngine.getAutoCorrection(word)
         }
@@ -251,8 +393,24 @@ class TypingViewModel
             _undoState.value = null
         }
 
-        fun onWordFinished() {
-            val word = currentWord
+        /**
+         * Ends the current word and learns [word].
+         *
+         * [word] is a parameter rather than [currentWord] on purpose, and this is the root fix
+         * for a defect found on device: typing `qwxzj` into a `TYPE_CLASS_PHONE` field left
+         * the field **empty** -- the editor's own input filter dropped every letter -- and put
+         * `qwxzj` in the personal dictionary. Nothing had gone wrong with the keyboard; it had
+         * simply learned its own running buffer rather than the text that exists.
+         *
+         * That buffer is a local mirror, built by appending on each key press because reading
+         * the editor per keystroke would be a blocking IPC. Destructive edits were already
+         * taught not to trust it -- the suggestion strip sizes its replacement with
+         * `currentWordSpan(controller)`, which re-reads the field. Learning was the other half
+         * of the same gap. Every caller now derives the word from the editor with
+         * `currentWordText(controller)`, so the mirror is no longer an input to learning at
+         * all: a field that rejects a character cannot teach it.
+         */
+        fun onWordFinished(word: String) {
             currentWord = ""
             _suggestions.value = emptyList()
             if (word.isNotBlank()) {
@@ -308,10 +466,22 @@ class TypingViewModel
             learn(suggestion)
         }
 
+        /**
+         * The keyboard's running copy of the word being typed. **Never use this for learning
+         * or for sizing a destructive edit** -- see [onWordFinished]. It exists so suggestions
+         * can be looked up without an IPC per keystroke, and it is correct only while this
+         * keyboard is the sole editor.
+         */
         fun getCurrentWord(): String = currentWord
 
         private fun updateSuggestions() {
-            if (currentWord.isBlank()) {
+            // A secret is never looked up and never displayed. Note this is a *read* gate, so
+            // it cannot be folded into incognito: incognito deliberately suspends writes only,
+            // leaving suggestions working, which is right for a field the host merely asked
+            // not to learn from and wrong for a password. Drawing dictionary matches for a
+            // password prefix in a strip above the keyboard is a shoulder-surfing hazard on
+            // its own, before any of it reaches storage.
+            if (currentWord.isBlank() || _fieldKind.value.isSensitive) {
                 _suggestions.value = emptyList()
                 return
             }
@@ -356,6 +526,46 @@ internal fun startsNewSentence(textBeforeCursor: String): Boolean {
 
 /** Marks that close a sentence, so the next letter is capitalized. */
 internal const val SENTENCE_ENDINGS = ".!?"
+
+/**
+ * How close together two taps must be to count as one gesture.
+ *
+ * `ViewConfiguration.getDoubleTapTimeout()` is 300ms on every Android build and is what the
+ * platform itself uses, so this matches every other double tap on the device. Named once here
+ * because the caps-lock retap will want the same number, and two constants that mean "a double
+ * tap" is exactly how they drift apart.
+ */
+internal const val DOUBLE_TAP_WINDOW_MS = 300L
+
+/**
+ * What a second space should replace, or null when it should just be a space.
+ *
+ * Pure, and that is the whole defence against the plausible-looking version of this feature.
+ * The naive implementation watches for two taps inside a time window and inserts a period
+ * without ever reading the text. It demonstrates perfectly and then produces ".. " after a
+ * sentence that already ended, ". " at the start of an empty field, and a stray period after
+ * a line break -- none of which show up until someone is actually writing something.
+ *
+ * [textBeforeCursor] is the text *including* the first space, as it stands when the second
+ * space arrives. Returns the replacement for that single trailing space.
+ */
+internal fun doubleSpaceReplacement(textBeforeCursor: String): String? {
+    // The first space must actually be there. If it is not, the two taps were not consecutive
+    // in the text even if they were consecutive in time -- something else was committed in
+    // between, and that something is not ours to overwrite.
+    if (!textBeforeCursor.endsWith(" ")) return null
+
+    val beforeSpace = textBeforeCursor.dropLast(1)
+    if (beforeSpace.isEmpty()) return null
+
+    val previous = beforeSpace.last()
+    // Only ever after something a sentence can end on. A letter or a digit qualifies; a
+    // closing bracket or quote does too, since "(like this) " is a real sentence ending.
+    val endsAClause = previous.isLetterOrDigit() || previous in ")]}\"'"
+    if (!endsAClause) return null
+
+    return ". "
+}
 
 /**
  * How much text is read back when re-deriving the word under the caret.

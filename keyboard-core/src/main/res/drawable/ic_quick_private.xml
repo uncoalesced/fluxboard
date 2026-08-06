@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- The manual privacy switch. A closed padlock in both states: the toggle shows on/off
+     through its own filled background, not by swapping in an open shackle. An open padlock
+     next to a lit indicator elsewhere on the strip is two symbols disagreeing about the
+     same fact. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,3 C9.51,3 7.5,5.01 7.5,7.5 L7.5,10 L9.5,10 L9.5,7.5 C9.5,6.12 10.62,5 12,5 C13.38,5 14.5,6.12 14.5,7.5 L14.5,10 L16.5,10 L16.5,7.5 C16.5,5.01 14.49,3 12,3 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M6,10.5 L18,10.5 C18.55,10.5 19,10.95 19,11.5 L19,20 C19,20.55 18.55,21 18,21 L6,21 C5.45,21 5,20.55 5,20 L5,11.5 C5,10.95 5.45,10.5 6,10.5 Z" />
+</vector>

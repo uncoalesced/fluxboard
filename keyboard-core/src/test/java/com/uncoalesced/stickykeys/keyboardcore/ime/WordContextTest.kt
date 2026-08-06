@@ -155,6 +155,9 @@ class WordContextTest {
         val prefs = mockk<KeyboardPreferences>(relaxed = true)
         io.mockk.every { prefs.autoCapitalizeEnabled } returns MutableStateFlow(true)
         io.mockk.every { prefs.autoCorrectEnabled } returns MutableStateFlow(true)
+        // A real flow, not the relaxed mock: TypingViewModel collects this one, and
+        // StateFlow.collect returns Nothing, which a relaxed mock cannot satisfy.
+        io.mockk.every { prefs.privateModeEnabled } returns MutableStateFlow(false)
         viewModel =
             TypingViewModel(
                 engine,
@@ -251,7 +254,7 @@ class WordContextTest {
             // The guard against "fixed" by making onWordFinished stop learning too.
             viewModel.onKeyPressed("h")
             viewModel.onKeyPressed("i")
-            viewModel.onWordFinished()
+            viewModel.onWordFinished("hi")
             advanceUntilIdle()
 
             coVerify(exactly = 1) { engine.learnWord("hi") }

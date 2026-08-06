@@ -71,10 +71,13 @@ internal fun EmojiPickerView(
     val groups by viewModel.emojiGroups.collectAsState()
     val stickers by viewModel.stickers.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
+    val recent by viewModel.recentEmoji.collectAsState()
 
-    // Stickers is index 0 and is the only non-Unicode tab; the rest are the emoji groups in
-    // the order emoji-test.txt lists them, which is the order every other picker uses.
-    val tabLabels = remember(groups) { listOf(STICKERS_TAB) + groups.map { it.name } }
+    // Recent leads, because that is where the emoji key lands and it is what a user reaching
+    // for the picker mid-message almost always wants. Stickers follows, then the emoji groups
+    // in the order emoji-test.txt lists them, which is the order every other picker uses.
+    val tabLabels =
+        remember(groups) { listOf(RECENT_TAB_LABEL, STICKERS_TAB) + groups.map { it.name } }
 
     Column(
         modifier =
@@ -180,7 +183,35 @@ internal fun EmojiPickerView(
             }
         }
 
-        if (selectedTab == 0) {
+        if (selectedTab == EmojiPickerViewModel.RECENT_TAB) {
+            if (recent.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "Emoji you use will show up here",
+                        color = StickyKeysTheme.colors.onSurfaceVariant,
+                        style = StickyKeysTheme.typography.labelLarge,
+                    )
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(EMOJI_CELL),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(items = recent, key = { it }) { glyph ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .aspectRatio(1f)
+                                    .clickable(role = Role.Button) { onEmojiClick(glyph) }
+                                    .semantics { contentDescription = "Recently used $glyph" },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(text = glyph, fontSize = 24.sp, textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+            }
+        } else if (selectedTab == EmojiPickerViewModel.STICKERS_TAB_INDEX) {
             StickerTabGrid(
                 stickers = stickers,
                 fileManager = fileManager,
@@ -188,7 +219,7 @@ internal fun EmojiPickerView(
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            val group = groups.getOrNull(selectedTab - 1)
+            val group = groups.getOrNull(selectedTab - EmojiPickerViewModel.FIRST_EMOJI_TAB)
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(EMOJI_CELL),
                 modifier = Modifier.fillMaxSize(),
@@ -218,6 +249,9 @@ internal fun EmojiPickerView(
 }
 
 private const val STICKERS_TAB = "Stickers"
+
+/** The first tab, and where the emoji key lands. */
+private const val RECENT_TAB_LABEL = "Recent"
 
 /** The universal label for "back to the letters", on every keyboard that has this panel. */
 private const val ABC_TAB = "ABC"

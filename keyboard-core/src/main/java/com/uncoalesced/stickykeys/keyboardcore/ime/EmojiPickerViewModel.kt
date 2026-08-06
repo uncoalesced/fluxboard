@@ -3,6 +3,7 @@ package com.uncoalesced.stickykeys.keyboardcore.ime
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.emoji.EmojiGroup
 import com.uncoalesced.stickykeys.keyboardcore.emoji.EmojiRepository
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
@@ -31,11 +32,16 @@ class EmojiPickerViewModel
     constructor(
         private val stickerRepository: StickerRepository,
         private val emojiRepository: EmojiRepository,
+        private val keyboardPreferences: KeyboardPreferences,
     ) : ViewModel() {
+        private val _recentEmoji = MutableStateFlow(keyboardPreferences.recentEmoji())
+
+        /** What the user has actually sent, most recent first. Drives the first tab. */
+        val recentEmoji: StateFlow<List<String>> = _recentEmoji.asStateFlow()
         private val _emojiGroups = MutableStateFlow<List<EmojiGroup>>(emptyList())
         val emojiGroups: StateFlow<List<EmojiGroup>> = _emojiGroups.asStateFlow()
 
-        private val _selectedTab = MutableStateFlow(0)
+        private val _selectedTab = MutableStateFlow(RECENT_TAB)
         val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
 
         /**
@@ -69,5 +75,28 @@ class EmojiPickerViewModel
 
         fun selectTab(index: Int) {
             _selectedTab.value = index
+        }
+
+        /**
+         * Opens the picker where the emoji key should land it.
+         *
+         * Recent, unless there is nothing recent yet -- landing a first-time user on an empty
+         * grid would make the feature look broken on the one occasion it gets the most
+         * scrutiny. In that case the first real emoji group is the honest default.
+         */
+        fun openAtDefaultTab() {
+            _selectedTab.value = if (_recentEmoji.value.isEmpty()) FIRST_EMOJI_TAB else RECENT_TAB
+        }
+
+        fun onEmojiUsed(glyph: String) {
+            keyboardPreferences.recordEmojiUse(glyph)
+            _recentEmoji.value = keyboardPreferences.recentEmoji()
+        }
+
+        companion object {
+            /** Tab 0 is Recent, tab 1 is Stickers, and the Unicode groups follow. */
+            const val RECENT_TAB = 0
+            const val STICKERS_TAB_INDEX = 1
+            const val FIRST_EMOJI_TAB = 2
         }
     }

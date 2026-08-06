@@ -51,7 +51,27 @@ internal data class ImePanelMetrics(
     val bottomPadding: Dp = KeyboardPreferences.DEFAULT_BOTTOM_PADDING_DP.dp,
     /** Whether the digit row is drawn, and therefore needs its own height. */
     val showNumberRow: Boolean = false,
+    /**
+     * How large a key is drawn inside the cell the layout gives it. 1.0 is the shipped size.
+     *
+     * Separate from [heightScale], which changes how much screen the panel takes. This changes
+     * the split between key and gap inside whatever space the panel already has, so the two
+     * are genuinely independent controls rather than two names for the same slider.
+     */
+    val keyScale: Float = 1f,
 )
+
+/**
+ * The gap left around each key, given the user's key-size preference.
+ *
+ * Inverse by construction: a larger key means a smaller gap, because the cell the key sits in
+ * is fixed by the row layout. Pure so the inversion is assertable -- getting the sign wrong
+ * here produces a control that visibly does something and does the opposite of its label.
+ */
+internal fun keyPaddingFor(
+    keyScale: Float,
+    basePadding: Dp,
+): Dp = (basePadding * (2f - keyScale.coerceIn(0.5f, 1.5f))).coerceAtLeast(0.dp)
 
 internal val LocalImePanelMetrics = compositionLocalOf { ImePanelMetrics() }
 
