@@ -148,17 +148,33 @@ not separate Gradle modules themselves.
 
 ## Project Status
 
-This project is planned in 38 dependency-ordered phases across 7 arcs
-plus post-launch additions. For detailed, continuously-updated status —
-what's done, what's fixed, what's still open, and who's working on what —
-see [`docs/roadmap.md`](docs/roadmap.md) rather than this file; a README
-is the wrong place for an audit log, so that detail lives there instead
-of here.
+**Current version: `v0.1.4-ALPHA`** (versionCode 4). Alpha — installable
+and usable, not yet ready for outside testers.
 
-Short version: the build compiles and the full unit suite passes.
-Several real pre-release issues are being worked through before this is
-ready for outside testers — tracked in the roadmap doc, not duplicated
-here.
+Two releases are tagged, `v0.1.0-alpha` and `v0.1.1-ALPHA`. `v0.1.2-ALPHA`
+was never tagged, and `v0.1.5` is reserved for the first beta rather than
+being the next alpha.
+
+For continuously-updated status — what's done, what's fixed, what's still
+open — see [`docs/roadmap.md`](docs/roadmap.md) rather than this file; a
+README is the wrong place for an audit log. Every entry there carries a
+status, and **nothing is ever marked plainly "fixed"**: `FIXED (unverified)`
+is the strongest claim anything gets before it has run on a phone.
+
+Recent work of note:
+
+- **Password and PIN fields are recognised.** Until v0.1.4 nothing read the
+  password input-type variations, so an alphanumeric password typed into
+  FluxBoard ran a dictionary lookup on every keystroke and could be written
+  to the on-disk personal dictionary. Sensitive fields now suppress
+  learning, suggestions and autocorrect, and a numeric PIN gets a
+  digits-only pad.
+- A recovery path for a keyboard that renders itself unusable, since that
+  state survives force-stop, cache clearing and reboot.
+- Symbol pages moved into the layout model, so they can finally carry
+  hints, weights and long-press alternates.
+
+The build compiles clean and the full unit suite passes on every module.
 
 ## Repository Structure
 
@@ -174,7 +190,9 @@ here.
 ├── docs/
 │   ├── repo-reference.md       # Every third-party repo/library evaluated, by subsystem
 │   ├── agent-prompts.md        # Exact prompts + explanations for running each phase
-│   └── roadmap.md              # Detailed phase-by-phase status and known issues
+│   ├── roadmap.md              # The bug tracker: every open issue, with a status
+│   ├── planning/               # Per-release plans and investigations
+│   └── testing/                # Manual device checklists and their findings
 ├── app/                         # Application module
 ├── sticker-core/                # Sticker creation, extraction, GIF/WebP, organization
 ├── keyboard-core/                # IME, theming, predictive text, clipboard, haptics

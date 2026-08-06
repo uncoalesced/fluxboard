@@ -162,7 +162,7 @@ consult the field kind rather than a fix bolted on beside it.
 3. **Does the quick-access toolbar appear on the numeric pad?** The reference has
    a toolbar. FluxBoard's is a disclosure row that grows the window upward.
    Recommendation: keep it, unchanged.
-4. **Is this v0.1.5 or later?** It is comparable in size to the symbol-page data
+4. **Is this v0.1.4 or later?** It is comparable in size to the symbol-page data
    model change, not a point-release afterthought.
 
 ## 6. What cannot be claimed without a device
