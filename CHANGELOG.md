@@ -32,10 +32,9 @@ the v0.1.1 tag".
 
 ---
 
-## [Unreleased] - v0.1.4-ALPHA
+## [v0.1.4-ALPHA] - 2026-08-06
 
-Work in progress. Entries are added as they land, not when they are planned.
-Planning for this release is in
+Tagged `v0.1.4-ALPHA`, versionCode 4. Planning for this release is in
 [`docs/planning/v0.1.4-alpha-plan.md`](docs/planning/v0.1.4-alpha-plan.md).
 
 **Device status:** everything below marked with a dagger was exercised on a
