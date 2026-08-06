@@ -1,6 +1,8 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -12,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -30,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -100,6 +105,10 @@ fun AppSettingsScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        // Scrollable: the About section pushed the content past a phone screen,
+                        // and a non-scrolling Column clips rather than scrolls -- the same
+                        // failure the theme editor had.
+                        .verticalScroll(rememberScrollState())
                         .padding(16.dp),
             ) {
                 // Brand header. Reuses the adaptive-icon foreground rather than shipping a
@@ -234,7 +243,83 @@ fun AppSettingsScreen(
                     text = "This format is used when converting videos to stickers.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // About
+                //
+                // Two rows, two destinations: the repository, and the author's profile. The
+                // uncoalesced site is not live, and shipping a link that 404s in an alpha
+                // testers are actively poking at is worse than pointing somewhere real, so
+                // SITE_URL holds the profile until there is a site. One line to change then.
+                Text(
+                    stringResource(R.string.text_about),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LinkRow(
+                    label = stringResource(R.string.text_source_code),
+                    url = REPO_URL,
+                )
+                LinkRow(
+                    label = stringResource(R.string.text_uncoalesced),
+                    url = SITE_URL,
+                )
+                Text(
+                    text = "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
+
+/**
+ * One tappable link row.
+ *
+ * Launched with a plain try/catch rather than a `resolveActivity` check first: package
+ * visibility filtering on Android 11+ makes that return null even when the launch would
+ * succeed, so checking is less reliable than trying.
+ */
+@Composable
+private fun LinkRow(
+    label: String,
+    url: String,
+) {
+    val context = LocalContext.current
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                }.padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                url,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The repository. Real, public, and where the source actually lives. */
+private const val REPO_URL = "https://github.com/uncoalesced/fluxboard"
+
+/**
+ * uncoalesced.
+ *
+ * The author's profile rather than this repository -- the row next to it already points at the
+ * repository, and two rows leading to the same page is a link that looks like information and
+ * is not. Points here until the site is live; one line to change when it is.
+ */
+private const val SITE_URL = "https://github.com/uncoalesced"
