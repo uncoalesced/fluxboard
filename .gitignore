@@ -47,19 +47,15 @@ Thumbs.db
 
 # Agents & Repository Documentation
 #
-# CLAUDE.md is deliberately NOT ignored. It is the accumulated record of what has
-# already gone wrong in this repository -- the Gradle daemon traps, the ViewTree owners
-# on the decor view, the DEX scan that proves nothing, the two adb commands that unbind
-# the IME -- and every one of those entries cost a session to learn. Untracked, that
-# knowledge lived on one machine and a fresh clone rediscovered it.
-#
-# Note it imports AGENTS.md and .agent/rules/, which are still ignored below, so those
-# imports do not resolve in a fresh clone. Tracking them too is the obvious follow-up
-# and is deliberately left as a decision rather than taken here.
+# These stay untracked deliberately. This repository is public, and the agent files
+# accumulate working notes that are not written for an audience -- local paths, device
+# details, and running commentary on the project. CLAUDE.md was briefly tracked and was
+# removed from history again; do not re-add it without reading it end to end first.
 .agent/
 .agents/
 .agents/skills/
 AGENTS.md
+CLAUDE.md
 ARCHITECTURE.md
 AUTHORS.md
 
