@@ -19,8 +19,12 @@
                 android:resource="@xml/method" />
         </service>
 
+        <!-- Not the stock FileProvider: stickers are stored as ".sticker", an extension
+             MimeTypeMap cannot resolve, so getType() answered null for every sticker and
+             any app that checks the URI's own type before accepting it (WhatsApp, Discord)
+             refused the content. The subclass reads the type from the file header. -->
         <provider
-            android:name="androidx.core.content.FileProvider"
+            android:name="com.uncoalesced.stickykeys.stickercore.data.file.StickerFileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">

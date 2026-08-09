@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!--
+  Android 11 and below. `data_extraction_rules.xml` carries the same intent for Android 12+;
+  the platform reads one or the other by version, never both, so any rule added there has to be
+  mirrored here or it applies to only some of the install base. minSdk is 26, so this covers
+  real devices rather than being a formality.
+
+  READ THIS BEFORE ADDING AN `exclude` HERE. This format does not work like the Android 12+
+  one. As soon as a single `include` is present, the system backs up *only* what is included
+  and everything else is excluded already. An `exclude` for a path that was never included is
+  not defence-in-depth, it is a no-op, and `lint` fails the build on it (FullBackupContent)
+  precisely because writing one usually means the author believed the opposite.
+
+  So the protection here is the shape of the list itself: `keyboard_database` - the learned
+  personal dictionary and the clipboard history - is absent, and absence is what keeps it off
+  Google's servers. Same for the sticker index, the sticker bytes and the background images,
+  which are omitted to stay far below the 25MB cloud quota. Passing that quota does not
+  degrade gracefully: the OS stops backing the app up at all and keeps serving a stale
+  snapshot without telling the user.
+
+  One thing this format cannot express: there is no `disableIfNoEncryptionCapabilities` here,
+  it is Android 12+ only. On a pre-12 device with no lock screen the backup is not
+  end-to-end encrypted and no manifest attribute refuses it. Keeping the sensitive data out of
+  the list is the only defence available on those versions, which makes this list matter more
+  there, not less.
+-->
+<full-backup-content>
+    <!-- Settings, themes and layouts. Small, and the things a user is annoyed to lose. -->
+    <include domain="sharedpref" path="keyboard_preferences.xml" />
+    <include domain="sharedpref" path="app_preferences.xml" />
+    <include domain="file" path="themes/" />
+    <include domain="file" path="layouts/" />
+</full-backup-content>

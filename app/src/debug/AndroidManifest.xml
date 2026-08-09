@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!--
+  Debug-only additions. Merged into the debug variant and into nothing else, which is the
+  point: a test screen gated on a BuildConfig flag would still exist in the release APK,
+  because a runtime boolean cannot make a class stop existing and R8 keeps whatever is still
+  referenced. This file is the same source-set mechanism UsageRecorder uses.
+
+  The harness is exported so `adb shell am start` can reach it. That is safe here and would
+  not be in a release build, which is the other half of why it lives in this source set.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="com.uncoalesced.stickykeys.debugharness.FieldTypeHarnessActivity"
+            android:exported="true"
+            android:label="FluxBoard field types"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>

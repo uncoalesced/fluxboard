@@ -189,15 +189,22 @@ fun ThemeEditorScreen(
             )
         },
     ) { padding ->
-        Column(
+        // One scrolling list for the whole editor, rather than a scrollable theme picker with
+        // fixed panels stacked under it.
+        //
+        // The panels used to sit *below* a `weight(1f)` LazyColumn inside a Column that did
+        // not scroll, so they were given whatever height was left and simply clipped when they
+        // needed more. Expanding the key-styling section is exactly that case: it adds swatch
+        // rows and sliders until the haze controls, the live-preview button and the keyboard
+        // preview are all off the bottom of the screen with no way to reach them. Nothing
+        // about the controls was broken -- they could not be scrolled to.
+        LazyColumn(
             modifier =
                 Modifier
                     .padding(padding)
                     .fillMaxSize(),
         ) {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-            ) {
+            run {
                 items(themes) { theme ->
                     val isSelected = theme.id == activeTheme?.id
                     // The picker used to be a bare list of theme names, so choosing one meant
@@ -238,96 +245,102 @@ fun ThemeEditorScreen(
             }
 
             // Image Customization Controls
-            Card(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "Background Image Customization",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { imagePickerLauncher.launch("image/*") }) {
-                            Text(stringResource(R.string.text_set_background_image))
-                        }
-                        if (activeTheme?.backgroundImagePath != null) {
-                            OutlinedButton(
-                                onClick = { viewModel.removeActiveThemeBackgroundImage() },
-                            ) {
-                                Text(stringResource(R.string.text_remove_image))
+            item {
+                Card(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Background Image Customization",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { imagePickerLauncher.launch("image/*") }) {
+                                Text(stringResource(R.string.text_set_background_image))
+                            }
+                            if (activeTheme?.backgroundImagePath != null) {
+                                OutlinedButton(
+                                    onClick = { viewModel.removeActiveThemeBackgroundImage() },
+                                ) {
+                                    Text(stringResource(R.string.text_remove_image))
+                                }
                             }
                         }
-                    }
-                    if (activeTheme?.backgroundImagePath != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Overlay Legibility Opacity: ${"%.2f".format(
-                                activeTheme?.imageOverlayOpacity ?: 0.4f,
-                            )}",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Slider(
-                            value = activeTheme?.imageOverlayOpacity ?: 0.4f,
-                            onValueChange = { viewModel.updateActiveThemeOverlayOpacity(it) },
-                            valueRange = 0.0f..0.9f,
-                        )
-                    }
+                        if (activeTheme?.backgroundImagePath != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Overlay Legibility Opacity: ${"%.2f".format(
+                                    activeTheme?.imageOverlayOpacity ?: 0.4f,
+                                )}",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Slider(
+                                value = activeTheme?.imageOverlayOpacity ?: 0.4f,
+                                onValueChange = { viewModel.updateActiveThemeOverlayOpacity(it) },
+                                valueRange = 0.0f..0.9f,
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    KeyStyleControls(
-                        style = activeTheme?.keyStyle ?: KeyStyle.Default,
-                        onChange = { transform -> viewModel.updateKeyStyle(transform) },
-                        hasBackgroundImage = activeTheme?.backgroundImagePath != null,
-                    )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        KeyStyleControls(
+                            style = activeTheme?.keyStyle ?: KeyStyle.Default,
+                            onChange = { transform -> viewModel.updateKeyStyle(transform) },
+                            hasBackgroundImage = activeTheme?.backgroundImagePath != null,
+                        )
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    // A static swatch cannot tell you whether a keyboard is comfortable to
-                    // type on -- the haze, the key size and the haptics only read under a
-                    // thumb. This opens the real keyboard with somewhere to type.
-                    Button(
-                        onClick = onOpenPreview,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Open live preview")
+                        Spacer(modifier = Modifier.height(12.dp))
+                        // A static swatch cannot tell you whether a keyboard is comfortable to
+                        // type on -- the haze, the key size and the haptics only read under a
+                        // thumb. This opens the real keyboard with somewhere to type.
+                        Button(
+                            onClick = onOpenPreview,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Open live preview")
+                        }
                     }
                 }
             }
 
-            Button(
-                onClick = {
-                    val baseColors =
-                        activeTheme?.colors
-                            ?: com.uncoalesced.stickykeys.keyboardcore.theme
-                                .lightStickyKeysColors()
-                    val newTheme =
-                        KeyboardTheme(
-                            id = "custom_" + UUID.randomUUID().toString(),
-                            name = "Custom Theme " + (themes.size),
-                            isLight = activeTheme?.isLight ?: true,
-                            colors =
-                                baseColors.copy(
-                                    primary = Color(0xFFFF5722),
-                                    primaryVariant = Color(0xFFE64A19),
-                                ),
-                            typeScale = TypeScale.MEDIUM,
-                        )
-                    viewModel.saveTheme(newTheme)
-                },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Text(stringResource(R.string.text_create_orange_accent_theme))
+            item {
+                Button(
+                    onClick = {
+                        val baseColors =
+                            activeTheme?.colors
+                                ?: com.uncoalesced.stickykeys.keyboardcore.theme
+                                    .lightStickyKeysColors()
+                        val newTheme =
+                            KeyboardTheme(
+                                id = "custom_" + UUID.randomUUID().toString(),
+                                name = "Custom Theme " + (themes.size),
+                                isLight = activeTheme?.isLight ?: true,
+                                colors =
+                                    baseColors.copy(
+                                        primary = Color(0xFFFF5722),
+                                        primaryVariant = Color(0xFFE64A19),
+                                    ),
+                                typeScale = TypeScale.MEDIUM,
+                            )
+                        viewModel.saveTheme(newTheme)
+                    },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Text(stringResource(R.string.text_create_orange_accent_theme))
+                }
             }
 
             // Live Preview
-            activeTheme?.let { theme ->
-                KeyboardPreview(theme = theme)
+            item {
+                activeTheme?.let { theme ->
+                    KeyboardPreview(theme = theme)
+                }
             }
         }
     }
