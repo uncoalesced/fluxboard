@@ -1,0 +1,46 @@
+# Engineered by uncoalesced
+#
+# Opens pull requests for dependency updates so an advisory arrives as a diff rather
+# than as something nobody noticed.
+#
+# Grouped and weekly on purpose. This project's rules require a human to vet every
+# dependency (`.agent/rules/privacy-and-scope.md`: no analytics or phone-home SDK, a
+# compatible licence, a known size impact), so a stream of one-line PRs nobody reads
+# would be worse than none -- it would train the reviewer to merge them unread, which
+# is precisely how a telemetry SDK would arrive.
+#
+# `dependency-review.yml` inspects what these PRs propose; the CI telemetry gate reads
+# the artifact they produce. An update that drags Play Services back in fails there.
+
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the routine patch traffic; anything major still arrives alone,
+      # where it gets read.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "build(deps)"
+
+  # Actions are dependencies too, and a compromised action runs with whatever the
+  # workflow's token can do. That is why every workflow here declares its permissions.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "ci(deps)"

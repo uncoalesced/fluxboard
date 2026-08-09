@@ -1,3 +1,12 @@
+# Engineered by uncoalesced
+#
+# `deployment` is a mirror of `main`, not a branch anyone works on. This keeps it
+# that way after every push to main.
+#
+# The force push is deliberate and is the whole point: deployment holds no commits of
+# its own, so there is nothing on it to lose. `deployment-integrity.yml` is the other
+# half -- it notices if that ever stops being true.
+
 name: Sync Main to Deployment
 
 on:
@@ -5,9 +14,22 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
+concurrency:
+  # Never two syncs at once. Two force pushes racing could leave deployment at the
+  # older of two mains, which is the one failure this job could plausibly cause.
+  group: sync-deployment
+  cancel-in-progress: false
+
 jobs:
   sync-deployment:
     runs-on: ubuntu-latest
+    permissions:
+      # The only job in this repository that writes, and it writes one ref.
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -15,5 +37,18 @@ jobs:
           fetch-depth: 0
 
       - name: Push main to deployment branch
+        run: git push origin origin/main:refs/heads/deployment --force
+
+      - name: Verify deployment now matches main
         run: |
-          git push origin origin/main:refs/heads/deployment --force
+          set -euo pipefail
+          git fetch origin main deployment
+          main_sha=$(git rev-parse origin/main)
+          dep_sha=$(git rev-parse origin/deployment)
+          echo "main       = $main_sha"
+          echo "deployment = $dep_sha"
+          if [ "$main_sha" != "$dep_sha" ]; then
+            echo "Sync reported success but deployment does not match main."
+            exit 1
+          fi
+          echo "deployment is an exact mirror of main."
