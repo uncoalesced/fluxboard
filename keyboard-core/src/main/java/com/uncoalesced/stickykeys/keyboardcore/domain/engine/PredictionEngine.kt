@@ -42,6 +42,26 @@ private const val COST_SUBSTITUTE = 4
 /** Two ordinary edits. Beyond this the candidate is not a plausible reading of the input. */
 private const val MAX_EDIT_COST = COST_SUBSTITUTE * 2
 
+/** The trie root sits immediately after the 4-byte "FLCT" magic. */
+private const val TRIE_ROOT_OFFSET = 4
+
+/**
+ * How many glide readings to keep.
+ *
+ * More than the three the suggestion strip shows, because the strip is where a wrong first
+ * guess gets corrected without retyping, and a glide is wrong more often than a tap.
+ */
+private const val MAX_GLIDE_CANDIDATES = 5
+
+/**
+ * Longest word a glide will produce.
+ *
+ * A guard on the walk rather than a real limit on English. Without it a path that loops back
+ * over itself lets a branch keep finding its next letter behind it, and the recursion follows
+ * arbitrarily long words down a trie that has no reason to stop.
+ */
+private const val MAX_GLIDE_WORD = 24
+
 /** A correction has to be at least this credible after its edit penalty to be applied. */
 private const val MIN_CORRECTION_SCORE = 20f
 
@@ -209,6 +229,123 @@ class PredictionEngine
                     .take(MAX_SUGGESTIONS)
                     .map { it.key }
             }
+
+        /**
+         * Decodes a finished glide into ranked word candidates.
+         *
+         * Walks the same trie the spelling search uses, but with a different question. Spelling
+         * asks how far a typed string is from each word; a glide asks which words the drawn
+         * path *could be*, and there are always many -- the path for "hello" crosses enough of
+         * the board that "ho", "hell" and "hilo" are all readings of it. Ranking is therefore
+         * the whole job, not a tie-break.
+         *
+         * The walk carries the position reached along the path, so a branch dies the moment its
+         * next letter cannot be found ahead of where the previous one matched. That is what
+         * keeps this from enumerating the dictionary: the first letter alone restricts the root
+         * to the keys under the finger at touch-down, and each subsequent letter prunes again.
+         *
+         * Frequency breaks ties and nothing more. It has to be secondary, or every glide
+         * returns the commonest short word whose letters happen to lie along the path.
+         */
+        suspend fun decodeGlide(stroke: GlideStroke): List<String> =
+            withContext(Dispatchers.IO) {
+                if (!stroke.isUsable) return@withContext emptyList()
+                val buf = reader() ?: return@withContext emptyList()
+                val results = mutableListOf<Pair<String, Int>>()
+                try {
+                    // 4 bytes in: the header is the ASCII magic "FLCT", and the root node follows it.
+                    glideWalk(buf, TRIE_ROOT_OFFSET, "", stroke, 0, 0, results)
+                } catch (e: Exception) {
+                    // A malformed offset must not escape: this runs in the IME process, where
+                    // an unhandled throw takes the keyboard down mid-gesture.
+                    return@withContext emptyList()
+                }
+                results
+                    .asSequence()
+                    .sortedWith(
+                        compareBy<Pair<String, Int>> { it.second }
+                            .thenByDescending { frequencyOf(it.first) ?: 0 },
+                    ).map { it.first }
+                    .distinct()
+                    .take(MAX_GLIDE_CANDIDATES)
+                    .toList()
+            }
+
+        private fun glideWalk(
+            buf: ByteBuffer,
+            offset: Int,
+            currentWord: String,
+            stroke: GlideStroke,
+            pathIndex: Int,
+            cost: Int,
+            results: MutableList<Pair<String, Int>>,
+        ) {
+            if (currentWord.length > MAX_GLIDE_WORD) return
+            buf.position(offset)
+            buf.get() // frequency, read through the ranking pass instead
+            val isTerminal = buf.get().toInt() and 0xFF
+            val childCount = buf.get().toInt() and 0xFF
+
+            val children = ArrayList<Pair<Char, Int>>(childCount)
+            for (i in 0 until childCount) {
+                val c1 = buf.get().toInt() and 0xFF
+                val c2 = buf.get().toInt() and 0xFF
+                val childChar = ((c1 shl 8) or c2).toChar()
+                children.add(Pair(childChar, buf.getInt()))
+            }
+
+            // A complete word only counts if the finger actually lifted here. scoreGlideCandidate
+            // re-scores from scratch rather than trusting the running cost, so the anchors and
+            // the unexplained-corner penalty are applied by one function with one definition.
+            if (isTerminal == 1) {
+                scoreGlideCandidate(currentWord, stroke)?.let { results.add(currentWord to it) }
+            }
+
+            for ((childChar, childOffset) in children) {
+                // A doubled letter does not advance along the path: a finger cannot visit the
+                // same key twice in succession, so the second 'l' of "hello" has no position
+                // of its own to occupy.
+                if (currentWord.isNotEmpty() && childChar == currentWord.last()) {
+                    glideWalk(
+                        buf,
+                        childOffset,
+                        currentWord + childChar,
+                        stroke,
+                        pathIndex,
+                        cost + 1,
+                        results,
+                    )
+                    continue
+                }
+                val next = nextGlideMatch(stroke, pathIndex, childChar) ?: continue
+                glideWalk(
+                    buf,
+                    childOffset,
+                    currentWord + childChar,
+                    stroke,
+                    next.first + 1,
+                    cost + next.second,
+                    results,
+                )
+            }
+        }
+
+        /** First position at or after [from] where [letter] is on the path, and what it cost. */
+        private fun nextGlideMatch(
+            stroke: GlideStroke,
+            from: Int,
+            letter: Char,
+        ): Pair<Int, Int>? {
+            var near: Pair<Int, Int>? = null
+            for (i in from until stroke.keys.size) {
+                val onPath = stroke.keys[i]
+                if (onPath == letter) return Pair(i, 0)
+                if (near == null && KeyProximity.areAdjacent(onPath, letter)) {
+                    near = Pair(i, 3)
+                }
+            }
+            return near
+        }
 
         private fun getBaseSuggestions(
             prefix: String,

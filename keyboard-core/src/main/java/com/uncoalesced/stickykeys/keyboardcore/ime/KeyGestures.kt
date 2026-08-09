@@ -188,6 +188,17 @@ internal val CURRENCY_ALTERNATES = listOf("€", "¥", "$", "¢", "₹")
 internal const val CURRENCY_DEFAULT_INDEX = 2
 
 /**
+ * Whether a key can take part in a glide.
+ *
+ * Only single letters. A path across shift, backspace or the symbol switcher says nothing
+ * about a word, and letting those start a glide would mean a mistimed drag off the shift key
+ * typed something. The space bar is excluded here too because it owns the scrub gesture, which
+ * is decided before this point.
+ */
+internal fun isGlideCandidate(keyOutput: String): Boolean =
+    keyOutput.length == 1 && keyOutput[0].isLetter()
+
+/**
  * Width of one alternates cell, shrunk when the strip would otherwise run off the screen.
  *
  * The strip used to assume every cell could have its full preferred width, and the only thing
@@ -412,8 +423,10 @@ internal fun Modifier.keyGestures(
     onCommit: (String) -> Unit,
     pressed: MutableState<Boolean>,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    glide: GlideTracker? = null,
+    onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
 ): Modifier =
-    this.pointerInput(keyOutput, longPress, alternates, cellWidthPx) {
+    this.pointerInput(keyOutput, longPress, alternates, cellWidthPx, glide) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             // Replacing `clickable` also removed the indication it supplied, so keys had no
@@ -433,6 +446,55 @@ internal fun Modifier.keyGestures(
                         onScrub = onScrub,
                         onTap = { onCommit(keyOutput) },
                     )
+                    return@awaitEachGesture
+                }
+
+                // A glide is the one gesture here that belongs to no single key, and this is
+                // where it is separated from a tap and from a hold.
+                //
+                // The key that received the down keeps ownership rather than handing over to a
+                // detector layered across the grid: two detectors both claiming the down event
+                // is the exact problem `keyGestures` replaced `clickable` to avoid. What the
+                // key cannot know is where the *other* keys are, and that is all the tracker
+                // supplies.
+                //
+                // The test is leaving this key's own bounds, not travelling some number of
+                // pixels. A threshold in pixels is a different gesture on a small key than on
+                // the space bar, whereas crossing into a neighbour means the same thing
+                // everywhere -- and it is precisely the moment a tap stops being a plausible
+                // reading of what the finger is doing.
+                if (glide != null && isGlideCandidate(keyOutput)) {
+                    val origin = keyBounds()
+                    var glided = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        val root = origin.topLeft + change.position
+                        if (!change.pressed) {
+                            if (glided) {
+                                glide.finish()?.let(onGlide)
+                                return@awaitEachGesture
+                            }
+                            break
+                        }
+                        if (!glided && !origin.contains(root)) {
+                            glided = true
+                            glide.begin(origin.center)
+                        }
+                        if (glided) {
+                            glide.move(root)
+                            // Claimed only once this is definitely a glide, so an ordinary tap
+                            // is left entirely alone.
+                            change.consume()
+                        }
+                    }
+                    if (glided) {
+                        glide.cancel()
+                        return@awaitEachGesture
+                    }
+                    // Never left the key: fall through and let it behave as a tap or a hold.
+                    if (!pressed.value) return@awaitEachGesture
+                    onCommit(keyOutput)
                     return@awaitEachGesture
                 }
 
