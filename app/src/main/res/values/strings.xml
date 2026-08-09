@@ -147,6 +147,8 @@
     <string name="text_key_size_summary">How large each key is drawn inside its space. Independent of the keyboard height.</string>
     <string name="text_double_space_period">Double-space for period</string>
     <string name="text_double_space_period_summary">Two quick taps of the space bar insert a full stop. Some apps do this themselves.</string>
+    <string name="text_beta_notice_title">This is a beta build</string>
+    <string name="text_beta_notice_body">Not a finished release. Expect rough edges, and please report anything that looks wrong, however small. Your typing stays on this device as always.</string>
     <string name="text_glide_typing">Glide typing</string>
     <string name="text_glide_typing_summary">Swipe across the letters to type a word instead of tapping each one. Tapping works exactly as before either way.</string>
     <string name="text_key_hints">Symbols on keys</string>

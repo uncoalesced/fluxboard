@@ -993,15 +993,18 @@ mode reaches backspace without leaving.
 
 ### 4B.3 Typing does not feel smooth
 
-**Status: OPEN, and deliberately not yet given a cause.** A feel complaint, not
-a defect report -- so the first job is to find out what "not smooth" is, not to
-start optimizing. Candidates already known to matter here, in the order worth
-checking: the release build has no baseline profile at all, so the first frames
-of every session are interpreted; a debug build additionally has no R8 and live
-literals on, so any measurement has to be taken against the release artifact;
-and the recomposition work in `KeyboardRecompositionTest` guards the key grid
-but nothing guards the suggestion strip, which rebuilds on every keystroke.
-Measure before changing anything.
+**Status: CLOSED, does not reproduce. Confirmed by Joel on device 2026-08-09.**
+
+Raised against an earlier build and no longer present. Deliberately closed on a
+report rather than on a fix, because nothing was changed to address it -- so if
+it returns it is a new observation and should be filed as one rather than
+reopened against work that never happened.
+
+Nothing here was measured, and that is the honest record: the item asked for
+measurement before optimizing, and the measurement that resolved it was somebody
+using the keyboard and finding it fine. The candidates listed originally (no
+baseline profile, debug-build overhead, the unguarded suggestion strip) remain
+true and remain unaddressed. They are not defects on their own.
 
 ### 4B.4 Space on a symbols page should return to letters
 

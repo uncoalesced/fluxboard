@@ -32,7 +32,13 @@ the v0.1.1 tag".
 
 ---
 
-## [Unreleased] - v0.1.5
+## [v0.1.5-BETA] - 2026-08-09
+
+**The first beta.** versionCode 6, versionName `v0.1.5-BETA`. The app says so
+itself: a BETA badge sits beside the name in Settings and a short notice under
+it explains what that means for a tester. Both are derived from the version
+string rather than a separate flag, so a stable build cannot announce itself as
+a beta and a beta cannot stay silent.
 
 Work in progress toward the first BETA. **Device-verified 2026-08-09** on a
 Redmi Note 11 (Android 15) with real touch events -- glides drawn as
@@ -135,6 +141,15 @@ letter. Each is described below.
   next word is almost never more symbols, so the board was left on the wrong
   plane and the user had to notice and press ABC. Enter already reset the page
   for the same reason.
+
+### Closed without a fix
+
+- **"Typing does not feel smooth"** does not reproduce and is closed on that
+  basis rather than on a change. Nothing was done to address it, so if it
+  returns it is a new observation rather than a regression of this one. The
+  things originally suspected -- no baseline profile, debug-build overhead, the
+  unguarded suggestion strip -- are all still true and still unaddressed; none
+  of them is a defect on its own.
 
 ---
 
