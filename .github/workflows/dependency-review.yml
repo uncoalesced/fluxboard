@@ -40,9 +40,15 @@ jobs:
           # Anything moderate or worse stops the merge. Low findings are reported
           # and do not block, so the gate keeps meaning something.
           fail-on-severity: moderate
-          # Copyleft that would force relicensing of a distributed Android binary,
-          # plus the licences that are simply incompatible with shipping this app.
-          # Apache-2.0, MIT, BSD and the GPL family used by the existing
-          # dependencies are all fine and are deliberately not listed here.
-          deny-licenses: AGPL-3.0, AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1, Commons-Clause
+          # Licences that are incompatible with shipping this app as a distributed
+          # Android binary. Apache-2.0, MIT, BSD and the GPL family used by the
+          # existing dependencies are all fine and are deliberately not listed.
+          #
+          # Every entry must be a real SPDX identifier or the action fails to start
+          # rather than failing a check -- which is a very different thing and reads
+          # identically in the run list. `Commons-Clause` was here and is not SPDX at
+          # all; it is a rider bolted onto another licence, so it cannot be matched
+          # this way and has to be caught by the human vetting step in
+          # `.agent/rules/privacy-and-scope.md`.
+          deny-licenses: AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1
           comment-summary-in-pr: on-failure
