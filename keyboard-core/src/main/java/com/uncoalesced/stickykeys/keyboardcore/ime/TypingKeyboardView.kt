@@ -211,6 +211,29 @@ fun TypingKeyboardView(
     // a caret tap or a paste, its length deleted the wrong span of the user's text. The read
     // and the replace happen in one synchronous step, so nothing can be typed in between and
     // shift what gets deleted.
+    // One tracker for the whole grid, remembered: every key registers its rectangle into it,
+    // and a reallocated instance would lose the map mid-gesture.
+    val glideTracker = remember { GlideTracker() }
+    val glideEnabled by typingViewModel.glideTypingEnabled.collectAsState()
+
+    // Hoisted for the same reason every other handler here is: an unmemoized lambda handed to
+    // every key is a fresh instance per recomposition, which takes the grid out of skipping.
+    val onGlide =
+        remember(keyboardController, typingViewModel, coroutineScope) {
+            { stroke: com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke ->
+                coroutineScope.launch {
+                    val word = typingViewModel.decodeGlide(stroke) ?: return@launch
+                    // A glide replaces nothing -- it starts a new word -- so whatever partial
+                    // word the finger crossed on the way is dropped rather than deleted. The
+                    // keys were never committed; only the tracker saw them.
+                    typingViewModel.onWordAbandoned()
+                    keyboardController.commitText("$word ")
+                    typingViewModel.onGlideCommitted(word)
+                }
+                Unit
+            }
+        }
+
     val onSuggestionTap =
         remember(keyboardController, typingViewModel) {
             { suggestion: String ->
@@ -494,6 +517,12 @@ fun TypingKeyboardView(
                         onKeyPress = onKeyPress,
                         modifier = Modifier.weight(1f),
                         onScrub = onScrub,
+                        // Null when the feature is off, which is what disables it: the gesture
+                        // branch is skipped entirely rather than running and discarding its
+                        // result, so a user who turns glide off gets the old pointer handling
+                        // back exactly.
+                        glide = if (glideEnabled) glideTracker else null,
+                        onGlide = onGlide,
                     )
                 }
 
@@ -545,6 +574,8 @@ internal fun KeyboardKey(
     border: Color? = null,
     haze: Color? = null,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    glide: GlideTracker? = null,
+    onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
 ) {
     val spokenLabel = accessibleKeyLabel(keyOutput)
     val spokenState = accessibleKeyState(keyOutput, mode)
@@ -614,7 +645,16 @@ internal fun KeyboardKey(
         modifier =
             modifier
                 .padding(keyPadding)
-                .onGloballyPositioned { bounds.value = it.boundsInRoot() }
+                .onGloballyPositioned {
+                    bounds.value = it.boundsInRoot()
+                    // Re-registered on every layout pass rather than once: the grid changes
+                    // shape when the number row is toggled, when the height preference moves
+                    // and on rotation, and a stale rectangle would decode glides against the
+                    // previous layout without anything looking wrong.
+                    if (glide != null && isGlideCandidate(keyOutput)) {
+                        glide.register(keyOutput[0], bounds.value)
+                    }
+                }
                 // Haze before the fill so it reads as glow behind the key rather than a
                 // wash over it. Skipped entirely when off, rather than drawn at zero alpha:
                 // a shadow modifier on every key costs a render-node per key whether or not
@@ -641,6 +681,8 @@ internal fun KeyboardKey(
                     onCommit = onKeyPress,
                     pressed = pressed,
                     onScrub = onScrub,
+                    glide = glide,
+                    onGlide = onGlide,
                 )
                 // pointerInput replaces `clickable`, which also supplied the button role and
                 // the click action. Both are restated here rather than lost: a screen reader
@@ -676,18 +718,31 @@ internal fun KeyboardKey(
         // Decoration only, on both of these. Without clearing them the merged node would also
         // announce the raw glyph -- "backspace, backspace" -- or, for the space bar, a single
         // blank character.
+        // Drawn only when the user wants corner symbols. The hint is still handed to the
+        // gesture machine above, so hiding it changes what the key *looks like* and never what
+        // it types -- a long press produces the symbol either way. Withholding the hint instead
+        // would have been the obvious implementation and the wrong one: `longPressFor` falls
+        // back to the hint for keys with no alternates of their own, so a visual setting would
+        // have quietly removed a way of typing.
+        //
+        // The branch shape matters as much as the condition. A hidden hint must not fall
+        // through to the hold-available dot below, or turning the setting off would swap one
+        // mark for another on every letter -- the opposite of the quieter board it was asked
+        // for. Keys that never had a hint keep their dot exactly as before.
         if (hint != null) {
-            KeyGlyphContent(
-                glyph = keyGlyph(hint),
-                tint = animatedForeground.copy(alpha = HINT_ALPHA),
-                style = StickyKeysTheme.typography.labelMedium,
-                iconSize = HINT_ICON_SIZE,
-                modifier =
-                    Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 5.dp, top = 2.dp)
-                        .clearAndSetSemantics { },
-            )
+            if (LocalImePanelMetrics.current.showKeyHints) {
+                KeyGlyphContent(
+                    glyph = keyGlyph(hint),
+                    tint = animatedForeground.copy(alpha = HINT_ALPHA),
+                    style = StickyKeysTheme.typography.labelMedium,
+                    iconSize = HINT_ICON_SIZE,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 5.dp, top = 2.dp)
+                            .clearAndSetSemantics { },
+                )
+            }
         } else if (longPress is LongPress.Alternates) {
             // A key can carry alternates without carrying a hint glyph -- the punctuation keys
             // do, from PUNCTUATION_ALTERNATES rather than from the layout. Those had a hold
@@ -776,14 +831,9 @@ internal fun handleKeyPress(
     viewModel.performKeyPressHaptic()
     when (keyLabel) {
         "SHIFT" -> {
-            setMode(
-                when (currentMode) {
-                    KeyboardMode.LETTERS_LOWER -> KeyboardMode.LETTERS_UPPER
-                    KeyboardMode.LETTERS_UPPER -> KeyboardMode.LETTERS_CAPS_LOCK
-                    KeyboardMode.LETTERS_CAPS_LOCK -> KeyboardMode.LETTERS_LOWER
-                    else -> KeyboardMode.LETTERS_LOWER
-                },
-            )
+            // Timing decides, not position in a cycle. A second tap soon after the first
+            // latches caps lock; a later one turns shift back off. See nextShiftMode.
+            setMode(nextShiftMode(currentMode, viewModel.consumeShiftTapGap()))
         }
         "SYMBOLS_SHIFT" -> {
             setMode(
@@ -900,6 +950,22 @@ internal fun handleKeyPress(
             // commit before the space ("a b" arriving as "ab ").
             controller.commitText(" ")
             val token = viewModel.onSpacePressed()
+
+            // A space ends a word, and the next word is almost never more symbols. Leaving the
+            // board on the symbols page meant the following word was typed on the wrong plane
+            // and the user had to notice and press ABC. Enter already reset the page for the
+            // same reason; space did not, which made the two inconsistent as well as wrong.
+            if (currentMode == KeyboardMode.SYMBOLS ||
+                currentMode == KeyboardMode.SYMBOLS_SHIFTED
+            ) {
+                setMode(
+                    if (viewModel.shouldAutoCapitalize.value) {
+                        KeyboardMode.LETTERS_UPPER
+                    } else {
+                        KeyboardMode.LETTERS_LOWER
+                    },
+                )
+            }
 
             coroutineScope.launch {
                 val corrected = viewModel.getAutoCorrectionFor(typedWord)
