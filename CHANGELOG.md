@@ -32,6 +32,80 @@ the v0.1.1 tag".
 
 ---
 
+## [Unreleased] - v0.1.5
+
+Work in progress toward the first BETA. Nothing here has run on a device: the
+phone was unavailable for this stretch, so everything below is compile-verified
+and unit-tested only. That is a weaker claim than the v0.1.4 entries carry and
+is stated rather than smoothed over.
+
+### Added
+
+- **Glide typing.** Swipe across the letters to type a word. On by default,
+  with a switch in Keyboard settings.
+
+  The decoder is the substance. A glide crosses every key between the letters
+  the user meant, so the path for "hello" also contains "ho", "hell" and "hilo"
+  as valid readings -- the question is never "is this word spelled like the
+  path" but "of the many words the path could be, which one was drawn". Word
+  letters must appear along the path in order; skipping keys the path crossed is
+  free; and the corners the finger turned are what separate the survivors.
+
+  Two cases carry it, and both are tested because both are where a plausible
+  implementation quietly fails. A finger cannot cross the same key twice in
+  succession, so a doubled letter matches without advancing -- otherwise
+  "hello", "coffee" and "letter" would be unglideable and the feature would read
+  as broken rather than imperfect. And at speed the finger rounds a turn and
+  lands on a neighbour, which is accepted at a cost so fast glides work while a
+  clean read still wins.
+
+  The gesture belongs to the key that received the touch rather than to a
+  detector layered over the grid: two detectors claiming the same down event is
+  the problem `keyGestures` replaced `clickable` to avoid. A press becomes a
+  glide when it leaves its own key's bounds -- not after some number of pixels,
+  which would mean a different gesture on a small key than on a wide one.
+
+  Suppressed entirely on password and PIN fields, through the same gate as the
+  suggestion strip. A new way of producing words is a new way of leaking them,
+  and it arrived after the privacy work rather than alongside it.
+
+- **Symbols on keys can be turned off.** Settings > Keyboard, under the number
+  row. On by default. Off gives a plainer board.
+
+  Presentation only, and that separation is load-bearing rather than tidy.
+  `longPressFor` falls back to the corner hint for any key with no alternates of
+  its own, which is every letter -- so the obvious implementation, withholding
+  the hint, would have silently removed long-press access to the entire
+  punctuation set. A user turning off a *visual* setting would have lost a way
+  of typing with nothing to say so. A hidden hint also does not fall through to
+  the hold-available dot, or turning the setting off would swap one mark for
+  another on every letter.
+
+- **Backspace in the emoji picker**, bottom right, where the letter keyboard
+  puts it, repeating on hold through the same gesture machine. Correcting a
+  mistyped emoji previously meant leaving the picker, deleting, and coming back.
+
+### Changed
+
+- **Caps lock is a double tap rather than the third step of a cycle.** The shift
+  key was lower, upper, caps lock, back to lower, which put caps lock one tap
+  from lower case so it latched by accident -- and escaping it took a *third*
+  tap, so overshooting meant going the rest of the way round rather than
+  pressing the key again to undo what you had just done.
+
+  Now: a tap arms shift; a second tap within a second latches caps lock; a
+  second tap later turns shift back off, because by then it is a separate
+  decision about a shift you can see is already on. From caps lock a tap always
+  releases, whatever the timing -- that is the one case where getting it wrong
+  strands somebody in capitals.
+
+- **Space on a symbols page returns to the letters.** A space ends a word and the
+  next word is almost never more symbols, so the board was left on the wrong
+  plane and the user had to notice and press ABC. Enter already reset the page
+  for the same reason.
+
+---
+
 ## [v0.1.4-ALPHA] - 2026-08-06
 
 Tagged `v0.1.4-ALPHA`, versionCode 4. Planning for this release is in
