@@ -5,6 +5,7 @@
          app visible. Rows share whatever is left after the strip rather than each
          keeping a fixed key height, so the keyboard compresses instead of overflowing. -->
     <dimen name="ime_panel_height">200dp</dimen>
+    <dimen name="ime_number_row_height">34dp</dimen>
     <dimen name="suggestion_strip_height">32dp</dimen>
     <dimen name="ime_content_padding">2dp</dimen>
 </resources>

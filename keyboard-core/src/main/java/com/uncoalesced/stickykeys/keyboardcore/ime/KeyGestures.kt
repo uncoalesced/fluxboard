@@ -4,6 +4,7 @@ package com.uncoalesced.stickykeys.keyboardcore.ime
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -34,9 +35,17 @@ internal sealed interface LongPress {
     /** Fire the key's own output over and over, faster the longer it is held. Backspace. */
     data object Repeat : LongPress
 
-    /** Show a pick-one strip above the key. Punctuation alternates, top-row digits. */
+    /**
+     * Show a pick-one strip above the key. Punctuation alternates, top-row digits.
+     *
+     * [defaultIndex] is the cell selected when the strip opens, and therefore what a release
+     * without any sideways drag commits. It is 0 almost everywhere; the currency key is the
+     * exception, because the character its own face shows sits in the middle of the run of
+     * currencies rather than at the start.
+     */
     data class Alternates(
         val options: List<String>,
+        val defaultIndex: Int = 0,
     ) : LongPress
 
     /** Drag sideways to walk the caret instead of typing. The space bar. */
@@ -53,6 +62,15 @@ internal sealed interface LongPress {
  * typed would be worse than either.
  */
 internal const val SCRUB_ACTIVATION_DP = 18f
+
+/**
+ * How far the finger must travel before it starts choosing cells in an alternates strip.
+ *
+ * Well below one cell, because this is not a selection threshold -- it only has to absorb the
+ * jitter of a stationary finger so that a hold-and-release keeps the strip's default cell.
+ * Past it, every cell including the first stays reachable by dragging back.
+ */
+internal const val ALTERNATE_DRAG_SLOP_DP = 6f
 
 /** Finger travel per caret step at the start of a scrub. */
 private const val SCRUB_STEP_START_DP = 14f
@@ -119,6 +137,90 @@ private val PUNCTUATION_ALTERNATES =
     )
 
 /**
+ * What holding a digit on the number row offers.
+ *
+ * **The shifted symbol is deliberately not here.** It used to lead every strip, on the
+ * reasoning that the corner hint promised it. But the same character is already directly
+ * reachable by arming shift, which swaps the whole row to real shifted-symbol keys, so the
+ * cell was a second route to something one tap away and it pushed the content the strip
+ * exists for down the row. The corner hint stays as information -- it still tells the user
+ * what shift will produce -- it simply is no longer what the hold commits.
+ *
+ * A release without any sideways drag therefore now commits the superscript, which is index 0.
+ *
+ * Ordering is superscript, then the vulgar fractions with that digit as numerator ascending by
+ * value, then any superscript letter that belongs with it. There is no length ceiling: the
+ * strip sizes its own cells to fit (see [alternateCellWidthPx]).
+ *
+ * `1` and `5` are Joel's confirmed spec, quoted rather than derived -- note that `1` is a
+ * *curated* subset of the nine numerator-1 fractions, so it cannot be generated. The rest are
+ * complete numerator-N sets and are a proposal pending confirmation; changing them is an edit
+ * to this table and nothing else.
+ *
+ * Attached to the keys themselves rather than consulted here -- see [KeyDefinition.alternates]
+ * for why an output-keyed table was the wrong shape.
+ */
+internal val DIGIT_ALTERNATES =
+    mapOf(
+        "0" to listOf("⁰"),
+        "1" to listOf("¹", "⅛", "¼", "⅓", "½", "ⁱ"),
+        "2" to listOf("²", "⅔", "⅖"),
+        "3" to listOf("³", "¾", "⅗", "⅜"),
+        "4" to listOf("⁴", "⅘"),
+        "5" to listOf("⁵", "⅝", "⅚", "ⁿ"),
+        "6" to listOf("⁶"),
+        "7" to listOf("⁷", "⅞"),
+        "8" to listOf("⁸"),
+        "9" to listOf("⁹"),
+    )
+
+/**
+ * The currency key's alternates, and the cell selected when the strip opens.
+ *
+ * Held separately from [DIGIT_ALTERNATES] on purpose. `$` is also digit 4's shifted symbol, so
+ * anything keyed on the character alone would have applied one of these tables to the other's
+ * key. They are attached to their own [KeyDefinition]s instead and never meet.
+ *
+ * `$` sits at index 2 because the list reads in a conventional order rather than starting with
+ * the key's own face -- so the default cell has to be named rather than assumed to be first.
+ */
+internal val CURRENCY_ALTERNATES = listOf("€", "¥", "$", "¢", "₹")
+internal const val CURRENCY_DEFAULT_INDEX = 2
+
+/**
+ * Whether a key can take part in a glide.
+ *
+ * Only single letters. A path across shift, backspace or the symbol switcher says nothing
+ * about a word, and letting those start a glide would mean a mistimed drag off the shift key
+ * typed something. The space bar is excluded here too because it owns the scrub gesture, which
+ * is decided before this point.
+ */
+internal fun isGlideCandidate(keyOutput: String): Boolean =
+    keyOutput.length == 1 && keyOutput[0].isLetter()
+
+/**
+ * Width of one alternates cell, shrunk when the strip would otherwise run off the screen.
+ *
+ * The strip used to assume every cell could have its full preferred width, and the only thing
+ * standing between that and an unreachable cell was a hard six-entry ceiling asserted in a
+ * test. Remove the ceiling without this and a long strip is clipped at the screen edge: the
+ * cells past the edge are drawn nowhere and, because selection is computed from the same cell
+ * width, they cannot be selected either.
+ *
+ * Pure so the arithmetic is assertable without a screen -- which matters, because the failure
+ * it prevents is invisible until someone tries the last cell of a long strip on a narrow phone.
+ */
+internal fun alternateCellWidthPx(
+    optionCount: Int,
+    availableWidthPx: Float,
+    preferredWidthPx: Float,
+): Float {
+    if (optionCount <= 0) return preferredWidthPx
+    val fits = availableWidthPx / optionCount
+    return minOf(preferredWidthPx, fits).coerceAtLeast(1f)
+}
+
+/**
  * The hold behaviour for a key.
  *
  * Driven by the layout's own [hint] rather than a table keyed on letters. A hardcoded map
@@ -133,9 +235,21 @@ private val PUNCTUATION_ALTERNATES =
 internal fun longPressFor(
     keyOutput: String,
     hint: String? = null,
+    alternates: List<String>? = null,
+    alternatesDefaultIndex: Int = 0,
 ): LongPress {
     if (keyOutput == "SPACE") return LongPress.Scrub
     if (keyOutput == "DEL") return LongPress.Repeat
+    // The key's own alternates win over every shared table. This is what keeps two keys that
+    // type the same character from inheriting each other's hold behaviour -- the digit row and
+    // the symbols page both carry "1", and the currency key types the same "$" as digit 4's
+    // shifted symbol.
+    if (alternates != null && alternates.isNotEmpty()) {
+        return LongPress.Alternates(
+            alternates,
+            alternatesDefaultIndex.coerceIn(0, alternates.lastIndex),
+        )
+    }
     PUNCTUATION_ALTERNATES[keyOutput]?.let { return LongPress.Alternates(it) }
     if (hint != null && hint.length == 1) return LongPress.Alternates(listOf(hint))
     return LongPress.None
@@ -242,7 +356,15 @@ internal class KeyAlternatesState {
     var selectedIndex by mutableIntStateOf(0)
         private set
 
-    private var cellWidthPx = 1f
+    /**
+     * The width one cell was actually given, which is not always the preferred width.
+     *
+     * Read by the strip when it draws. Drawing from the shared constant while selecting from
+     * this value is how a long strip ends up highlighting a different cell than the one under
+     * the finger, so both sides take the same number from here.
+     */
+    var cellWidthPx by androidx.compose.runtime.mutableFloatStateOf(1f)
+        private set
 
     val visible: Boolean get() = anchor != null
 
@@ -250,11 +372,14 @@ internal class KeyAlternatesState {
         options: List<String>,
         anchor: Rect,
         cellWidthPx: Float,
+        defaultIndex: Int = 0,
     ) {
         this.options = options
         this.anchor = anchor
         this.cellWidthPx = cellWidthPx.coerceAtLeast(1f)
-        this.selectedIndex = 0
+        // Not always zero. A release with no drag commits whatever is selected here, so this
+        // is what decides the "just hold it" character.
+        this.selectedIndex = defaultIndex.coerceIn(0, maxOf(0, options.lastIndex))
     }
 
     /** Track the finger across the strip. [x] is in root coordinates. */
@@ -296,71 +421,196 @@ internal fun Modifier.keyGestures(
     cellWidthPx: Float,
     keyBounds: () -> Rect,
     onCommit: (String) -> Unit,
+    pressed: MutableState<Boolean>,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    glide: GlideTracker? = null,
+    onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
 ): Modifier =
-    this.pointerInput(keyOutput, longPress, alternates, cellWidthPx) {
+    this.pointerInput(keyOutput, longPress, alternates, cellWidthPx, glide) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-
-            // Scrubbing is decided before the long-press clock, not after it. Gating it on
-            // the hold threshold would mean the cursor sat still for the first 350ms of a
-            // drag, which reads as the gesture being broken rather than deliberate.
-            if (longPress is LongPress.Scrub) {
-                runScrub(
-                    activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
-                    stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
-                    onScrub = onScrub,
-                    onTap = { onCommit(keyOutput) },
-                )
-                return@awaitEachGesture
-            }
-
-            // null  -> the threshold elapsed, this is a hold
-            // true  -> released before the threshold, an ordinary tap
-            // false -> the gesture was cancelled out from under us
-            val early =
-                withTimeoutOrNull(LONG_PRESS_MS) {
-                    waitForUpOrCancellation() != null
+            // Replacing `clickable` also removed the indication it supplied, so keys had no
+            // press feedback of any kind while every other control in the app did. A
+            // MutableState rather than a callback: an instance is stable and remembered per
+            // key, where a lambda parameter would be reallocated on each recomposition and
+            // take the whole grid out of skipping.
+            pressed.value = true
+            try {
+                // Scrubbing is decided before the long-press clock, not after it. Gating it on
+                // the hold threshold would mean the cursor sat still for the first 350ms of a
+                // drag, which reads as the gesture being broken rather than deliberate.
+                if (longPress is LongPress.Scrub) {
+                    runScrub(
+                        activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
+                        stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
+                        onScrub = onScrub,
+                        onTap = { onCommit(keyOutput) },
+                    )
+                    return@awaitEachGesture
                 }
 
-            when {
-                early == true -> onCommit(keyOutput)
-                early == false -> Unit
-                longPress is LongPress.None -> {
-                    // Held, but this key has no hold behaviour: still a keystroke on release,
-                    // otherwise resting a moment on a letter would silently swallow it.
-                    if (waitForUpOrCancellation() != null) onCommit(keyOutput)
-                }
-                longPress is LongPress.Repeat -> {
-                    var step = 0
-                    while (true) {
-                        onCommit(keyOutput)
-                        val ended =
-                            withTimeoutOrNull(repeatIntervalAt(step)) {
-                                waitForUpOrCancellation()
+                // A glide is the one gesture here that belongs to no single key, and this is
+                // where it is separated from a tap and from a hold.
+                //
+                // The key that received the down keeps ownership rather than handing over to a
+                // detector layered across the grid: two detectors both claiming the down event
+                // is the exact problem `keyGestures` replaced `clickable` to avoid. What the
+                // key cannot know is where the *other* keys are, and that is all the tracker
+                // supplies.
+                //
+                // The test is leaving this key's own bounds, not travelling some number of
+                // pixels. A threshold in pixels is a different gesture on a small key than on
+                // the space bar, whereas crossing into a neighbour means the same thing
+                // everywhere -- and it is precisely the moment a tap stops being a plausible
+                // reading of what the finger is doing.
+                // The glide watch runs *inside* the long-press window rather than instead of
+                // it, and that is the whole reason this is shaped the way it is.
+                //
+                // The first version simply took over the gesture for every letter, which made
+                // holding a letter commit it as an ordinary tap: long-press stopped producing
+                // the corner symbol on all 26 keys. Nothing failed and nothing logged -- the
+                // key just typed the wrong thing, which is how a gesture regression hides.
+                //
+                // So only three outcomes are decided here. The finger left the key, which is a
+                // glide. The finger lifted, which is a tap. Or the window elapsed with the
+                // finger still on the key, which is a hold and is handed to the existing
+                // machinery below untouched.
+                var heldPastThreshold = false
+                if (glide != null && isGlideCandidate(keyOutput)) {
+                    val origin = keyBounds()
+                    var glided = false
+                    var lifted = false
+                    withTimeoutOrNull(LONG_PRESS_MS) {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) {
+                                lifted = true
+                                break
                             }
-                        if (ended != null) break
-                        step++
-                    }
-                }
-                longPress is LongPress.Alternates -> {
-                    alternates.show(longPress.options, keyBounds(), cellWidthPx)
-                    val origin = keyBounds().left
-                    var committed = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull()
-                        if (change == null) break
-                        alternates.moveTo(origin + change.position.x)
-                        if (!change.pressed) {
-                            committed = true
-                            break
+                            val root = origin.topLeft + change.position
+                            if (!origin.contains(root)) {
+                                glided = true
+                                glide.begin(origin.center)
+                                glide.move(root)
+                                // Claimed only once this is definitely a glide, so an ordinary
+                                // tap or hold is left entirely alone.
+                                change.consume()
+                                break
+                            }
                         }
                     }
-                    val picked = if (committed) alternates.consume() else null
-                    alternates.hide()
-                    if (picked != null) onCommit(picked)
+
+                    if (glided) {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            glide.move(origin.topLeft + change.position)
+                            change.consume()
+                            if (!change.pressed) {
+                                glide.finish()?.let(onGlide)
+                                return@awaitEachGesture
+                            }
+                        }
+                        glide.cancel()
+                        return@awaitEachGesture
+                    }
+                    if (lifted) {
+                        onCommit(keyOutput)
+                        return@awaitEachGesture
+                    }
+                    // Still down, still on the key: this is a hold, and the window has already
+                    // been spent waiting it out.
+                    heldPastThreshold = true
                 }
+
+                // null  -> the threshold elapsed, this is a hold
+                // true  -> released before the threshold, an ordinary tap
+                // false -> the gesture was cancelled out from under us
+                val early =
+                    if (heldPastThreshold) {
+                        // Already established as a hold above; waiting a second full window
+                        // would make every long press on a letter take twice as long.
+                        null
+                    } else {
+                        withTimeoutOrNull(LONG_PRESS_MS) {
+                            waitForUpOrCancellation() != null
+                        }
+                    }
+
+                when {
+                    early == true -> onCommit(keyOutput)
+                    early == false -> Unit
+                    longPress is LongPress.None -> {
+                        // Held, but this key has no hold behaviour: still a keystroke on
+                        // release, otherwise resting a moment on a letter would silently
+                        // swallow it.
+                        if (waitForUpOrCancellation() != null) onCommit(keyOutput)
+                    }
+                    longPress is LongPress.Repeat -> {
+                        var step = 0
+                        while (true) {
+                            onCommit(keyOutput)
+                            val ended =
+                                withTimeoutOrNull(repeatIntervalAt(step)) {
+                                    waitForUpOrCancellation()
+                                }
+                            if (ended != null) break
+                            step++
+                        }
+                    }
+                    longPress is LongPress.Alternates -> {
+                        alternates.show(
+                            longPress.options,
+                            keyBounds(),
+                            cellWidthPx,
+                            longPress.defaultIndex,
+                        )
+                        val origin = keyBounds().left
+                        var committed = false
+                        // The finger has to actually move before it starts choosing cells.
+                        //
+                        // This loop used to call moveTo on every pointer event, and the
+                        // release is a pointer event -- it carries the finger's position,
+                        // which for a hold-and-release has never left the key. So the very
+                        // first thing that reached moveTo overwrote defaultIndex with the cell
+                        // under the finger, and a plain hold could only ever commit whichever
+                        // cell the key sits over.
+                        //
+                        // Invisible on every digit, because their defaultIndex is 0 and cell 0
+                        // is the one under the finger, so both answers agree. The currency key
+                        // is the single case where they differ, and it was wrong: the strip
+                        // drew "$" highlighted and committed "€". Worse, the TalkBack path
+                        // commits options[defaultIndex] directly, so touch and screen reader
+                        // produced different characters from the same key -- the exact
+                        // inconsistency defaultIndex exists to prevent.
+                        val startX = down.position.x
+                        val slopPx = ALTERNATE_DRAG_SLOP_DP.dp.toPx()
+                        var tracking = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull()
+                            if (change == null) break
+                            if (!tracking && abs(change.position.x - startX) > slopPx) {
+                                tracking = true
+                            }
+                            if (tracking) alternates.moveTo(origin + change.position.x)
+                            if (!change.pressed) {
+                                committed = true
+                                break
+                            }
+                        }
+                        val picked = if (committed) alternates.consume() else null
+                        alternates.hide()
+                        if (picked != null) onCommit(picked)
+                    }
+                }
+            } finally {
+                // finally, not after the when: every branch above can leave early -- the
+                // scrub returns, a cancelled gesture falls through, and any of them can be
+                // cancelled by the composition going away mid-press. A key stuck in its
+                // pressed colour is worse than no feedback at all.
+                pressed.value = false
             }
         }
     }

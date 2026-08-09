@@ -92,8 +92,33 @@ class KeyboardSettingsViewModel
         val hapticsIntensity = preferences.hapticsIntensity
 
         val showNumberRow = preferences.showNumberRow
+        val keySizePercent = preferences.keySizePercent
+        val doubleSpacePeriod = preferences.doubleSpacePeriodEnabled
+        val privateMode = preferences.privateModeEnabled
+        val showKeyHints = preferences.showKeyHints
+        val glideTyping = preferences.glideTypingEnabled
+
+        fun setKeySizePercent(percent: Int) = preferences.setKeySizePercent(percent)
+
+        fun setDoubleSpacePeriod(enabled: Boolean) = preferences.setDoubleSpacePeriod(enabled)
+
+        /** Mirrors the toggle in the keyboard's own quick-access row; one stored flag. */
+        fun setPrivateMode(enabled: Boolean) = preferences.setPrivateMode(enabled)
 
         fun setShowNumberRow(show: Boolean) = preferences.setShowNumberRow(show)
+
+        /** Shows or hides the corner symbols. Long-press still types them either way. */
+        fun setShowKeyHints(show: Boolean) = preferences.setShowKeyHints(show)
+
+        /** Turns swipe-to-type on or off. */
+        fun setGlideTyping(enabled: Boolean) = preferences.setGlideTyping(enabled)
+
+        val keyboardHeightPercent = preferences.keyboardHeightPercent
+        val keyboardBottomPaddingDp = preferences.keyboardBottomPaddingDp
+
+        fun setKeyboardHeightPercent(percent: Int) = preferences.setKeyboardHeightPercent(percent)
+
+        fun setKeyboardBottomPaddingDp(dp: Int) = preferences.setKeyboardBottomPaddingDp(dp)
 
         fun setAutoCapitalize(enabled: Boolean) = preferences.setAutoCapitalize(enabled)
 
@@ -110,6 +135,22 @@ class KeyboardSettingsViewModel
         fun clearClipboardHistory() {
             viewModelScope.launch(Dispatchers.IO) {
                 clipboardDao.deleteAll()
+            }
+        }
+
+        /**
+         * The escape hatch from a keyboard that has rendered itself unusable.
+         *
+         * Both halves in one action on purpose: a user in this state cannot read their
+         * keyboard, so they cannot be asked to work out whether it was the theme or the
+         * layout that did it. Preferences that cannot blank a keyboard -- height, bottom
+         * padding, haptics, the number row -- are deliberately left alone, so this is not a
+         * general "reset all settings" that quietly throws away unrelated choices.
+         */
+        fun resetKeyboardAppearance() {
+            viewModelScope.launch {
+                themeManager.resetToDefaults()
+                layoutManager.resetToDefaults()
             }
         }
 
@@ -136,6 +177,13 @@ fun KeyboardSettingsScreen(
             val autoCap by viewModel.autoCapitalizeEnabled.collectAsState()
             val autoCorrect by viewModel.autoCorrectEnabled.collectAsState()
             val showNumberRow by viewModel.showNumberRow.collectAsState()
+            val keySizePercent by viewModel.keySizePercent.collectAsState()
+            val doubleSpacePeriod by viewModel.doubleSpacePeriod.collectAsState()
+            val privateMode by viewModel.privateMode.collectAsState()
+            val showKeyHints by viewModel.showKeyHints.collectAsState()
+            val glideTyping by viewModel.glideTyping.collectAsState()
+            val keyboardHeight by viewModel.keyboardHeightPercent.collectAsState()
+            val keyboardBottomPadding by viewModel.keyboardBottomPaddingDp.collectAsState()
 
             val activeThemeId by viewModel.activeThemeId.collectAsState()
             val activeLayoutId by viewModel.activeLayoutId.collectAsState()
@@ -147,6 +195,7 @@ fun KeyboardSettingsScreen(
             val availableLayouts by viewModel.layoutManager.availableLayouts.collectAsState()
 
             var showClearClipboardDialog by remember { mutableStateOf(false) }
+            var showResetAppearanceDialog by remember { mutableStateOf(false) }
             val context = LocalContext.current
 
             Column(
@@ -209,6 +258,27 @@ fun KeyboardSettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
+                            stringResource(R.string.text_glide_typing),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_glide_typing_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = glideTyping,
+                        onCheckedChange = { viewModel.setGlideTyping(it) },
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
                             stringResource(R.string.text_number_row),
                             style = MaterialTheme.typography.titleMedium,
                         )
@@ -222,6 +292,191 @@ fun KeyboardSettingsScreen(
                         checked = showNumberRow,
                         onCheckedChange = { viewModel.setShowNumberRow(it) },
                     )
+                }
+
+                // Directly under the number row, because the two answer the same question --
+                // what is printed on the keys -- and a user hunting for one will look here for
+                // the other.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_key_hints),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_key_hints_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = showKeyHints,
+                        onCheckedChange = { viewModel.setShowKeyHints(it) },
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                // Keyboard size
+                Text(
+                    stringResource(R.string.text_keyboard_size),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_keyboard_height),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_keyboard_height_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        "$keyboardHeight%",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                val minHeight = KeyboardPreferences.MIN_KEYBOARD_HEIGHT_PERCENT
+                val maxHeight = KeyboardPreferences.MAX_KEYBOARD_HEIGHT_PERCENT
+                Slider(
+                    value = keyboardHeight.toFloat(),
+                    onValueChange = { viewModel.setKeyboardHeightPercent(it.toInt()) },
+                    valueRange = minHeight.toFloat()..maxHeight.toFloat(),
+                    // Five-point steps: fine enough to find a comfortable height, coarse
+                    // enough that the slider lands on a round number every time.
+                    steps = (maxHeight - minHeight) / 5 - 1,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+
+                // Key size, deliberately its own control rather than a second name for the
+                // height slider. Height decides how much screen the keyboard occupies; this
+                // decides how much of that space is key rather than gap. Someone who wants a
+                // tall keyboard with generous gaps and someone who wants a short one with fat
+                // keys are asking for different things, and one slider cannot serve both.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_key_size),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_key_size_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        "$keySizePercent%",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                val minKey = KeyboardPreferences.MIN_KEY_SIZE_PERCENT
+                val maxKey = KeyboardPreferences.MAX_KEY_SIZE_PERCENT
+                Slider(
+                    value = keySizePercent.toFloat(),
+                    onValueChange = { viewModel.setKeySizePercent(it.toInt()) },
+                    valueRange = minKey.toFloat()..maxKey.toFloat(),
+                    steps = (maxKey - minKey) / 5 - 1,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_double_space_period),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_double_space_period_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = doubleSpacePeriod,
+                        onCheckedChange = { viewModel.setDoubleSpacePeriod(it) },
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_private_mode),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_private_mode_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = privateMode,
+                        onCheckedChange = { viewModel.setPrivateMode(it) },
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_keyboard_bottom_padding),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_keyboard_bottom_padding_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        "${keyboardBottomPadding}dp",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Slider(
+                    value = keyboardBottomPadding.toFloat(),
+                    onValueChange = { viewModel.setKeyboardBottomPaddingDp(it.toInt()) },
+                    valueRange = 0f..KeyboardPreferences.MAX_BOTTOM_PADDING_DP.toFloat(),
+                    steps = KeyboardPreferences.MAX_BOTTOM_PADDING_DP / 2 - 1,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+
+                TextButton(
+                    onClick = {
+                        viewModel.setKeyboardHeightPercent(
+                            KeyboardPreferences.DEFAULT_KEYBOARD_HEIGHT_PERCENT,
+                        )
+                        viewModel.setKeyboardBottomPaddingDp(
+                            KeyboardPreferences.DEFAULT_BOTTOM_PADDING_DP,
+                        )
+                    },
+                ) {
+                    Text(stringResource(R.string.text_reset_to_default))
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
@@ -409,13 +664,7 @@ fun KeyboardSettingsScreen(
                     AlertDialog(
                         onDismissRequest = { showClearClipboardDialog = false },
                         title = { Text(stringResource(R.string.text_clear_clipboard_history)) },
-                        text = {
-                            Text(
-                                stringResource(
-                                    R.string.text_are_you_sure_you_want_to_delete_all_saved_clipboard_history_this_action_is_irreversible,
-                                ),
-                            )
-                        },
+                        text = { Text(stringResource(R.string.text_clear_clipboard_confirm)) },
                         confirmButton = {
                             TextButton(
                                 onClick = {
@@ -431,6 +680,79 @@ fun KeyboardSettingsScreen(
                         },
                         dismissButton = {
                             TextButton(onClick = { showClearClipboardDialog = false }) {
+                                Text(stringResource(R.string.text_cancel))
+                            }
+                        },
+                    )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                // Troubleshooting
+                //
+                // This exists because of a specific reported failure: a keyboard whose keys
+                // stopped being drawn while still responding to touch, with no way back short
+                // of uninstalling and reinstalling. The active theme id and layout id live in
+                // SharedPreferences and the files themselves in filesDir, so that state
+                // survives force-stop, cache clearing and reboot -- and the user is left with
+                // a keyboard they cannot read and no control they can find to fix it, because
+                // every control for fixing it is on a keyboard they cannot read.
+                //
+                // Deliberately not gated on diagnosing the cause. Whatever a saved theme or
+                // layout does to the renderer, throwing both away returns the user to a
+                // keyboard that is known to draw.
+                Text(
+                    stringResource(R.string.text_troubleshooting),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.text_reset_appearance_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = { showResetAppearanceDialog = true }) {
+                    Text(stringResource(R.string.text_reset_keyboard_appearance))
+                }
+
+                // Resolved in composable scope rather than with context.getString inside the
+                // click handler: a LocalContext read is not invalidated by a Configuration
+                // change, so the toast could show a stale-locale string after the user
+                // switches language.
+                val appearanceResetMessage = stringResource(R.string.text_appearance_reset)
+
+                if (showResetAppearanceDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showResetAppearanceDialog = false },
+                        title = {
+                            Text(stringResource(R.string.text_reset_keyboard_appearance))
+                        },
+                        text = {
+                            Text(stringResource(R.string.text_reset_appearance_confirm))
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.resetKeyboardAppearance()
+                                    showResetAppearanceDialog = false
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            appearanceResetMessage,
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                },
+                            ) {
+                                Text(
+                                    stringResource(R.string.text_reset),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showResetAppearanceDialog = false }) {
                                 Text(stringResource(R.string.text_cancel))
                             }
                         },

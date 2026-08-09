@@ -84,4 +84,68 @@ class ImePanelHeightTest {
         val height = measuredPanelHeight()
         assertEquals(120.dp, height)
     }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `the number row brings its own height instead of taking it from the letters`() {
+        // The reported problem: turning the digit row on divided the same fixed height across
+        // five rows instead of four, so every key lost a fifth of its height. The panel has
+        // to grow by the row's own height for the letters to keep theirs -- 280 + 48.
+        assertEquals(328.dp, measuredPanelHeightWith(ImePanelMetrics(showNumberRow = true)))
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `the panel keeps its shipped height when the number row is off`() {
+        assertEquals(280.dp, measuredPanelHeightWith(ImePanelMetrics(showNumberRow = false)))
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `the height preference can shrink the panel`() {
+        assertEquals(196.dp, measuredPanelHeightWith(ImePanelMetrics(heightScale = 0.7f)))
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp")
+    fun `the height preference can grow the panel`() {
+        assertEquals(420.dp, measuredPanelHeightWith(ImePanelMetrics(heightScale = 1.5f)))
+    }
+
+    @Test
+    fun `raising the slider is not silently clamped away`() {
+        // The reason the window cap is not simply a constant. On a normal phone window, the
+        // largest thing the slider can ask for -- full scale with the number row on -- has to
+        // actually be delivered, or the control stops responding partway along its travel and
+        // looks broken.
+        val request = (280.dp + 48.dp) * 1.5f
+        assertEquals(request, panelHeightFor(request, 891.dp, heightScale = 1.5f))
+    }
+
+    @Test
+    fun `a user who never touched the slider is unaffected by the raised ceiling`() {
+        // The split-screen protection is load-bearing and was measured on device. Scaling the
+        // cap must not weaken it for the default configuration.
+        assertEquals(150.dp, panelHeightFor(280.dp, 300.dp, heightScale = 1f))
+        assertEquals(200.dp, panelHeightFor(280.dp, 400.dp, heightScale = 1f))
+    }
+
+    @Test
+    fun `choosing a smaller keyboard does not tighten the clamp`() {
+        // Scaling the cap by anything below 1 would clamp a request that was already small,
+        // which would make short windows behave differently for no reason.
+        assertEquals(196.dp, panelHeightFor(196.dp, 891.dp, heightScale = 0.7f))
+    }
+
+    private fun measuredPanelHeightWith(metrics: ImePanelMetrics): Dp {
+        composeRule.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                LocalImePanelMetrics provides metrics,
+            ) {
+                Box(modifier = Modifier.testTag("panel").height(rememberImePanelHeight()))
+            }
+        }
+        val node = composeRule.onNodeWithTag("panel").fetchSemanticsNode()
+        return with(composeRule.density) { node.size.height.toDp() }
+    }
 }

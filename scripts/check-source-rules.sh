@@ -63,8 +63,36 @@ if [ -n "$missing_watermark" ]; then
   fail=1
 fi
 
+# --- 3. SharedPreferences change listeners -----------------------------------
+# Banned outright, because one shipped in v0.1.5-BETA and did nothing in release.
+#
+# SharedPreferences stores its listeners in a WeakHashMap. The `private val
+# listener` field was the only strong reference to ours, and R8 -- seeing a field
+# written once and read once -- removed the field. The listener was then collected
+# at the first GC and no preference change reached any StateFlow again for the life
+# of the process. It worked perfectly in debug, which is why it survived to a
+# release build: every settings toggle appeared dead until the app was restarted,
+# and the privacy switch could be turned on and never off.
+#
+# The preference classes are @Singleton and every write goes through their own
+# setters, so the setter can publish to its flow directly and no listener is needed.
+# If one is ever genuinely required, it must be kept alive by something R8 cannot
+# prove unused -- and this check must then be given a documented exemption rather
+# than deleted.
+listener_hits=$(grep -RIn "registerOnSharedPreferenceChangeListener" \
+  --include='*.kt' --include='*.java' \
+  "${SRC_GLOBS[@]}" 2>/dev/null || true)
+
+if [ -n "$listener_hits" ]; then
+  echo "PREFS LISTENER RULE VIOLATION -- SharedPreferences listeners are weakly held"
+  echo "and R8 deletes the field that keeps them alive. Publish from the setter instead:"
+  echo "$listener_hits"
+  echo
+  fail=1
+fi
+
 if [ "$fail" -eq 0 ]; then
-  echo "Source rule check passed: no emoji, all source files watermarked."
+  echo "Source rule check passed: no emoji, all source files watermarked, no prefs listeners."
 fi
 
 exit "$fail"

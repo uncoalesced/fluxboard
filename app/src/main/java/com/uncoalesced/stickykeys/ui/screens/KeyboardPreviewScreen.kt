@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.uncoalesced.stickykeys.keyboardcore.ime.AppMode
+import com.uncoalesced.stickykeys.keyboardcore.ime.CursorMove
 import com.uncoalesced.stickykeys.keyboardcore.ime.KeyboardController
 import com.uncoalesced.stickykeys.keyboardcore.ime.TypingKeyboardView
 import com.uncoalesced.stickykeys.keyboardcore.ime.TypingViewModel
@@ -63,6 +64,12 @@ private class PreviewKeyboardController(
         state.value = TextFieldValue(updated, TextRange(from + replacement.length))
     }
 
+    override fun textBeforeCursor(maxChars: Int): String {
+        val current = state.value
+        val cursor = current.selection.start.coerceIn(0, current.text.length)
+        return current.text.substring((cursor - maxChars).coerceAtLeast(0), cursor)
+    }
+
     override fun sendDelete() {
         val current = state.value
         val cursor = current.selection.start.coerceIn(0, current.text.length)
@@ -85,24 +92,32 @@ private class PreviewKeyboardController(
 
     override fun switchMode(mode: AppMode) = Unit
 
-    override fun sendEditingKey(
-        keyCode: Int,
-        shift: Boolean,
-        ctrl: Boolean,
+    override fun moveCursor(
+        move: CursorMove,
+        extend: Boolean,
     ) {
         // Enough for the space-bar scrub to be felt, which is the point of the preview.
         val current = state.value
-        val cursor = current.selection.start
+        val cursor = current.selection.end
         val next =
-            when (keyCode) {
-                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> cursor - 1
-                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> cursor + 1
-                android.view.KeyEvent.KEYCODE_MOVE_HOME -> 0
-                android.view.KeyEvent.KEYCODE_MOVE_END -> current.text.length
-                else -> cursor
+            when (move) {
+                CursorMove.LEFT -> cursor - 1
+                CursorMove.RIGHT -> cursor + 1
+                CursorMove.DOC_START -> 0
+                CursorMove.DOC_END -> current.text.length
+                // The preview field is single-line, so there is nowhere to go.
+                CursorMove.UP, CursorMove.DOWN -> cursor
             }
+        val target = next.coerceIn(0, current.text.length)
         state.value =
-            current.copy(selection = TextRange(next.coerceIn(0, current.text.length)))
+            current.copy(
+                selection =
+                    if (extend) {
+                        TextRange(current.selection.start, target)
+                    } else {
+                        TextRange(target)
+                    },
+            )
     }
 
     override fun performEditAction(actionId: Int) = Unit
