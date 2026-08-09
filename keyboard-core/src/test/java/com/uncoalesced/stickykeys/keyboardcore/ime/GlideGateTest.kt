@@ -19,7 +19,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -75,7 +74,7 @@ class GlideGateTest {
             // be committed into a field the user cannot read back to check. Both are reasons
             // the suggestion strip is already suppressed there.
             viewModel.onInputStarted(initialCapsMode = 0, fieldKind = FieldKind.PASSWORD)
-            assertNull(viewModel.decodeGlide(stroke))
+            assertTrue(viewModel.decodeGlide(stroke).isEmpty())
             advanceUntilIdle()
             coVerify(exactly = 0) { engine.decodeGlide(any()) }
         }
@@ -84,7 +83,7 @@ class GlideGateTest {
     fun `a PIN field is never glide-decoded`() =
         runTest(dispatcher) {
             viewModel.onInputStarted(initialCapsMode = 0, fieldKind = FieldKind.PIN)
-            assertNull(viewModel.decodeGlide(stroke))
+            assertTrue(viewModel.decodeGlide(stroke).isEmpty())
             advanceUntilIdle()
             coVerify(exactly = 0) { engine.decodeGlide(any()) }
         }
@@ -96,14 +95,14 @@ class GlideGateTest {
             // caught by nothing else here.
             io.mockk.coEvery { engine.decodeGlide(any()) } returns listOf("hello", "hell")
             viewModel.onInputStarted(initialCapsMode = 0, fieldKind = FieldKind.NORMAL)
-            assertTrue(viewModel.decodeGlide(stroke) == "hello")
+            assertTrue(viewModel.decodeGlide(stroke).first() == "hello")
         }
 
     @Test
     fun `a glided word is learned like any other finished word`() =
         runTest(dispatcher) {
             viewModel.onInputStarted(initialCapsMode = 0, fieldKind = FieldKind.NORMAL)
-            viewModel.onGlideCommitted("hello")
+            viewModel.onGlideCommitted("hello", listOf("hello", "hell"))
             advanceUntilIdle()
             coVerify(exactly = 1) { engine.learnWord("hello") }
         }
@@ -113,7 +112,7 @@ class GlideGateTest {
         runTest(dispatcher) {
             // Routed through the same write gate as everything else rather than a second one.
             viewModel.onIncognitoChanged(true)
-            viewModel.onGlideCommitted("secret")
+            viewModel.onGlideCommitted("secret", listOf("secret"))
             advanceUntilIdle()
             coVerify(exactly = 0) { engine.learnWord(any()) }
         }
@@ -126,8 +125,22 @@ class GlideGateTest {
             // that are not in the editor.
             viewModel.onKeyPressed("x")
             viewModel.onKeyPressed("y")
-            viewModel.onGlideCommitted("hello")
+            viewModel.onGlideCommitted("hello", listOf("hello", "hell"))
             assertTrue(viewModel.getCurrentWord().isEmpty())
+        }
+
+    @Test
+    fun `the readings that lost stay in the strip`() =
+        runTest(dispatcher) {
+            // A glide is wrong more often than a tap, and several real words are usually valid
+            // readings of the same path. Leaving the runners-up where the user is already
+            // looking turns a wrong guess into one tap rather than a delete and a re-glide.
+            viewModel.onGlideCommitted("hero", listOf("hero", "hello", "here"))
+            assertTrue(viewModel.suggestions.value.contains("hello"))
+            assertTrue(
+                "the committed word must not also be offered",
+                !viewModel.suggestions.value.contains("hero"),
+            )
         }
 
     @Test

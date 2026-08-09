@@ -54,7 +54,14 @@ internal class GlideTracker {
         key: Char,
         bounds: Rect,
     ) {
-        keyRects[key] = bounds
+        // Lowercased, and this is not cosmetic. A key reports whatever it currently *types*,
+        // so while shift is armed the letter keys register as 'H', 'E', 'L'. The dictionary is
+        // lowercase, so a path recorded in capitals matches nothing and the glide silently
+        // decodes to nothing -- which is exactly what happened on the first device run, where
+        // auto-capitalize had armed shift on an empty field and every glide returned null with
+        // no error anywhere. Case belongs to rendering; the path is about which key was
+        // crossed.
+        keyRects[key.lowercaseChar()] = bounds
         if (bounds.width > 0f) keyWidthPx = bounds.width
     }
 

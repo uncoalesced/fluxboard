@@ -222,13 +222,14 @@ fun TypingKeyboardView(
         remember(keyboardController, typingViewModel, coroutineScope) {
             { stroke: com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke ->
                 coroutineScope.launch {
-                    val word = typingViewModel.decodeGlide(stroke) ?: return@launch
+                    val candidates = typingViewModel.decodeGlide(stroke)
+                    val word = candidates.firstOrNull() ?: return@launch
                     // A glide replaces nothing -- it starts a new word -- so whatever partial
                     // word the finger crossed on the way is dropped rather than deleted. The
                     // keys were never committed; only the tracker saw them.
                     typingViewModel.onWordAbandoned()
                     keyboardController.commitText("$word ")
-                    typingViewModel.onGlideCommitted(word)
+                    typingViewModel.onGlideCommitted(word, candidates)
                 }
                 Unit
             }
@@ -237,7 +238,12 @@ fun TypingKeyboardView(
     val onSuggestionTap =
         remember(keyboardController, typingViewModel) {
             { suggestion: String ->
-                val span = currentWordSpan(keyboardController)
+                // After a glide the strip holds the readings that lost, and the text already
+                // contains the winner plus its space -- so the span to replace is what the
+                // glide wrote, not the word under the caret, which is empty there.
+                val glided = typingViewModel.consumeGlideCommit()
+                val span =
+                    if (glided != null) glided.length + 1 else currentWordSpan(keyboardController)
                 keyboardController.replaceTextBeforeCursor(span, "$suggestion ")
                 typingViewModel.onSuggestionSelected(suggestion)
             }

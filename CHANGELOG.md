@@ -34,10 +34,15 @@ the v0.1.1 tag".
 
 ## [Unreleased] - v0.1.5
 
-Work in progress toward the first BETA. Nothing here has run on a device: the
-phone was unavailable for this stretch, so everything below is compile-verified
-and unit-tested only. That is a weaker claim than the v0.1.4 entries carry and
-is stated rather than smoothed over.
+Work in progress toward the first BETA. **Device-verified 2026-08-09** on a
+Redmi Note 11 (Android 15) with real touch events -- glides drawn as
+`motionevent` polylines across the real key rectangles, not `input swipe`, which
+emits too few samples to record the corners a glide is decoded from.
+
+The pass found three defects that unit tests could not have caught, all fixed
+and re-verified: glides decoded to nothing whenever shift was armed, doubled
+words lost to their single-letter twins, and long-press stopped working on every
+letter. Each is described below.
 
 ### Added
 
@@ -67,7 +72,34 @@ is stated rather than smoothed over.
 
   Suppressed entirely on password and PIN fields, through the same gate as the
   suggestion strip. A new way of producing words is a new way of leaking them,
-  and it arrived after the privacy work rather than alongside it.
+  and it arrived after the privacy work rather than alongside it. Confirmed on
+  device: gliding into a password field types nothing and learns nothing.
+
+  The readings that lost stay in the suggestion strip, and tapping one replaces
+  the committed word rather than appending after it. This matters more for glide
+  than for tapping: several real words are usually valid readings of the same
+  path, so being wrong is the normal case rather than the exceptional one.
+  Gliding t-o-o commits "to" and offers "too" first, because those two paths are
+  *identical* and no decoder can separate them -- only the user can.
+
+  Three device findings, each invisible to the tests that existed:
+
+    - Every glide decoded to nothing whenever shift was armed. Keys register the
+      character they currently *type*, so with auto-capitalize on an empty field
+      they registered as 'H', 'E', 'L' while the dictionary is lowercase.
+      Nothing errored; the feature simply did nothing, which is the hardest kind
+      of failure to attribute. Registration now lowercases.
+    - Doubled words lost to their single-letter twins: g-o-o-d produced "god",
+      t-o-o produced "to". A doubled letter carried a one-point cost, on the
+      reasoning that doubling is slightly unusual. The reasoning was wrong
+      rather than mistuned -- a glide *cannot show* a doubled letter, so the path
+      carries no evidence either way and charging for it invents a preference
+      against every doubled word in English. Now free, so frequency decides.
+    - Long-press stopped producing corner symbols on all 26 letters. The glide
+      watch had replaced the long-press window rather than running inside it, so
+      holding a letter committed it as a tap. It now resolves only three
+      outcomes -- left the key, lifted, or the window elapsed -- and hands a hold
+      to the existing machinery untouched.
 
 - **Symbols on keys can be turned off.** Settings > Keyboard, under the number
   row. On by default. Off gives a plainer board.
