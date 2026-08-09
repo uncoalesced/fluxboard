@@ -163,6 +163,8 @@ internal fun KeyboardRowsView(
     onKeyPress: (String) -> Unit,
     modifier: Modifier = Modifier,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    glide: GlideTracker? = null,
+    onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
 ) {
     // One strip for the whole grid, not one per key. A popup owned by the key that opened it
     // is dismissed by its own pointer-exit the moment the finger slides across to choose.
@@ -214,6 +216,8 @@ internal fun KeyboardRowsView(
                             )
 
                         KeyboardKey(
+                            glide = glide,
+                            onGlide = onGlide,
                             keyOutput = keyDef.output,
                             glyph =
                                 keyGlyph(
