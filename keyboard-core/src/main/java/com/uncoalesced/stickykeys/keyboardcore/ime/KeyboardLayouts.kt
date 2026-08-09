@@ -219,8 +219,10 @@ object KeyboardLayouts {
      *
      * - `/` is present, on row 3. It previously existed nowhere on either symbol page and was
      *   reachable only by holding the `m` key, which is why it read as missing entirely.
-     * - `$` is *not* here; the reference puts `£` in that slot and reaches `$` through the
-     *   shifted number row instead.
+     * - the reference draws `£` in the currency slot. This ships `$` there instead, carrying
+     *   the other currencies as its long-press strip (B4). The comment used to say `$` was not
+     *   on this page at all, which stopped being true in the same change that added the key
+     *   twelve lines below it.
      * - the emoji key is absent from this page, where the letters page keeps it.
      *
      * No corner hints: the reference draws none on this page.
