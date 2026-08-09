@@ -463,47 +463,79 @@ internal fun Modifier.keyGestures(
                 // the space bar, whereas crossing into a neighbour means the same thing
                 // everywhere -- and it is precisely the moment a tap stops being a plausible
                 // reading of what the finger is doing.
+                // The glide watch runs *inside* the long-press window rather than instead of
+                // it, and that is the whole reason this is shaped the way it is.
+                //
+                // The first version simply took over the gesture for every letter, which made
+                // holding a letter commit it as an ordinary tap: long-press stopped producing
+                // the corner symbol on all 26 keys. Nothing failed and nothing logged -- the
+                // key just typed the wrong thing, which is how a gesture regression hides.
+                //
+                // So only three outcomes are decided here. The finger left the key, which is a
+                // glide. The finger lifted, which is a tap. Or the window elapsed with the
+                // finger still on the key, which is a hold and is handed to the existing
+                // machinery below untouched.
+                var heldPastThreshold = false
                 if (glide != null && isGlideCandidate(keyOutput)) {
                     val origin = keyBounds()
                     var glided = false
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        val root = origin.topLeft + change.position
-                        if (!change.pressed) {
-                            if (glided) {
+                    var lifted = false
+                    withTimeoutOrNull(LONG_PRESS_MS) {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) {
+                                lifted = true
+                                break
+                            }
+                            val root = origin.topLeft + change.position
+                            if (!origin.contains(root)) {
+                                glided = true
+                                glide.begin(origin.center)
+                                glide.move(root)
+                                // Claimed only once this is definitely a glide, so an ordinary
+                                // tap or hold is left entirely alone.
+                                change.consume()
+                                break
+                            }
+                        }
+                    }
+
+                    if (glided) {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            glide.move(origin.topLeft + change.position)
+                            change.consume()
+                            if (!change.pressed) {
                                 glide.finish()?.let(onGlide)
                                 return@awaitEachGesture
                             }
-                            break
                         }
-                        if (!glided && !origin.contains(root)) {
-                            glided = true
-                            glide.begin(origin.center)
-                        }
-                        if (glided) {
-                            glide.move(root)
-                            // Claimed only once this is definitely a glide, so an ordinary tap
-                            // is left entirely alone.
-                            change.consume()
-                        }
-                    }
-                    if (glided) {
                         glide.cancel()
                         return@awaitEachGesture
                     }
-                    // Never left the key: fall through and let it behave as a tap or a hold.
-                    if (!pressed.value) return@awaitEachGesture
-                    onCommit(keyOutput)
-                    return@awaitEachGesture
+                    if (lifted) {
+                        onCommit(keyOutput)
+                        return@awaitEachGesture
+                    }
+                    // Still down, still on the key: this is a hold, and the window has already
+                    // been spent waiting it out.
+                    heldPastThreshold = true
                 }
 
                 // null  -> the threshold elapsed, this is a hold
                 // true  -> released before the threshold, an ordinary tap
                 // false -> the gesture was cancelled out from under us
                 val early =
-                    withTimeoutOrNull(LONG_PRESS_MS) {
-                        waitForUpOrCancellation() != null
+                    if (heldPastThreshold) {
+                        // Already established as a hold above; waiting a second full window
+                        // would make every long press on a letter take twice as long.
+                        null
+                    } else {
+                        withTimeoutOrNull(LONG_PRESS_MS) {
+                            waitForUpOrCancellation() != null
+                        }
                     }
 
                 when {

@@ -218,9 +218,9 @@ class TypingViewModel
          */
         suspend fun decodeGlide(
             stroke: com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke,
-        ): String? {
-            if (_fieldKind.value.isSensitive) return null
-            return predictionEngine.decodeGlide(stroke).firstOrNull()
+        ): List<String> {
+            if (_fieldKind.value.isSensitive) return emptyList()
+            return predictionEngine.decodeGlide(stroke)
         }
 
         /**
@@ -230,14 +230,49 @@ class TypingViewModel
          * of how they write. Routed through the same gate, so incognito and private mode
          * suppress it without needing to know glide exists.
          */
-        fun onGlideCommitted(word: String) {
+        fun onGlideCommitted(
+            word: String,
+            alternatives: List<String>,
+        ) {
             currentWord = ""
-            _suggestions.value = emptyList()
             _undoState.value = null
             generation++
             atSentenceStart = false
             publishAutoCapitalize()
             learn(word)
+            // The readings that lost stay in the strip.
+            //
+            // A glide is wrong more often than a tap -- several real words are usually valid
+            // readings of the same path, and the engine picks one. Leaving the runners-up
+            // where the user is already looking turns a wrong guess into one tap instead of
+            // deleting a word and gliding again. This is what the decoder keeps five
+            // candidates *for*; without it they were computed and thrown away.
+            _suggestions.value = alternatives.filter { it != word }.take(MAX_STRIP_SUGGESTIONS)
+            lastGlideCommit = word
+            lastGlideGeneration = generation
+        }
+
+        private var lastGlideCommit: String? = null
+        private var lastGlideGeneration = -1
+
+        /**
+         * The word a glide just committed, if the text has not moved since.
+         *
+         * A glide commits "word " including the trailing space, so the caret sits *after* a
+         * space and `wordUnderCaret` correctly reports nothing. Tapping an alternative would
+         * then insert rather than replace, leaving both readings in the text. The span has to
+         * come from what the glide wrote.
+         *
+         * Gated on the generation token rather than cleared from every path that could
+         * invalidate it. Everything that changes the text bumps that token -- a keystroke, a
+         * delete, a space, punctuation, an edit made outside this keyboard -- so one check
+         * covers all of them, where a list of explicit clears would silently miss whichever
+         * path was added next.
+         */
+        fun consumeGlideCommit(): String? {
+            val word = lastGlideCommit ?: return null
+            lastGlideCommit = null
+            return if (lastGlideGeneration == generation) word else null
         }
 
         /** When the shift key was last tapped, for the caps-lock double-tap window. */
@@ -593,6 +628,9 @@ internal const val SENTENCE_ENDINGS = ".!?"
  * tap" is exactly how they drift apart.
  */
 internal const val DOUBLE_TAP_WINDOW_MS = 300L
+
+/** How many losing glide readings the suggestion strip holds. */
+private const val MAX_STRIP_SUGGESTIONS = 3
 
 /**
  * What a second space should replace, or null when it should just be a space.

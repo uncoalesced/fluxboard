@@ -227,8 +227,21 @@ private fun matchesKey(
     key: Char,
 ): Boolean = letter == key || KeyProximity.areAdjacent(key, letter)
 
-/** A doubled letter is normal, so this is a nudge rather than a penalty. */
-private const val COST_DOUBLE_LETTER = 1
+/**
+ * Free, and it has to be.
+ *
+ * This was 1 -- a nudge, on the reasoning that a doubled letter is slightly unusual. On a
+ * device that turned out to decide real words wrongly: "good" and "god" are both readings of
+ * the same path, and the doubled one lost by exactly this point every time. So did "too"
+ * against "to", "been" against "ben", "week" against "wek".
+ *
+ * The reasoning was wrong rather than mistuned. A glide cannot show a doubled letter at all --
+ * the finger has no way to visit one key twice in succession -- so the path carries *no
+ * evidence either way*. Charging for it does not express uncertainty, it invents a preference
+ * against every doubled word in English. With it at zero the two readings tie on structure and
+ * frequency decides, which is the only signal that actually distinguishes them.
+ */
+private const val COST_DOUBLE_LETTER = 0
 
 /** Landing on a neighbour instead of the target is what fast gliding does. */
 private const val COST_NEIGHBOUR = 3
