@@ -32,6 +32,48 @@ the v0.1.1 tag".
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Every preference silently stopped propagating in release builds.** Settings
+  appeared to do nothing: a toggle wrote to disk and nothing in the app or the
+  keyboard changed until the process was restarted. The privacy switch in the
+  quick-access row was the worst of it -- it could be turned on and never off,
+  and because it suppresses suggestions, autocorrect and glide, that left the
+  keyboard's headline feature dead with the only control for it inert.
+
+  `KeyboardPreferences` and `AppPreferences` published changes through a
+  `SharedPreferences.OnSharedPreferenceChangeListener`. SharedPreferences holds
+  its listeners in a `WeakHashMap`, so the `private val listener` field was the
+  only strong reference to ours -- and R8, seeing a field written once and read
+  once, removed the field. The listener was collected at the first GC and no
+  preference change reached any `StateFlow` again for the life of the process.
+
+  Debug builds are not minified, so it worked perfectly everywhere except the
+  artifact that ships. Confirmed against `outputs/mapping/release/mapping.txt`,
+  which lists `prefs` and all sixteen flow fields for the class and no `listener`
+  field at all.
+
+  Both classes are `@Singleton` and every write already goes through their own
+  setters, so the listener was never doing anything a setter could not. Each
+  setter now publishes to its own flow directly, which R8 cannot remove because
+  the flow is read elsewhere. Clamped setters compute the clamped value once and
+  use it for both the write and the flow, so the stored number and the published
+  one cannot drift.
+
+  `PreferencePublishTest` pins the setter contract (verified to fail when a
+  publish is removed), and `scripts/check-source-rules.sh` now refuses to let a
+  SharedPreferences listener back into the codebase.
+
+### Changed
+
+- `KeyboardLayouts.symbolsPrimaryRows` KDoc said `$` was not on symbols page 1.
+  It has been since B4 put the currency key there, twelve lines below the
+  sentence saying otherwise.
+
+---
+
 ## [v0.1.5-BETA] - 2026-08-09
 
 **The first beta.** versionCode 6, versionName `v0.1.5-BETA`. The app says so

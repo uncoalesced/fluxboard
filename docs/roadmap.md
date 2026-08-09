@@ -2,7 +2,7 @@
 
 # FluxBoard Roadmap and Bug Tracker
 
-Current version: `v0.1.4-ALPHA` (versionCode 4), branch `development`.
+Current version: `v0.1.5-BETA` (versionCode 6), branch `development`.
 
 This is the document `README.md` has pointed at since v0.1.0 and which was
 never committed. It is the single place where open issues live. If something is
@@ -1042,6 +1042,112 @@ to the punctuation set. `KeyHintToggleTest` pins that.
 symbols pages and the number row are not editable, even though both became part
 of `KeyboardLayoutConfig` in v0.1.4 specifically so they could be. The data
 model is ready; the editor has not caught up with it.
+
+---
+
+## 4C. Found by the 2026-08-09 full device pass (v0.1.5-BETA)
+
+The pass ran on the Redmi Note 11 (2201117TI, LineageOS 22.2, Android 15,
+1080x2400 @420dpi) against the signed release artifact, with a debug build
+swapped in mid-pass to read app-private state and swapped back out afterwards.
+
+### 4C.1 No preference change reached anything in a release build
+
+**Status: FIXED, device-verified 2026-08-09 on the signed release artifact.**
+**This was release-blocking.**
+
+Every switch and slider in Settings appeared dead. The write landed on disk and
+was picked up on the next launch, so nothing looked broken while it happened --
+the setting simply did not take effect until the app was restarted. The privacy
+toggle in the quick-access row was the sharp end: it could be turned **on and
+never off**, and since `FieldKind.PRIVATE` suppresses suggestions, autocorrect
+and glide, a user who tried it once lost glide typing -- the release's headline
+feature -- with the only control for it visibly inert.
+
+**Root cause.** `KeyboardPreferences` and `AppPreferences` published through a
+`SharedPreferences.OnSharedPreferenceChangeListener`. SharedPreferences keeps
+listeners in a `WeakHashMap`; the `private val listener` field was the only
+strong reference, and R8 -- a field written once and read once -- deleted it.
+First GC collected the listener and every `StateFlow` in the process froze.
+
+**Why it survived to a release.** Debug builds are not minified and unit tests
+run un-minified, so it is invisible in both. This is the same shape as the Room
+`_Impl` constructor incident: an R8 optimization that is correct in isolation
+and wrong because a framework holds the reference weakly.
+
+**How it was confirmed, not guessed.** `outputs/mapping/release/mapping.txt`
+lists `prefs` and all sixteen flow fields for `KeyboardPreferences` and **no
+`listener` field**. Behaviourally: on the debug build the toggle worked both
+ways and `shared_prefs/keyboard_preferences.xml` tracked it; on the release
+build the same tap changed nothing, and a whole-IME pixel diff across the tap
+was byte-identical -- not even a press ripple.
+
+**Fix.** Both classes are `@Singleton` and every write in the app already goes
+through their setters (checked, not assumed), so the listener was never doing
+anything a setter could not. Each setter publishes to its own flow directly.
+Clamped setters clamp once and use that value for both the write and the flow.
+
+**Guards.** `PreferencePublishTest` pins the setter contract and was verified to
+fail when a single publish is removed. `scripts/check-source-rules.sh` fails the
+build if `registerOnSharedPreferenceChangeListener` reappears anywhere in source.
+
+### 4C.2 Verified on device in the same pass
+
+Recorded because these promote entries that were **FIXED (unverified)**:
+
+- **Glide typing (4B.1).** Gliding `h-e-l-o` committed `hello ` with its own
+  trailing space; the doubled `l` decoded from a single crossing, which is the
+  `COST_DOUBLE_LETTER = 0` invariant. Losing readings (`help`, `hell`, `hero`)
+  went to the suggestion strip, and tapping one **replaced** rather than
+  appended (`hello ` became `hell `).
+- **Caps lock by double tap (4B.5).** Two quick shift taps latched; `bcd` typed
+  as `BCD`. A single later tap released it and `ef` typed lower case.
+- **Space leaves the symbols page (4B.4).** `@` then space returned to letters.
+- **Emoji picker backspace (4B.2).** Present, bottom right. Deleted exactly one
+  whole emoji (len 4 to 2), not half a surrogate pair. The picker stayed open on
+  insert, and both exits (chevron, `ABC`) are present.
+- **Symbols on keys (4B.7).** With the setting **off**, holding `q`, `m`, `x`
+  still committed `%`, `/`, `£` -- the hint reaches `longPressFor` even when it
+  is not drawn, which is the whole point of the setting being presentation-only.
+- **Number row (3.2).** Corner hints read `1!` `2@` `3#` `4$` `5%` `6^` `7&`
+  `8*` `9(` `0)`. Arming shift replaced the digits with real `! @ # $ % ^ & * ( )`
+  keys. Holding `1`, `2`, `3` committed `¹ ² ³` -- the superscript, per the
+  current design; note the older checklist step 7.6 still describes the
+  pre-B4 behaviour and is stale.
+- **Symbols page 1 (3.1) and 4.6/F1.** Row 3 is `{&= " * ' : / ! ? +`, `/` is
+  present, the `{&=` label is correct, the emoji key is kept, and the digit row
+  carries **no corner hints and no hold-affordance dots** -- the output-keyed
+  alternates collision stays fixed.
+- **Toolbar geometry.** Opening it moved the IME window top from 1444 to 1212
+  (956px to 1188px) while the key-grid band was **pixel-identical**. It grows
+  the window upward and takes nothing from the keys.
+- **One height for every mode (4A.3).** Typing, emoji picker, clipboard,
+  password and PIN-classified fields all measured **956px** from
+  `dumpsys window`.
+- **Password fields (3.8, 4A.5).** An alphanumeric password lit the lock, drew
+  no suggestions, and `correcthorse` kept its lower-case `c` -- auto-capitalize
+  suppressed via `isCredential`.
+- **False positives (3.8).** `tel`, `number` and `email` fields were **not**
+  treated as sensitive; the email field offered `help`, `held`, `helpful`.
+- **Autocorrect.** `teh` + space gave `The `, `brwon` + space gave `Brown `,
+  `teh` + `.` gave `The.`, and `thankbyou` + space split to `Thank you `.
+- **Beta signalling.** The BETA badge, the beta notice and `v0.1.5-BETA` all
+  render in Settings, with `REPO_URL` and `SITE_URL` correct.
+
+### 4C.3 Not settled by this pass
+
+- **The PIN pad was not exercised.** Gecko maps `type=password
+  inputmode=numeric` to a *text* password, so the browser harness cannot produce
+  `TYPE_NUMBER_VARIATION_PASSWORD`. The keyboard did the right thing with what
+  it was given (QWERTY, lock lit, no suggestions). The digits-only grid still
+  needs a native field that declares that input type.
+- **One glyph in digit 1's hold strip is unidentified.** The strip renders six
+  cells and `⅛ ¼ ⅓ ½` are unambiguous and free of tofu; the last cell resolved
+  as a dot above a stem at 8x zoom, which is neither `!` (bar above dot) nor an
+  obvious `¹`. The committed default is correct, so this is cosmetic at worst,
+  but it is written down rather than waved through.
+- **Sticker delivery to WhatsApp and Discord (4.1) remains unverified.** Neither
+  app is installed on this device. Unchanged.
 
 ---
 

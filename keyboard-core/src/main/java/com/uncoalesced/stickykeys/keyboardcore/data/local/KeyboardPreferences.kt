@@ -23,50 +23,23 @@ class KeyboardPreferences
                 Context.MODE_PRIVATE,
             )
 
-        private val listener =
-            SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                when (key) {
-                    "auto_capitalize" ->
-                        _autoCapitalizeEnabled.value =
-                            prefs.getBoolean("auto_capitalize", true)
-                    "auto_correct" ->
-                        _autoCorrectEnabled.value =
-                            prefs.getBoolean("auto_correct", true)
-                    "active_theme_id" ->
-                        _activeThemeId.value =
-                            prefs.getString("active_theme_id", "preset_default_dark")
-                                ?: "preset_default_dark"
-                    "active_layout_id" ->
-                        _activeLayoutId.value =
-                            prefs.getString("active_layout_id", "preset_qwerty") ?: "preset_qwerty"
-                    "haptics_enabled" ->
-                        _hapticsEnabled.value =
-                            prefs.getBoolean("haptics_enabled", true)
-                    "haptics_intensity" ->
-                        _hapticsIntensity.value = readHapticsPercent()
-                    "double_space_period" ->
-                        _doubleSpacePeriodEnabled.value =
-                            prefs.getBoolean("double_space_period", true)
-                    "key_size_percent" ->
-                        _keySizePercent.value = readKeySizePercent()
-                    "show_number_row" ->
-                        _showNumberRow.value =
-                            prefs.getBoolean("show_number_row", true)
-                    "keyboard_height_percent" ->
-                        _keyboardHeightPercent.value = readHeightPercent()
-                    "keyboard_bottom_padding_dp" ->
-                        _keyboardBottomPaddingDp.value = readBottomPadding()
-                    "glide_typing" ->
-                        _glideTypingEnabled.value =
-                            prefs.getBoolean("glide_typing", true)
-                    "show_key_hints" ->
-                        _showKeyHints.value =
-                            prefs.getBoolean("show_key_hints", true)
-                    "private_mode" ->
-                        _privateModeEnabled.value =
-                            prefs.getBoolean("private_mode", false)
-                }
-            }
+        // There is deliberately no OnSharedPreferenceChangeListener here. Every setter below
+        // publishes to its own flow directly, which is the only mechanism.
+        //
+        // There used to be one, and in a release build it silently did nothing.
+        // SharedPreferences keeps its listeners in a WeakHashMap, so the `private val listener`
+        // field was the only strong reference to ours -- and R8, seeing a field written once and
+        // read once, inlined the field away. Nothing then held the listener, the first GC
+        // collected it, and from that moment no preference change reached any flow in the
+        // process. Nothing looked broken: writes still landed on disk and were picked up on the
+        // next launch, so every toggle in Settings appeared dead until the app was restarted,
+        // and the privacy switch in the quick-access row could be turned on and never off.
+        // Confirmed against outputs/mapping/release/mapping.txt, which lists `prefs` and every
+        // flow field for this class and no `listener` field at all.
+        //
+        // This class is a @Singleton and every write in the app goes through it (checked, not
+        // assumed), so a listener was never doing anything a setter could not. Publishing from
+        // the setter cannot be optimized away, because the flow it writes is read elsewhere.
 
         private val _autoCapitalizeEnabled =
             MutableStateFlow(prefs.getBoolean("auto_capitalize", true))
@@ -206,6 +179,7 @@ class KeyboardPreferences
         /** Turns glide typing on or off. */
         fun setGlideTyping(enabled: Boolean) {
             prefs.edit().putBoolean("glide_typing", enabled).apply()
+            _glideTypingEnabled.value = enabled
         }
 
         private fun readKeySizePercent(): Int =
@@ -223,28 +197,29 @@ class KeyboardPreferences
                 .getInt("keyboard_bottom_padding_dp", DEFAULT_BOTTOM_PADDING_DP)
                 .coerceIn(0, MAX_BOTTOM_PADDING_DP)
 
-        init {
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-        }
-
         fun setAutoCapitalize(enabled: Boolean) {
             prefs.edit().putBoolean("auto_capitalize", enabled).apply()
+            _autoCapitalizeEnabled.value = enabled
         }
 
         fun setAutoCorrect(enabled: Boolean) {
             prefs.edit().putBoolean("auto_correct", enabled).apply()
+            _autoCorrectEnabled.value = enabled
         }
 
         fun setActiveThemeId(themeId: String) {
             prefs.edit().putString("active_theme_id", themeId).apply()
+            _activeThemeId.value = themeId
         }
 
         fun setActiveLayoutId(layoutId: String) {
             prefs.edit().putString("active_layout_id", layoutId).apply()
+            _activeLayoutId.value = layoutId
         }
 
         fun setHapticsEnabled(enabled: Boolean) {
             prefs.edit().putBoolean("haptics_enabled", enabled).apply()
+            _hapticsEnabled.value = enabled
         }
 
         /**
@@ -276,53 +251,56 @@ class KeyboardPreferences
 
         fun setDoubleSpacePeriod(enabled: Boolean) {
             prefs.edit().putBoolean("double_space_period", enabled).apply()
+            _doubleSpacePeriodEnabled.value = enabled
         }
+
+        // The clamped value is computed once and used for both the write and the flow. Clamping
+        // twice from two expressions is how the stored number and the published one drift.
 
         /** [percent] scales the key inside its cell. 100 is the shipped size. */
         fun setKeySizePercent(percent: Int) {
-            prefs
-                .edit()
-                .putInt(
-                    "key_size_percent",
-                    percent.coerceIn(MIN_KEY_SIZE_PERCENT, MAX_KEY_SIZE_PERCENT),
-                ).apply()
+            val clamped = percent.coerceIn(MIN_KEY_SIZE_PERCENT, MAX_KEY_SIZE_PERCENT)
+            prefs.edit().putInt("key_size_percent", clamped).apply()
+            _keySizePercent.value = clamped
         }
 
         fun setShowNumberRow(show: Boolean) {
             prefs.edit().putBoolean("show_number_row", show).apply()
+            _showNumberRow.value = show
         }
 
         /** [intensity] is a slider percentage, 0-100. Zero is valid and means silent. */
         fun setHapticsIntensity(intensity: Int) {
-            prefs.edit().putInt("haptics_intensity", intensity.coerceIn(0, 100)).apply()
+            val clamped = intensity.coerceIn(0, 100)
+            prefs.edit().putInt("haptics_intensity", clamped).apply()
+            _hapticsIntensity.value = clamped
         }
 
         /** [percent] scales the whole panel. 100 is the shipped height. */
         fun setKeyboardHeightPercent(percent: Int) {
-            prefs
-                .edit()
-                .putInt(
-                    "keyboard_height_percent",
-                    percent.coerceIn(MIN_KEYBOARD_HEIGHT_PERCENT, MAX_KEYBOARD_HEIGHT_PERCENT),
-                ).apply()
+            val clamped =
+                percent.coerceIn(MIN_KEYBOARD_HEIGHT_PERCENT, MAX_KEYBOARD_HEIGHT_PERCENT)
+            prefs.edit().putInt("keyboard_height_percent", clamped).apply()
+            _keyboardHeightPercent.value = clamped
         }
 
         /** Shows or hides the corner symbols. Does not change what long-press types. */
         fun setShowKeyHints(show: Boolean) {
             prefs.edit().putBoolean("show_key_hints", show).apply()
+            _showKeyHints.value = show
         }
 
         /** Turns the manual privacy switch on or off. See [privateModeEnabled]. */
         fun setPrivateMode(enabled: Boolean) {
             prefs.edit().putBoolean("private_mode", enabled).apply()
+            _privateModeEnabled.value = enabled
         }
 
         /** [dp] is the gap held below the bottom key row, above the gesture bar. */
         fun setKeyboardBottomPaddingDp(dp: Int) {
-            prefs
-                .edit()
-                .putInt("keyboard_bottom_padding_dp", dp.coerceIn(0, MAX_BOTTOM_PADDING_DP))
-                .apply()
+            val clamped = dp.coerceIn(0, MAX_BOTTOM_PADDING_DP)
+            prefs.edit().putInt("keyboard_bottom_padding_dp", clamped).apply()
+            _keyboardBottomPaddingDp.value = clamped
         }
 
         companion object {
