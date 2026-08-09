@@ -56,6 +56,12 @@ class KeyboardPreferences
                         _keyboardHeightPercent.value = readHeightPercent()
                     "keyboard_bottom_padding_dp" ->
                         _keyboardBottomPaddingDp.value = readBottomPadding()
+                    "glide_typing" ->
+                        _glideTypingEnabled.value =
+                            prefs.getBoolean("glide_typing", true)
+                    "show_key_hints" ->
+                        _showKeyHints.value =
+                            prefs.getBoolean("show_key_hints", true)
                     "private_mode" ->
                         _privateModeEnabled.value =
                             prefs.getBoolean("private_mode", false)
@@ -174,6 +180,34 @@ class KeyboardPreferences
             MutableStateFlow(prefs.getBoolean("private_mode", false))
         val privateModeEnabled: StateFlow<Boolean> = _privateModeEnabled.asStateFlow()
 
+        /**
+         * Whether letter keys show their symbol in the top-left corner.
+         *
+         * On by default: the corner symbols are how the punctuation on this keyboard is found
+         * at all, and a board that hides them by default would look cleaner and type worse.
+         * Off is for people who already know where things are and want the quieter board.
+         *
+         * Presentation only. Long-press still produces the symbol whether or not it is drawn.
+         */
+        private val _showKeyHints = MutableStateFlow(prefs.getBoolean("show_key_hints", true))
+        val showKeyHints: StateFlow<Boolean> = _showKeyHints.asStateFlow()
+
+        /**
+         * Whether swiping across the letters types a word.
+         *
+         * On by default. Off restores the previous pointer handling exactly rather than
+         * running the gesture and discarding it, which matters for anyone whose grip drags
+         * across keys on the way to a tap.
+         */
+        private val _glideTypingEnabled =
+            MutableStateFlow(prefs.getBoolean("glide_typing", true))
+        val glideTypingEnabled: StateFlow<Boolean> = _glideTypingEnabled.asStateFlow()
+
+        /** Turns glide typing on or off. */
+        fun setGlideTyping(enabled: Boolean) {
+            prefs.edit().putBoolean("glide_typing", enabled).apply()
+        }
+
         private fun readKeySizePercent(): Int =
             prefs
                 .getInt("key_size_percent", DEFAULT_KEY_SIZE_PERCENT)
@@ -271,6 +305,11 @@ class KeyboardPreferences
                     "keyboard_height_percent",
                     percent.coerceIn(MIN_KEYBOARD_HEIGHT_PERCENT, MAX_KEYBOARD_HEIGHT_PERCENT),
                 ).apply()
+        }
+
+        /** Shows or hides the corner symbols. Does not change what long-press types. */
+        fun setShowKeyHints(show: Boolean) {
+            prefs.edit().putBoolean("show_key_hints", show).apply()
         }
 
         /** Turns the manual privacy switch on or off. See [privateModeEnabled]. */

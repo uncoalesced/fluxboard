@@ -59,6 +59,16 @@ internal data class ImePanelMetrics(
      * are genuinely independent controls rather than two names for the same slider.
      */
     val keyScale: Float = 1f,
+    /**
+     * Whether the corner symbol is drawn on keys that carry one.
+     *
+     * Presentation only, and that separation is the whole point. The hint is also what *gives*
+     * a letter key its long-press symbol -- `longPressFor` falls back to it when a key has no
+     * alternates of its own -- so hiding it by withholding the hint would quietly take away
+     * long-press access to every corner symbol on the board. A user turning off a visual
+     * setting would lose a way of typing, and nothing would say so.
+     */
+    val showKeyHints: Boolean = true,
 )
 
 /**

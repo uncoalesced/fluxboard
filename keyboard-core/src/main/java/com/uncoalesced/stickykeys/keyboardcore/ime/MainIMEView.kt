@@ -116,8 +116,15 @@ fun MainIMEView(
     val bottomPaddingDp by typingViewModel.keyboardBottomPaddingDp.collectAsState()
     val numberRowShown by typingViewModel.showNumberRow.collectAsState()
     val keySizePercent by typingViewModel.keySizePercent.collectAsState()
+    val showKeyHints by typingViewModel.showKeyHints.collectAsState()
     val panelMetrics =
-        remember(heightPercent, bottomPaddingDp, numberRowShown, keySizePercent) {
+        remember(
+            heightPercent,
+            bottomPaddingDp,
+            numberRowShown,
+            keySizePercent,
+            showKeyHints,
+        ) {
             ImePanelMetrics(
                 heightScale = heightPercent / 100f,
                 keyScale = keySizePercent / 100f,
@@ -136,6 +143,7 @@ fun MainIMEView(
                 // which is what `dimens.xml` says the value is for: one number, every mode, so
                 // switching changes what is drawn and never how tall the window is.
                 showNumberRow = numberRowShown,
+                showKeyHints = showKeyHints,
             )
         }
 
@@ -211,6 +219,11 @@ fun MainIMEView(
                                 onBackToKeyboard = {
                                     interceptingController.switchMode(AppMode.TYPING)
                                 },
+                                // Deletes without leaving the picker. Routed through the
+                                // controller rather than the typing model because there is no
+                                // word being tracked here -- an emoji is a committed glyph, not
+                                // a letter in progress.
+                                onBackspace = { interceptingController.sendDelete() },
                                 modifier = Modifier.height(rememberImePanelHeight()),
                             )
                         }
