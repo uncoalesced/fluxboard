@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -126,15 +127,47 @@ fun AppSettingsScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.headlineMedium,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                style = MaterialTheme.typography.headlineMedium,
+                            )
+                            if (IS_PRERELEASE) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                PrereleaseBadge()
+                            }
+                        }
                         Text(
                             text = BuildConfig.VERSION_NAME,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                }
+
+                if (IS_PRERELEASE) {
+                    // Said once, plainly, where somebody deciding whether to trust this build
+                    // will see it. A badge alone says "beta" without saying what follows from
+                    // it, and what follows is the part a tester needs: things will break, and
+                    // reporting them is the point of their having it.
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = stringResource(R.string.text_beta_notice_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.text_beta_notice_body),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            )
+                        }
                     }
                 }
 
@@ -323,3 +356,37 @@ private const val REPO_URL = "https://github.com/uncoalesced/fluxboard"
  * is not. Points here until the site is live; one line to change when it is.
  */
 private const val SITE_URL = "https://github.com/uncoalesced"
+
+/**
+ * Whether this build is a pre-release, derived from the version rather than declared.
+ *
+ * A separate flag would be a second thing to remember at release time, and the one that gets
+ * forgotten is always the one that makes a stable build announce itself as a beta -- or worse,
+ * a beta stay silent. The version string is already the thing that has to be right.
+ */
+private val IS_PRERELEASE: Boolean =
+    BuildConfig.VERSION_NAME.contains("BETA", ignoreCase = true) ||
+        BuildConfig.VERSION_NAME.contains("ALPHA", ignoreCase = true) ||
+        BuildConfig.VERSION_NAME.contains("RC", ignoreCase = true)
+
+/** The word itself, next to the app name, in the one colour reserved for saying "not final". */
+@Composable
+private fun PrereleaseBadge() {
+    val label =
+        when {
+            BuildConfig.VERSION_NAME.contains("BETA", ignoreCase = true) -> "BETA"
+            BuildConfig.VERSION_NAME.contains("ALPHA", ignoreCase = true) -> "ALPHA"
+            else -> "PRE-RELEASE"
+        }
+    Surface(
+        color = MaterialTheme.colorScheme.tertiary,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onTertiary,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+    }
+}
