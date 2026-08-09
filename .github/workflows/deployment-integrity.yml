@@ -1,0 +1,77 @@
+# Engineered by uncoalesced
+#
+# `deployment` is what a tester build is cut from, so the question it has to answer
+# is narrow: is this exactly what was reviewed and merged into main?
+#
+# `sync-deployment.yml` force-pushes main here, which means anything that is on
+# deployment and not on main arrived some other way -- a direct push, or a sync that
+# did not finish. Either way the branch is no longer a mirror, and a build cut from
+# it would ship code that never went through a pull request.
+#
+# This job says so out loud rather than letting the next release be quietly different
+# from the one that was approved.
+
+name: Deployment Integrity
+
+on:
+  push:
+    branches: [ deployment ]
+  # Cheap enough to also run on a schedule, which catches a divergence introduced
+  # while nobody was pushing.
+  schedule:
+    - cron: '43 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-integrity
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: deployment must be an exact mirror of main
+        run: |
+          set -euo pipefail
+          git fetch origin main deployment
+
+          main_sha=$(git rev-parse origin/main)
+          dep_sha=$(git rev-parse origin/deployment)
+          echo "main       = $main_sha"
+          echo "deployment = $dep_sha"
+
+          if [ "$main_sha" = "$dep_sha" ]; then
+            echo "deployment matches main exactly."
+            exit 0
+          fi
+
+          echo
+          echo "deployment has diverged from main."
+          echo
+          echo "Commits on deployment that are not on main:"
+          git log --oneline origin/main..origin/deployment || true
+          echo
+          echo "Commits on main that have not reached deployment:"
+          git log --oneline origin/deployment..origin/main || true
+          echo
+
+          # The two cases are not equally serious, and the message says which is which
+          # rather than making the reader work it out.
+          ahead=$(git rev-list --count origin/main..origin/deployment)
+          if [ "$ahead" -ne 0 ]; then
+            echo "deployment carries $ahead commit(s) main does not have. Something was"
+            echo "pushed straight to the distribution branch, bypassing review. Do not cut"
+            echo "a build from it until that commit is on main or removed."
+          else
+            echo "deployment is only behind. The sync probably has not run yet; re-run"
+            echo "'Sync Main to Deployment', or push to main again."
+          fi
+          exit 1
