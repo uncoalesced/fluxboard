@@ -105,8 +105,43 @@ jobs:
           echo "TELEMETRY GATE: Play Services components in the merged manifest."
           fail=1
         fi
-
         rm -rf "$WORK"
+
+        # R8's own mapping is the authoritative half of this check, and the DEX scan
+        # above is the weaker one. CLAUDE.md records why: a release build is
+        # obfuscated, so a dependency that is present but renamed need not leave its
+        # original string in any DEX -- a scan that only reads DEX bytes can pass for
+        # the wrong reason. mapping.txt lists what R8 processed under its *original*
+        # name, so a dependency cannot hide in it.
+        MAP=app/build/outputs/mapping/release/mapping.txt
+        if [ ! -f "$MAP" ]; then
+          echo "TELEMETRY GATE: no mapping.txt, so the strong half of this check did"
+          echo "not run. Refusing to pass on the DEX scan alone."
+          exit 1
+        fi
+
+        # Positive control. If this is ever zero the grep is broken rather than the
+        # build being clean, and every check below it would pass meaninglessly.
+        control=$(grep -c "androidx.room" "$MAP" || true)
+        echo "  control androidx.room -> $control"
+        if [ "$control" -eq 0 ]; then
+          echo "TELEMETRY GATE: positive control found nothing. The check is broken."
+          exit 1
+        fi
+
+        for pkg in \
+          "com.google.android.gms" \
+          "com.google.mlkit" \
+          "com.google.firebase" \
+          "com.google.android.datatransport" ; do
+          n=$(grep -c "$pkg" "$MAP" || true)
+          echo "  mapping $pkg -> $n"
+          if [ "$n" -ne 0 ]; then
+            echo "TELEMETRY GATE: '$pkg' was compiled into the release build."
+            fail=1
+          fi
+        done
+
         if [ "$fail" -ne 0 ]; then
           echo
           echo "This project promises zero telemetry and no Play Services dependency."
