@@ -64,6 +64,12 @@ class TypingViewModel
         /** Whether the always-visible digit row is drawn above the letters. */
         val showNumberRow: StateFlow<Boolean> = keyboardPreferences.showNumberRow
 
+        /** Whether keys draw their corner symbol. Presentation only; long-press is unaffected. */
+        val showKeyHints: StateFlow<Boolean> = keyboardPreferences.showKeyHints
+
+        /** Whether swiping across the letters decodes into a word. */
+        val glideTypingEnabled: StateFlow<Boolean> = keyboardPreferences.glideTypingEnabled
+
         /** Panel sizing, chosen by the user rather than fixed. See `ImePanelHeight`. */
         val keyboardHeightPercent: StateFlow<Int> = keyboardPreferences.keyboardHeightPercent
         val keyboardBottomPaddingDp: StateFlow<Int> = keyboardPreferences.keyboardBottomPaddingDp
@@ -202,6 +208,57 @@ class TypingViewModel
         }
 
         fun isCurrent(token: Int): Boolean = token == generation
+
+        /**
+         * Decodes a finished glide, or null if nothing plausible came out of it.
+         *
+         * Suppressed entirely on a secret, for the same two reasons the suggestion strip is:
+         * the decode is a dictionary lookup over what is being typed, and the result would be
+         * committed into a field the user cannot read back to check.
+         */
+        suspend fun decodeGlide(
+            stroke: com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke,
+        ): String? {
+            if (_fieldKind.value.isSensitive) return null
+            return predictionEngine.decodeGlide(stroke).firstOrNull()
+        }
+
+        /**
+         * A glided word was committed.
+         *
+         * Learned like any other finished word, because a glide the user accepted is evidence
+         * of how they write. Routed through the same gate, so incognito and private mode
+         * suppress it without needing to know glide exists.
+         */
+        fun onGlideCommitted(word: String) {
+            currentWord = ""
+            _suggestions.value = emptyList()
+            _undoState.value = null
+            generation++
+            atSentenceStart = false
+            publishAutoCapitalize()
+            learn(word)
+        }
+
+        /** When the shift key was last tapped, for the caps-lock double-tap window. */
+        private var lastShiftTapAt = 0L
+
+        /**
+         * How long since the previous shift tap, recording this one.
+         *
+         * Lives here rather than in the view because the view's mode state is rebuilt on every
+         * input session, and a timestamp that resets with it would make the first shift tap in
+         * a new field behave differently from every other one.
+         *
+         * Returns [Long.MAX_VALUE] when there is no previous tap, so the first tap of a session
+         * can never be read as the second half of a double tap.
+         */
+        fun consumeShiftTapGap(): Long {
+            val now = System.currentTimeMillis()
+            val gap = if (lastShiftTapAt == 0L) Long.MAX_VALUE else now - lastShiftTapAt
+            lastShiftTapAt = now
+            return gap
+        }
 
         /** When the last space was committed, for the double-space window. */
         private var lastSpaceAt = 0L
