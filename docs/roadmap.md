@@ -969,6 +969,79 @@ mid-word backspace-and-retype.
 
 ---
 
+## 4B. v0.1.5 backlog, as stated 2026-08-08
+
+Six items. Recorded before any of them was started so the list is not
+reconstructed later from whatever happened to get built.
+
+### 4B.1 Glide typing -- the headline feature for v0.1.5
+
+**Status: FIXED (unverified). Built end to end; never run on a device.**
+
+Decoder in `GlideStroke.kt` plus `PredictionEngine.decodeGlide`; gesture capture
+in `GlideTracker` and the glide branch of `keyGestures`. On by default with a
+settings switch. Gated on `isSensitive`, so passwords and PINs never decode.
+
+Swipe across the letters to type a word. The one large piece of work in this
+release; everything else here is small by comparison.
+
+### 4B.2 The emoji picker has no backspace
+
+**Status: FIXED (unverified).** Bottom right, repeating on hold. There is no way to delete from inside the picker, so a
+mistyped emoji means switching back to the keyboard and returning. Every other
+mode reaches backspace without leaving.
+
+### 4B.3 Typing does not feel smooth
+
+**Status: OPEN, and deliberately not yet given a cause.** A feel complaint, not
+a defect report -- so the first job is to find out what "not smooth" is, not to
+start optimizing. Candidates already known to matter here, in the order worth
+checking: the release build has no baseline profile at all, so the first frames
+of every session are interpreted; a debug build additionally has no R8 and live
+literals on, so any measurement has to be taken against the release artifact;
+and the recomposition work in `KeyboardRecompositionTest` guards the key grid
+but nothing guards the suggestion strip, which rebuilds on every keystroke.
+Measure before changing anything.
+
+### 4B.4 Space on a symbols page should return to letters
+
+**Status: FIXED (unverified).** Typing a symbol then space leaves the board on the symbols
+page, so the next word is typed on the wrong plane. Enter already resets the
+page; space does not.
+
+### 4B.5 Caps lock double-tap
+
+**Status: FIXED (unverified).** `nextShiftMode` is pure and tested;
+`ShiftCycleTest` covers both sides of the window and the always-escapable latch. The current shift key is a three-way cycle -- lower, upper,
+caps lock -- so reaching caps lock is one tap away from lower case and is easy
+to enter by accident. Wanted instead:
+
+- One tap arms shift for the next letter, as now. The number row shows its
+  shifted symbols, as now.
+- A second tap **within a short window** (about a second) latches caps lock, and
+  the shift key shows a bar under the arrow to say so.
+- A second tap **after** that window returns to lower case rather than latching.
+
+So the same key does two different things depending on timing, which is the
+part that needs a pure, tested decision function rather than a state machine
+spread across the view.
+
+### 4B.7 Symbols on keys can be turned off
+
+**Status: FIXED (unverified).** Added this release, not on the original list.
+Settings > Keyboard, under the number row, default on. Presentation only -- the
+hint still reaches `longPressFor`, so hiding it cannot remove long-press access
+to the punctuation set. `KeyHintToggleTest` pins that.
+
+### 4B.6 Only the letters plane can be remapped
+
+**Status: OPEN.** The layout editor remaps the main letters keyboard. The
+symbols pages and the number row are not editable, even though both became part
+of `KeyboardLayoutConfig` in v0.1.4 specifically so they could be. The data
+model is ready; the editor has not caught up with it.
+
+---
+
 ## 5. Deliberate shortcuts, recorded so they are not mistaken for bugs
 
 - **Vertical caret movement counts hard newlines only** (`CursorMove.kt:47`,
