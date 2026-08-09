@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,13 +25,16 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -50,6 +52,9 @@ private val TAB_STRIP_HEIGHT = 40.dp
 private val EMOJI_CELL = 44.dp
 private val STICKER_CELL = 72.dp
 
+/** Matches one key row, so the picker's bottom edge lines up with the keyboard's. */
+private val EMOJI_ACTION_BAR_HEIGHT = 52.dp
+
 /**
  * One picker for stickers and emoji.
  *
@@ -66,12 +71,17 @@ internal fun EmojiPickerView(
     onEmojiClick: (String) -> Unit,
     onStickerClick: (Sticker) -> Unit,
     onBackToKeyboard: () -> Unit,
+    onBackspace: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val groups by viewModel.emojiGroups.collectAsState()
     val stickers by viewModel.stickers.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
     val recent by viewModel.recentEmoji.collectAsState()
+    // Remembered instances, not fresh ones per recomposition: the gesture machine
+    // writes into them and a reallocated holder loses the press mid-gesture.
+    val emojiBackspacePressed = remember { mutableStateOf(false) }
+    val emojiBackspaceAlternates = remember { KeyAlternatesState() }
 
     // Recent leads, because that is where the emoji key lands and it is what a user reaching
     // for the picker mid-message almost always wants. Stickers follows, then the emoji groups
@@ -185,7 +195,10 @@ internal fun EmojiPickerView(
 
         if (selectedTab == EmojiPickerViewModel.RECENT_TAB) {
             if (recent.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Text(
                         text = "Emoji you use will show up here",
                         color = StickyKeysTheme.colors.onSurfaceVariant,
@@ -195,7 +208,7 @@ internal fun EmojiPickerView(
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(EMOJI_CELL),
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 ) {
                     items(items = recent, key = { it }) { glyph ->
                         Box(
@@ -216,13 +229,13 @@ internal fun EmojiPickerView(
                 stickers = stickers,
                 fileManager = fileManager,
                 onStickerClick = onStickerClick,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
             )
         } else {
             val group = groups.getOrNull(selectedTab - EmojiPickerViewModel.FIRST_EMOJI_TAB)
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(EMOJI_CELL),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
             ) {
                 items(
                     items = group?.emoji.orEmpty(),
@@ -243,6 +256,59 @@ internal fun EmojiPickerView(
                         )
                     }
                 }
+            }
+        }
+
+        // Backspace, in the place the keyboard puts it: bottom row, hard against the right
+        // edge. It was first put in the tab strip, which is where it fits the layout rather
+        // than where a thumb already goes -- and a delete key that moves depending on which
+        // panel is open is one the user has to hunt for every time.
+        //
+        // Repeats on hold through the same gesture machine the letter keyboard's backspace
+        // uses. A run of emoji is exactly what somebody wants to clear in one gesture, and a
+        // key that deletes one per tap here while repeating one screen away reads as a bug.
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(EMOJI_ACTION_BAR_HEIGHT)
+                    .background(StickyKeysTheme.colors.surface),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .padding(end = 12.dp)
+                        .size(44.dp)
+                        .minimumInteractiveComponentSize()
+                        .background(
+                            StickyKeysTheme.colors.surfaceVariant,
+                            RoundedCornerShape(6.dp),
+                        ).keyGestures(
+                            keyOutput = "DEL",
+                            longPress = LongPress.Repeat,
+                            alternates = emojiBackspaceAlternates,
+                            cellWidthPx = 1f,
+                            keyBounds = { Rect.Zero },
+                            onCommit = { onBackspace() },
+                            pressed = emojiBackspacePressed,
+                        ).semantics {
+                            role = Role.Button
+                            contentDescription = "Backspace"
+                            onClick(label = "Delete") {
+                                onBackspace()
+                                true
+                            }
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_key_backspace),
+                    contentDescription = null,
+                    tint = StickyKeysTheme.colors.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
             }
         }
     }

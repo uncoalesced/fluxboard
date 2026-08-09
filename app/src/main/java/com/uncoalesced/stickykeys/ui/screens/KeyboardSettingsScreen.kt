@@ -95,6 +95,8 @@ class KeyboardSettingsViewModel
         val keySizePercent = preferences.keySizePercent
         val doubleSpacePeriod = preferences.doubleSpacePeriodEnabled
         val privateMode = preferences.privateModeEnabled
+        val showKeyHints = preferences.showKeyHints
+        val glideTyping = preferences.glideTypingEnabled
 
         fun setKeySizePercent(percent: Int) = preferences.setKeySizePercent(percent)
 
@@ -104,6 +106,12 @@ class KeyboardSettingsViewModel
         fun setPrivateMode(enabled: Boolean) = preferences.setPrivateMode(enabled)
 
         fun setShowNumberRow(show: Boolean) = preferences.setShowNumberRow(show)
+
+        /** Shows or hides the corner symbols. Long-press still types them either way. */
+        fun setShowKeyHints(show: Boolean) = preferences.setShowKeyHints(show)
+
+        /** Turns swipe-to-type on or off. */
+        fun setGlideTyping(enabled: Boolean) = preferences.setGlideTyping(enabled)
 
         val keyboardHeightPercent = preferences.keyboardHeightPercent
         val keyboardBottomPaddingDp = preferences.keyboardBottomPaddingDp
@@ -172,6 +180,8 @@ fun KeyboardSettingsScreen(
             val keySizePercent by viewModel.keySizePercent.collectAsState()
             val doubleSpacePeriod by viewModel.doubleSpacePeriod.collectAsState()
             val privateMode by viewModel.privateMode.collectAsState()
+            val showKeyHints by viewModel.showKeyHints.collectAsState()
+            val glideTyping by viewModel.glideTyping.collectAsState()
             val keyboardHeight by viewModel.keyboardHeightPercent.collectAsState()
             val keyboardBottomPadding by viewModel.keyboardBottomPaddingDp.collectAsState()
 
@@ -248,6 +258,27 @@ fun KeyboardSettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
+                            stringResource(R.string.text_glide_typing),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_glide_typing_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = glideTyping,
+                        onCheckedChange = { viewModel.setGlideTyping(it) },
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
                             stringResource(R.string.text_number_row),
                             style = MaterialTheme.typography.titleMedium,
                         )
@@ -260,6 +291,30 @@ fun KeyboardSettingsScreen(
                     Switch(
                         checked = showNumberRow,
                         onCheckedChange = { viewModel.setShowNumberRow(it) },
+                    )
+                }
+
+                // Directly under the number row, because the two answer the same question --
+                // what is printed on the keys -- and a user hunting for one will look here for
+                // the other.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_key_hints),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_key_hints_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = showKeyHints,
+                        onCheckedChange = { viewModel.setShowKeyHints(it) },
                     )
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
