@@ -1,0 +1,66 @@
+# Engineered by uncoalesced
+#
+# Static analysis for the Kotlin sources. Results land in the repository's Security
+# tab rather than as build output, so a finding is triaged rather than scrolled past.
+#
+# The build-mode is `manual` on purpose. CodeQL's autobuild works for simple Gradle
+# projects and this one is not: AGP 9 with built-in Kotlin, KSP, Hilt and four
+# modules. Telling it exactly what to build is the difference between analysing the
+# app and analysing nothing while reporting success.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly, because a dependency does not have to change for a new advisory about
+    # it to appear. Monday morning UTC.
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze Kotlin
+    runs-on: ubuntu-latest
+    permissions:
+      # Only this job may write findings, and that is all it may write.
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: manual
+          queries: security-extended
+
+      - name: Build
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:java-kotlin

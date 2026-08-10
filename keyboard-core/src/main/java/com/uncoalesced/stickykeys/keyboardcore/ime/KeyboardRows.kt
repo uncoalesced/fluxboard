@@ -163,12 +163,22 @@ internal fun KeyboardRowsView(
     onKeyPress: (String) -> Unit,
     modifier: Modifier = Modifier,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    glide: GlideTracker? = null,
+    onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
 ) {
     // One strip for the whole grid, not one per key. A popup owned by the key that opened it
     // is dismissed by its own pointer-exit the moment the finger slides across to choose.
     val alternates = remember { KeyAlternatesState() }
     val keyStyle = StickyKeysTheme.keyStyle
-    val cellWidthPx = with(LocalDensity.current) { ALTERNATE_CELL_WIDTH.toPx() }
+    val density = LocalDensity.current
+    val preferredCellPx = with(density) { ALTERNATE_CELL_WIDTH.toPx() }
+    // The strip may not get its preferred cell width. A long one has to shrink to stay on
+    // screen, and both drawing and selection then have to use the shrunk value.
+    val availableWidthPx =
+        with(density) {
+            LocalConfiguration.current.screenWidthDp.dp
+                .toPx()
+        }
     val gridOrigin = remember { mutableStateOf(Offset.Zero) }
 
     Box(
@@ -206,6 +216,8 @@ internal fun KeyboardRowsView(
                             )
 
                         KeyboardKey(
+                            glide = glide,
+                            onGlide = onGlide,
                             keyOutput = keyDef.output,
                             glyph =
                                 keyGlyph(
@@ -214,13 +226,16 @@ internal fun KeyboardRowsView(
                                     shift = shiftRenderingFor(mode),
                                 ),
                             hint = keyDef.hint,
+                            keyAlternates = keyDef.alternates,
+                            keyAlternatesDefaultIndex = keyDef.alternatesDefaultIndex,
                             mode = mode,
                             background = colors.background,
                             foreground = colors.foreground,
                             border = colors.border,
                             haze = colors.haze,
                             alternates = alternates,
-                            alternateCellWidthPx = cellWidthPx,
+                            preferredCellWidthPx = preferredCellPx,
+                            availableWidthPx = availableWidthPx,
                             modifier = Modifier.weight(keyDef.weight).fillMaxHeight(),
                             onKeyPress = onKeyPress,
                             onScrub = onScrub,
@@ -268,9 +283,13 @@ private fun AlternatesStrip(
     if (options.isEmpty()) return
 
     val density = LocalDensity.current
-    val cellWidth = ALTERNATE_CELL_WIDTH
+    // Taken from the state, not from the constant. The gesture machine may have had to shrink
+    // the cells to fit a long strip on screen, and drawing at the preferred width while
+    // selecting at the shrunk one would highlight a different cell than the finger is over.
+    val cellWidthPx = state.cellWidthPx
+    val cellWidth = with(density) { cellWidthPx.toDp() }
     val stripHeight = 44.dp
-    val stripWidthPx = with(density) { (cellWidth * options.size).toPx() }
+    val stripWidthPx = cellWidthPx * options.size
 
     // Keep the strip on screen when the originating key is near either edge.
     val rawLeft = anchor.left - gridOrigin.x

@@ -22,15 +22,10 @@ class AppPreferences
                 Context.MODE_PRIVATE,
             )
 
-        private val listener =
-            SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                when (key) {
-                    "default_export_format" ->
-                        _defaultExportFormat.value =
-                            prefs.getString("default_export_format", "image/webp") ?: "image/webp"
-                    "theme_mode" -> _themeMode.value = readThemeMode()
-                }
-            }
+        // No OnSharedPreferenceChangeListener, for the reason given at length in
+        // KeyboardPreferences: SharedPreferences holds listeners weakly, R8 removes the field
+        // that was the only strong reference to ours, and the listener is then collected in
+        // release builds only. Each setter publishes to its own flow instead.
 
         private val _defaultExportFormat =
             MutableStateFlow(
@@ -38,12 +33,9 @@ class AppPreferences
             )
         val defaultExportFormat: StateFlow<String> = _defaultExportFormat.asStateFlow()
 
-        init {
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-        }
-
         fun setDefaultExportFormat(format: String) {
             prefs.edit().putString("default_export_format", format).apply()
+            _defaultExportFormat.value = format
         }
 
         private fun readThemeMode(): ThemeMode =
@@ -60,6 +52,7 @@ class AppPreferences
 
         fun setThemeMode(mode: ThemeMode) {
             prefs.edit().putString("theme_mode", mode.name).apply()
+            _themeMode.value = mode
         }
 
         /**

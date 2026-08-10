@@ -238,6 +238,13 @@ fun DevicePairingScreen(
             )
         },
     ) { padding ->
+        // Top-aligned, not centred.
+        //
+        // `Arrangement.Center` on a `fillMaxSize()` column centres the content in the whole
+        // remaining window, which on a tall phone leaves a screen's worth of empty space
+        // between the app bar and the first line of text -- the page reads as broken rather
+        // than as deliberately airy, and the buttons end up under the thumb only by accident.
+        // The idle state here is three short controls; they belong under the heading.
         Column(
             modifier =
                 Modifier
@@ -245,7 +252,7 @@ fun DevicePairingScreen(
                     .padding(padding)
                     .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.Top,
         ) {
             // Determine what to show based on client and server states
             when {

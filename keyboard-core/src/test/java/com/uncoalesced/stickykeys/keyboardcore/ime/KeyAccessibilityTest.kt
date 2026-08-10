@@ -22,8 +22,12 @@ class KeyAccessibilityTest {
                 KeyboardLayouts.letterRows(upper = true, showNumberRow = true).map { row ->
                     row.map { it.output }
                 } +
-                KeyboardLayouts.symbolsPrimary +
-                KeyboardLayouts.symbolsShifted
+                KeyboardLayouts.symbolsPrimaryRows.map { row -> row.map { it.output } } +
+                KeyboardLayouts.symbolsShiftedRows.map { row -> row.map { it.output } } +
+                // Drawn in place of the digits while shift is armed, so these are shipped keys
+                // a user reaches with a single tap -- letterRows() only ever yields the
+                // unshifted row, which would leave them outside this gate entirely.
+                listOf(KeyboardLayouts.shiftedNumberRow.map { it.output })
         ).flatten()
             .filterNot { it == KeyboardLayouts.SPACER }
             .distinct()

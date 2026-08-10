@@ -1,0 +1,54 @@
+# Engineered by uncoalesced
+#
+# Reviews dependencies a pull request adds, before they are merged rather than after.
+#
+# This project already has a written vetting checklist in
+# `.agent/rules/privacy-and-scope.md`: no analytics or phone-home SDK, a licence that
+# suits a fully open-source project, and a known size impact. Two of those three can
+# be checked mechanically, so they are.
+#
+# The licence list is the checklist's own wording turned into configuration. It denies
+# rather than allows, because an allow-list silently blocks every dependency whose
+# licence string is merely spelled differently, and a blocked build teaches people to
+# switch the check off.
+
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [ main, development ]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets the action leave its findings as a summary on the pull request.
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          # Anything moderate or worse stops the merge. Low findings are reported
+          # and do not block, so the gate keeps meaning something.
+          fail-on-severity: moderate
+          # Licences that are incompatible with shipping this app as a distributed
+          # Android binary. Apache-2.0, MIT, BSD and the GPL family used by the
+          # existing dependencies are all fine and are deliberately not listed.
+          #
+          # Every entry must be a real SPDX identifier or the action fails to start
+          # rather than failing a check -- which is a very different thing and reads
+          # identically in the run list. `Commons-Clause` was here and is not SPDX at
+          # all; it is a rider bolted onto another licence, so it cannot be matched
+          # this way and has to be caught by the human vetting step in
+          # `.agent/rules/privacy-and-scope.md`.
+          deny-licenses: AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1
+          comment-summary-in-pr: on-failure
