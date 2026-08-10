@@ -940,8 +940,14 @@ All six were fixed and re-verified on the same phone on 2026-08-06.
   measure 956px.
 - **4A.4** claims the clip text synchronously on the listener thread before
   dispatching the write, because the duplicate callback arrives faster than a
-  database round-trip could return. Also suppresses an immediately repeated
-  identical copy; a different copy in between is still stored.
+  database round-trip could return. The guard is **time-bounded**
+  (`REDELIVERY_WINDOW_MS`, one second) and that bound is deliberate: suppressing
+  on text alone also swallowed a *deliberate* re-copy of the same passage, which
+  is worse than the duplicate it fixed because the user watches a copy silently
+  not happen. So copying identical text twice a second or more apart correctly
+  produces two entries. This sentence used to read "suppresses an immediately
+  repeated identical copy", which describes a stronger promise than the code makes
+  and was briefly mistaken for a bug during the 2026-08-09 pass.
 - **4A.6** resets `appModeState` on `inputSession`.
 
 Re-verified unchanged after all six landed: the currency default (5/5 holds
@@ -1133,6 +1139,43 @@ Recorded because these promote entries that were **FIXED (unverified)**:
   `teh` + `.` gave `The.`, and `thankbyou` + space split to `Thank you `.
 - **Beta signalling.** The BETA badge, the beta notice and `v0.1.5-BETA` all
   render in Settings, with `REPO_URL` and `SITE_URL` correct.
+
+### 4C.2b Second device round, same day, on the fixed release build
+
+Run after the 4C.1 fix was installed, which is what made most of it possible.
+
+- **Double-space for period (B12).** `hi` space `there` then two quick space taps
+  produced exactly `Hi there. ` -- period inserted, single trailing space, and the
+  first word capitalized.
+- **Undo chip.** After `teh` corrected to `The `, the strip offered `Undo: Teh`.
+  Tapping it restored `Teh ` with exactly one trailing space and nothing left over.
+- **Space-bar scrub (4.3).** Scrubbed from near the end of `Hello world again`
+  well past the start. No space was typed, the caret stopped rather than escaping,
+  and `mCurrentFocus` stayed on the host app -- the DPAD focus escape is gone.
+  Proved the caret had actually moved by typing at it: the character landed at
+  position 2, giving `Hezllo world again`.
+- **Text-edit panel.** All eleven controls draw (Back, Select, Select all, Start,
+  Up, End, Copy, Left, Down, Right, Paste) and the panel measures 956px like every
+  other mode.
+- **Clipboard (4A.4).** One row per copy, so the double-write is fixed. Two copies
+  of the same text a second apart correctly produce two rows -- see the corrected
+  note in 4A.8 for why that is the intended behaviour and not a regression.
+- **Focusing a new field leaves CLIPBOARD mode (4A.6).** Tapping a different field
+  with the clipboard panel open returned to the typing keyboard.
+- **Landscape (10.9).** Full grid with no overflow, corner hints intact,
+  suggestions live (`again`, `against`). The IME measures 634px / 241.5dp against
+  364dp in portrait, so the `values-land` override is being applied. The host app
+  stays visible, which is `onEvaluateFullscreenMode()` returning false doing its
+  job -- the default would have taken the whole window.
+- **Media transport (3.13), against a real player.** Retro Music was the media
+  button session and **paused**, which is the case the design note calls out.
+  Play from the keyboard moved it `PAUSED(2)` to `PLAYING(3)`. Next and previous
+  each move exactly one track and are exact inverses:
+  `DELRESTO -> Untitled -> Dad Vibes -> Untitled -> DELRESTO`.
+  *Residual:* that sequence proves the two buttons are inverses moving one step,
+  not which of them is forward -- the queue order was not independently known.
+  `MediaTransportTest` pins 87/88, which is where the transposition risk is
+  covered.
 
 ### 4C.3 Not settled by this pass
 
