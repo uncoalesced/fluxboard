@@ -302,11 +302,11 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.12.1")
-    testImplementation("androidx.test:core:1.5.0")
-    testImplementation("androidx.test.ext:junit:1.1.5")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    testImplementation("io.mockk:mockk:1.13.9")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("androidx.test:core:1.7.0")
+    testImplementation("androidx.test.ext:junit:1.3.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("io.mockk:mockk:1.14.11")
     // Test-only: the core modules expose Room via `implementation`, so it is not on this
     // module's compile classpath. DatabaseStartupTest builds both databases directly.
     testImplementation(libs.room.runtime)
@@ -317,8 +317,8 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test:runner:1.5.2")
-    androidTestImplementation("com.google.dagger:hilt-android-testing:2.51.1")
-    kspAndroidTest("com.google.dagger:hilt-android-compiler:2.51.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.60.1")
+    kspAndroidTest("com.google.dagger:hilt-android-compiler:2.60.1")
 }
