@@ -46,6 +46,11 @@ Thumbs.db
 .kotlin/
 
 # Agents & Repository Documentation
+#
+# These stay untracked deliberately. This repository is public, and the agent files
+# accumulate working notes that are not written for an audience -- local paths, device
+# details, and running commentary on the project. CLAUDE.md was briefly tracked and was
+# removed from history again; do not re-add it without reading it end to end first.
 .agent/
 .agents/
 .agents/skills/

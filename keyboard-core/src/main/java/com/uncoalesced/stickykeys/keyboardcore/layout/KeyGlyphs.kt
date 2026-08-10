@@ -59,7 +59,8 @@ fun keyGlyph(
         "CLIPBOARD" -> KeyGlyph.Icon(R.drawable.ic_key_clipboard, "Clipboard history")
         "MIC" -> KeyGlyph.Icon(R.drawable.ic_key_mic, "Voice input")
         "SYMBOLS" -> KeyGlyph.Label("123")
-        "SYMBOLS_SHIFT" -> KeyGlyph.Label("=\\<")
+        // Per the supplied symbols-page reference, which labels this key "{&=".
+        "SYMBOLS_SHIFT" -> KeyGlyph.Label("{&=")
         "ABC" -> KeyGlyph.Label("ABC")
         "SPACE" -> KeyGlyph.Label(" ")
         else -> KeyGlyph.Label(keyOutput)

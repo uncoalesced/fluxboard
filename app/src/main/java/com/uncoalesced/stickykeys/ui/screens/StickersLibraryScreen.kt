@@ -31,6 +31,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.R
+import com.uncoalesced.stickykeys.capture.MediaImageAccess
+import com.uncoalesced.stickykeys.capture.ScreenshotHelper
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
@@ -272,6 +274,33 @@ fun StickersLibraryScreen(
             uri?.let { onVideoPicked(it.toString()) }
         }
 
+    // Set when the screenshot lookup finds nothing, so the failure is visible rather than the
+    // button appearing dead. See the dialog at the bottom of this screen.
+    var screenshotUnavailable by remember { mutableStateOf(false) }
+    // Set when the user declined gallery access, which needs different wording: nothing is
+    // broken and there may well be a screenshot there, we just cannot look.
+    var screenshotAccessDenied by remember { mutableStateOf(false) }
+
+    val screenshotContext = LocalContext.current
+
+    /** Runs the lookup, assuming access has already been established. */
+    fun grabLatestScreenshot() {
+        val uri = ScreenshotHelper.getLastScreenshotUri(screenshotContext)
+        if (uri != null) onImagePicked(uri.toString()) else screenshotUnavailable = true
+    }
+
+    // Requested here, at the button, rather than at first launch -- the app is usable without
+    // it and most sessions never touch this feature.
+    val screenshotPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestMultiplePermissions(),
+        ) { results ->
+            // Any grant is enough to query, including the narrower "Select photos" choice on
+            // Android 14+. Insisting on the full-library permission would reject exactly the
+            // users who made the more privacy-preserving choice.
+            if (results.values.any { it }) grabLatestScreenshot() else screenshotAccessDenied = true
+        }
+
     when (val current = state) {
         is StickersUiState.Loading -> LoadingScreen()
         is StickersUiState.Success -> {
@@ -299,13 +328,17 @@ fun StickersLibraryScreen(
 
                         ExtendedFloatingActionButton(
                             onClick = {
-                                val screenshotUri =
-                                    com.uncoalesced.stickykeys.capture.ScreenshotHelper
-                                        .getLastScreenshotUri(
-                                            context,
-                                        )
-                                if (screenshotUri != null) {
-                                    onImagePicked(screenshotUri.toString())
+                                // Ask only when we cannot already read. Reading MediaStore for
+                                // images this app did not create needs READ_MEDIA_IMAGES, and
+                                // without it the query returns an empty cursor rather than an
+                                // error -- which is why this button used to do nothing at all
+                                // on every device running API 33 or newer.
+                                if (MediaImageAccess.hasAccess(screenshotContext)) {
+                                    grabLatestScreenshot()
+                                } else {
+                                    screenshotPermissionLauncher.launch(
+                                        MediaImageAccess.requiredPermissions(),
+                                    )
                                 }
                             },
                             containerColor = StickyKeysTheme.colors.secondary,
@@ -336,6 +369,12 @@ fun StickersLibraryScreen(
                             .fillMaxSize()
                             .padding(paddingValues),
                 ) {
+                    // Smart-cast once rather than re-casting at each use: the repeated
+                    // `current.currentTab as TabFilter.CategoryFilter` was both unreadable and
+                    // the reason two of these lines could not be wrapped inside the limit.
+                    val activeCategoryId =
+                        (current.currentTab as? TabFilter.CategoryFilter)?.category?.id
+
                     // Category & Filter Tabs
                     ScrollableTabRow(
                         selectedTabIndex =
@@ -345,8 +384,7 @@ fun StickersLibraryScreen(
                                 is TabFilter.CategoryFilter ->
                                     2 +
                                         current.categories.indexOfFirst {
-                                            it.id ==
-                                                (current.currentTab as TabFilter.CategoryFilter).category.id
+                                            it.id == activeCategoryId
                                         }
                             }.coerceAtLeast(0),
                         edgePadding = StickyKeysTheme.spacing.sm,
@@ -364,10 +402,7 @@ fun StickersLibraryScreen(
                         )
                         current.categories.forEach { category ->
                             Tab(
-                                selected =
-                                    current.currentTab is TabFilter.CategoryFilter &&
-                                        (current.currentTab as TabFilter.CategoryFilter).category.id ==
-                                        category.id,
+                                selected = activeCategoryId == category.id,
                                 onClick = {
                                     viewModel.selectTab(
                                         TabFilter.CategoryFilter(category),
@@ -511,6 +546,66 @@ fun StickersLibraryScreen(
                         }
                     },
                     confirmButton = {},
+                )
+            }
+
+            if (screenshotUnavailable) {
+                AlertDialog(
+                    onDismissRequest = { screenshotUnavailable = false },
+                    title = { Text(stringResource(R.string.text_no_screenshot_found)) },
+                    text = {
+                        // Two ways to reach here now that the permission exists: there really
+                        // is no screenshot, or the user granted access to a selection that
+                        // does not include one. The second is worth naming, because from the
+                        // user's side it looks like the app ignoring a screenshot they can see.
+                        Text(
+                            if (MediaImageAccess.isPartialAccess(screenshotContext)) {
+                                stringResource(R.string.text_no_screenshot_found_partial)
+                            } else {
+                                stringResource(R.string.text_no_screenshot_found_body)
+                            },
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            screenshotUnavailable = false
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                ),
+                            )
+                        }) { Text(stringResource(R.string.text_choose_an_image)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { screenshotUnavailable = false }) {
+                            Text(stringResource(R.string.text_close))
+                        }
+                    },
+                )
+            }
+
+            if (screenshotAccessDenied) {
+                AlertDialog(
+                    onDismissRequest = { screenshotAccessDenied = false },
+                    title = { Text(stringResource(R.string.text_gallery_access_needed)) },
+                    text = { Text(stringResource(R.string.text_gallery_access_needed_body)) },
+                    confirmButton = {
+                        // The picker needs no permission at all, so declining gallery access
+                        // never leaves the feature unreachable -- it costs one extra tap.
+                        TextButton(onClick = {
+                            screenshotAccessDenied = false
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                ),
+                            )
+                        }) { Text(stringResource(R.string.text_choose_an_image)) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { screenshotAccessDenied = false }) {
+                            Text(stringResource(R.string.text_close))
+                        }
+                    },
                 )
             }
         }

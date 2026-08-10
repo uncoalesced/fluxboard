@@ -82,7 +82,8 @@ class KeyboardRecompositionTest {
             background = background,
             foreground = foreground,
             alternates = alternates,
-            alternateCellWidthPx = 100f,
+            preferredCellWidthPx = 100f,
+            availableWidthPx = 1080f,
             onKeyPress = onKeyPress,
         )
     }
@@ -263,6 +264,8 @@ class KeyboardRecompositionTest {
 private class NoOpController : KeyboardController {
     override fun commitText(text: String) = Unit
 
+    override fun textBeforeCursor(maxChars: Int): String = ""
+
     override fun replaceTextBeforeCursor(
         charCount: Int,
         replacement: String,
@@ -276,10 +279,9 @@ private class NoOpController : KeyboardController {
 
     override fun switchMode(mode: AppMode) = Unit
 
-    override fun sendEditingKey(
-        keyCode: Int,
-        shift: Boolean,
-        ctrl: Boolean,
+    override fun moveCursor(
+        move: CursorMove,
+        extend: Boolean,
     ) = Unit
 
     override fun performEditAction(actionId: Int) = Unit

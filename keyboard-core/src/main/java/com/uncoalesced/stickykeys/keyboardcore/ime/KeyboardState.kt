@@ -7,19 +7,30 @@ enum class KeyboardMode {
     LETTERS_CAPS_LOCK,
     SYMBOLS,
     SYMBOLS_SHIFTED,
+
+    /**
+     * The digits-only pad shown on a numeric secret -- a PIN, a passcode, a card CVV.
+     *
+     * Entered from the field's own input type rather than from a key, and there is no key on
+     * it that leaves: a field declaring `TYPE_NUMBER_VARIATION_PASSWORD` accepts nothing but
+     * digits, so an ABC key would only offer the user a way to type characters the field will
+     * refuse. The way out is the host's own focus change.
+     */
+    PIN,
 }
 
 enum class AppMode {
     TYPING,
 
     /**
-     * The unified sticker + emoji picker, reached in one tap from the emoji key.
+     * The unified sticker and emoji picker, reached in one tap from the emoji key.
      *
-     * Distinct from [STICKERS], which is Phase 16's dedicated sticker-only panel. Both
-     * exist while the question of retiring the older shell is open; see MainIMEView.
+     * There used to be a second, sticker-only panel beside this one from Phase 16. Nothing
+     * routed to it after the emoji key and the quick-access grid were both pointed here --
+     * this is a superset of what it showed -- so it was retired rather than left as a mode
+     * that could only be reached by editing code.
      */
     EMOJI_PICKER,
-    STICKERS,
     CLIPBOARD,
     TEXT_EDIT,
 }

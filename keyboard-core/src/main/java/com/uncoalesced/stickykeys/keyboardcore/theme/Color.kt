@@ -3,21 +3,44 @@ package com.uncoalesced.stickykeys.keyboardcore.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- Brand palette (confirmed, "sticky3" board) -----------------------------
+// --- Brand palette (confirmed, "sticky6" board) -----------------------------
 // Dark mode is the DEFAULT experience (see StickyKeysTheme). These five values
 // are the source of truth; everything below maps them into semantic slots.
 //
-// Ink    #3D3B30  primary surface/background -- the dark-mode base
-// Blue   #5C80BC  primary accent -- buttons, active states, keyboard accent key
-// Slate  #4D5061  secondary neutral -- muted surfaces, secondary buttons
-// Yellow #E7E247  secondary/highlight ONLY -- sparse; never a default button/
-//                 active-state color (see BrandYellow, kept out of the semantic
-//                 slots on purpose so it can't become a default accent)
-// Cream  #E9EDDE  primary text/foreground on the dark base; light-mode bg
-val Ink = Color(0xFF3D3B30)
-val Blue = Color(0xFF5C80BC)
-val Slate = Color(0xFF4D5061)
+// Indigo #394053  darkest neutral -- the muted/special-key surface
+// Iris   #4E4A59  neutral surface -- ordinary key fill
+// Taupe  #6E6362  warm neutral -- secondary
+// Sage   #839073  muted accent -- the locked/latched state
+// Fern   #7CAE7A  the accent -- active states, selection, the accent key
+//
+// Contrast measured against the dark base (#000000), not estimated:
+//   Fern 8.19  Sage 6.20  Taupe 3.62  Iris 2.45  Indigo 2.03
+//
+// Fern takes the accent role sticky3's yellow used to hold. It is the highest
+// contrast of the five and the only one that reads as an accent rather than a
+// neutral -- but it is NOT a like-for-like replacement: the old yellow measured
+// 15.37 against black, so every accent on this board is roughly half as loud as
+// it used to be. That is a property of the palette, flagged rather than hidden.
+//
+// The one forced consequence: Cream on Fern is 2.15, which is unreadable. Text
+// on the accent is therefore near-black now (8.19) where it used to be Cream.
+val Indigo = Color(0xFF394053)
+val Iris = Color(0xFF4E4A59)
+val Taupe = Color(0xFF6E6362)
+val Sage = Color(0xFF839073)
+val Fern = Color(0xFF7CAE7A)
+
+/**
+ * The foreground, which sticky6 does not supply.
+ *
+ * Every one of the five is a mid-tone, so a legible light foreground has to come
+ * from outside the board. Cream is carried over from sticky3 for exactly that
+ * reason: 8.68 on Indigo, 7.20 on Iris, 17.9 on the black base.
+ */
 val Cream = Color(0xFFE9EDDE)
+
+/** Kept for the light palette's foreground and for [OnBrandYellow]. */
+val Ink = Color(0xFF3D3B30)
 
 /**
  * The dark-mode base.
@@ -40,10 +63,10 @@ val BrandYellow = Color(0xFFE7E247)
 val OnBrandYellow = Ink // Ink-on-Yellow = 8.23:1 (Cream-on-Yellow would be 1.15:1)
 
 // Derived tones (not new brand colors -- tonal variants for elevation/contrast):
-// BlueDark is a darker accent that passes AA for normal-size text on-accent
-// (white 6.73:1, cream 5.65:1), where brand Blue alone reaches only ~3.4-4.0:1.
-val BlueDark = Color(0xFF3F5C8C)
-val InkSurfaceVariant = Color(0xFF43454F) // muted dark surface (Cream on it 8.0:1)
+// FernDeep exists only because the light palette needs an accent that white text
+// can sit on: white on Fern is 2.15, white on FernDeep is 6.21. Same role BlueDark
+// played for sticky3's Blue, and derived the same way.
+val FernDeep = Color(0xFF3F6B3D)
 val CreamSurface = Color(0xFFF3F5EC) // light-preset elevated surface
 val CreamSurfaceVariant = Color(0xFFDCE0D2) // light-preset muted surface
 
@@ -72,21 +95,26 @@ data class StickyKeysColors(
     val isLight: Boolean,
 )
 
-// Contrast against the dark base (WCAG AA, measured):
-//   Cream on TrueBlack 17.9 (was 9.45 on Ink)  Cream on Slate 6.69  Cream on InkSurfaceVariant 8.00
-//     -> text is legible everywhere, and the base change only improved it
-//   onPrimary (Cream) on Blue 3.35 -> primary labels must be large/bold (>=18sp or bold 14sp); use primaryVariant (BlueDark) for normal-size text on-accent
-//   Blue fill vs Ink 2.82, Slate vs Ink 1.41 -> filled elements share low luminance with the base; component edges rely on Material elevation + labels, not fill-vs-bg contrast. This is an accepted property of the brand palette, flagged rather than hidden.
+// Contrast against the dark base (WCAG AA, measured not estimated):
+//   Cream on TrueBlack 17.9  Cream on Iris 7.20  Cream on Indigo 8.68
+//     -> text is legible on every surface this palette draws
+//   onPrimary is near-black, not Cream: Cream on Fern is 2.15 and unreadable,
+//     black on Fern is 8.19. This is the one slot sticky6 forced to change sign.
+//   Fern vs TrueBlack 8.19, Sage vs TrueBlack 6.20 -> the accent and the latched
+//     state are distinguishable from each other and from the base, which is what
+//     makes caps lock visible.
 fun darkStickyKeysColors() =
     StickyKeysColors(
-        primary = Blue,
-        primaryVariant = BlueDark,
-        secondary = Slate,
+        primary = Fern,
+        primaryVariant = Sage,
+        secondary = Taupe,
         background = TrueBlack,
-        surface = Slate,
-        surfaceVariant = InkSurfaceVariant,
+        surface = Iris,
+        surfaceVariant = Indigo,
         error = ErrorRedDark,
-        onPrimary = Cream,
+        // Near-black rather than Cream. See the note above -- this is not a
+        // stylistic preference, Cream on Fern cannot be read.
+        onPrimary = TrueBlack,
         onSecondary = Cream,
         onBackground = Cream,
         onSurface = Cream,
@@ -97,18 +125,22 @@ fun darkStickyKeysColors() =
 
 fun lightStickyKeysColors() =
     StickyKeysColors(
-        primary = Blue,
-        primaryVariant = BlueDark,
-        secondary = Slate,
+        // FernDeep rather than Fern: the light palette puts white on the accent,
+        // and white on Fern is 2.15 against 6.21 on FernDeep.
+        primary = FernDeep,
+        primaryVariant = Sage,
+        secondary = Taupe,
         background = Cream,
         surface = CreamSurface,
         surfaceVariant = CreamSurfaceVariant,
         error = ErrorRed,
         onPrimary = Color.White,
         onSecondary = Cream,
-        onBackground = Ink,
-        onSurface = Ink,
-        onSurfaceVariant = Ink,
+        // Indigo is sticky6's darkest tone and reads 8.68 on Cream, so the light
+        // palette's foreground comes from the board rather than from Ink.
+        onBackground = Indigo,
+        onSurface = Indigo,
+        onSurfaceVariant = Indigo,
         onError = Color.White,
         isLight = true,
     )

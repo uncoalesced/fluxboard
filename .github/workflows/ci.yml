@@ -1,10 +1,28 @@
+# Engineered by uncoalesced
+#
+# The build gate. Everything here has to pass before code reaches main.
+#
+# Note the `permissions` block: without one, a workflow triggered by `push` gets a
+# GITHUB_TOKEN with write access to the repository. This job only ever reads, so it
+# says so. Any job that needs more asks for it explicitly and locally.
+
 name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, development ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, development ]
+
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run irrelevant. Cancelling it is
+# not just tidiness -- a queue of stale runs is how a red build gets attributed to
+# the wrong commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -12,6 +30,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        # The build never pushes. Leaving the token in .git/config would make it
+        # reachable by anything the build runs, including Gradle plugins.
+        persist-credentials: false
 
     - name: set up JDK 17
       uses: actions/setup-java@v4
@@ -23,7 +45,7 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Check Source Rules (no emoji, watermark present)
+    - name: Check Source Rules (no emoji, watermark, no prefs listeners)
       run: bash scripts/check-source-rules.sh
 
     - name: Check Code Style (ktlint)
@@ -37,6 +59,96 @@ jobs:
 
     - name: Build Release APK
       run: ./gradlew assembleRelease
+
+    # This is the project's central promise turned into a gate rather than a habit.
+    # AGENTS.md says zero telemetry and no Play Services, and CLAUDE.md records that
+    # the check was previously run by hand on the built artifact. A promise verified
+    # by remembering to check it is a promise that breaks the first time somebody
+    # adds a dependency without knowing what it drags in.
+    #
+    # It reads the built artifact, not the source: a transitive dependency is exactly
+    # the case a source grep cannot see.
+    - name: No Play Services, ML Kit or telemetry in the release artifact
+      run: |
+        set -uo pipefail
+        APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+        if [ -z "$APK" ]; then echo "No release APK found"; exit 1; fi
+        echo "Scanning $APK"
+
+        WORK=$(mktemp -d)
+        unzip -q -o "$APK" -d "$WORK"
+
+        fail=0
+        # Class-name prefixes that must not appear in any DEX. `datatransport` is the
+        # CCT logging library ML Kit pulled in; it is named explicitly because it is
+        # the one that actually shipped once.
+        for needle in \
+          "com/google/android/gms" \
+          "com/google/mlkit" \
+          "com/google/android/datatransport" \
+          "com/google/firebase" ; do
+          hits=0
+          for dex in "$WORK"/classes*.dex; do
+            [ -e "$dex" ] || continue
+            n=$(grep -c "$needle" "$dex" 2>/dev/null || true)
+            hits=$((hits + n))
+          done
+          echo "  $needle -> $hits"
+          if [ "$hits" -ne 0 ]; then
+            echo "TELEMETRY GATE: '$needle' is present in the release DEX."
+            fail=1
+          fi
+        done
+
+        # The merged manifest must declare no Play Services components either.
+        if grep -aq "com.google.android.gms" "$WORK/AndroidManifest.xml"; then
+          echo "TELEMETRY GATE: Play Services components in the merged manifest."
+          fail=1
+        fi
+        rm -rf "$WORK"
+
+        # R8's own mapping is the authoritative half of this check, and the DEX scan
+        # above is the weaker one. CLAUDE.md records why: a release build is
+        # obfuscated, so a dependency that is present but renamed need not leave its
+        # original string in any DEX -- a scan that only reads DEX bytes can pass for
+        # the wrong reason. mapping.txt lists what R8 processed under its *original*
+        # name, so a dependency cannot hide in it.
+        MAP=app/build/outputs/mapping/release/mapping.txt
+        if [ ! -f "$MAP" ]; then
+          echo "TELEMETRY GATE: no mapping.txt, so the strong half of this check did"
+          echo "not run. Refusing to pass on the DEX scan alone."
+          exit 1
+        fi
+
+        # Positive control. If this is ever zero the grep is broken rather than the
+        # build being clean, and every check below it would pass meaninglessly.
+        control=$(grep -c "androidx.room" "$MAP" || true)
+        echo "  control androidx.room -> $control"
+        if [ "$control" -eq 0 ]; then
+          echo "TELEMETRY GATE: positive control found nothing. The check is broken."
+          exit 1
+        fi
+
+        for pkg in \
+          "com.google.android.gms" \
+          "com.google.mlkit" \
+          "com.google.firebase" \
+          "com.google.android.datatransport" ; do
+          n=$(grep -c "$pkg" "$MAP" || true)
+          echo "  mapping $pkg -> $n"
+          if [ "$n" -ne 0 ]; then
+            echo "TELEMETRY GATE: '$pkg' was compiled into the release build."
+            fail=1
+          fi
+        done
+
+        if [ "$fail" -ne 0 ]; then
+          echo
+          echo "This project promises zero telemetry and no Play Services dependency."
+          echo "Something added one, most likely transitively. See AGENTS.md."
+          exit 1
+        fi
+        echo "Telemetry gate passed: no Play Services, ML Kit, Firebase or datatransport."
 
     - name: Check APK Size
       run: |
