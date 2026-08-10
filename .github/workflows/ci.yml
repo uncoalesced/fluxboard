@@ -61,7 +61,7 @@ jobs:
       run: ./gradlew assembleRelease
 
     # This is the project's central promise turned into a gate rather than a habit.
-    # AGENTS.md says zero telemetry and no Play Services, and CLAUDE.md records that
+    # The README and PRIVACY.md both promise zero telemetry and no Play Services, and
     # the check was previously run by hand on the built artifact. A promise verified
     # by remembering to check it is a promise that breaks the first time somebody
     # adds a dependency without knowing what it drags in.
@@ -108,7 +108,7 @@ jobs:
         rm -rf "$WORK"
 
         # R8's own mapping is the authoritative half of this check, and the DEX scan
-        # above is the weaker one. CLAUDE.md records why: a release build is
+        # above is the weaker one. The reason is that a release build is
         # obfuscated, so a dependency that is present but renamed need not leave its
         # original string in any DEX -- a scan that only reads DEX bytes can pass for
         # the wrong reason. mapping.txt lists what R8 processed under its *original*
@@ -145,7 +145,7 @@ jobs:
         if [ "$fail" -ne 0 ]; then
           echo
           echo "This project promises zero telemetry and no Play Services dependency."
-          echo "Something added one, most likely transitively. See AGENTS.md."
+          echo "Something added one, most likely transitively. See CONTRIBUTING.md."
           exit 1
         fi
         echo "Telemetry gate passed: no Play Services, ML Kit, Firebase or datatransport."

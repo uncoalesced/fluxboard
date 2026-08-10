@@ -6,33 +6,22 @@ All notable changes to FluxBoard. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 alpha-track and not yet semantic.
 
-## A note on how this file was rebuilt
+## How to read this
 
-Entries below are derived from `git log`, the two release tags, and the source
-tree as it actually stands, not from a summary of what any phase was supposed
-to produce.
+Dates are release dates. Anything marked as fixed but not yet confirmed on real
+hardware says so, because this project has twice marked work complete on the
+strength of code that read correctly and did not run.
 
-The previous version of this file was a restatement of the 37-phase plan
-presented as release history, and it disagreed with the code in at least two
-places that matter: it listed "On-Device Segmentation Integration using ML Kit
-Subject Segmentation" as shipped when ML Kit was deliberately removed from the
-project (see v0.1.1 below, and `AGENTS.md` on Play Services), and it listed
-ephemeral link sharing as delivered when `RelayClient` still points at
-`ws://10.0.2.2:8080` and `relay/server.js` is deployed nowhere. Both are now
-recorded where they belong: the removal as a removal, the relay as an open item
-in [`docs/roadmap.md`](docs/roadmap.md).
+Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
+so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
+`v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
-**Version boundaries are only partly reliable, and this is stated rather than
-smoothed over.** Two tags exist -- `v0.1.0-alpha` (2026-07-24) and
-`v0.1.1-ALPHA` (2026-07-30). **`v0.1.2-ALPHA` was never tagged**, and a
-retroactive tag was considered and declined. Its boundary below is inferred from
-`versionName` in `app/build.gradle.kts` and from the commit that names it in its
-own subject line; read the v0.1.2 section as "everything on `development` after
-the v0.1.1 tag".
+## [v0.1.5-BETA] - 2026-08-10
 
----
-
-## [Unreleased]
+Re-released the same day the beta was cut, because a full device pass found a
+defect serious enough that the first build should not be the one people install.
+Same versionName and versionCode; if you have an earlier `v0.1.5-BETA` build,
+reinstall rather than update.
 
 ### Fixed
 
@@ -74,7 +63,7 @@ the v0.1.1 tag".
 
 ---
 
-## [v0.1.5-BETA] - 2026-08-09
+## [v0.1.5-BETA] - 2026-08-09, first cut
 
 **The first beta.** versionCode 6, versionName `v0.1.5-BETA`. The app says so
 itself: a BETA badge sits beside the name in Settings and a short notice under
@@ -198,12 +187,12 @@ letter. Each is described below.
 ## [v0.1.4-ALPHA] - 2026-08-06
 
 Tagged `v0.1.4-ALPHA`, versionCode 4. Planning for this release is in
-[`docs/planning/v0.1.4-alpha-plan.md`](docs/planning/v0.1.4-alpha-plan.md).
+the release plan for that version.
 
 **Device status:** everything below marked with a dagger was exercised on a
 Redmi Note 11 (Android 15) on 2026-08-06 -- real key taps and real gestures, not
 `adb shell input text`, which bypasses the IME entirely and measures nothing.
-The rest is unit-tested only. `docs/roadmap.md` section 4A carries the pass
+The rest is unit-tested only. The device pass notes carry
 itself, including what it found.
 
 ### Added

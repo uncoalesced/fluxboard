@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Engineered by uncoalesced
+#
+# Strips Co-Authored-By trailers that credit an AI model.
+#
+# These were added automatically by coding tooling rather than chosen, and they
+# accumulated across 54 commits before anyone looked at what it did to the
+# repository: GitHub renders a co-author as an avatar on every commit, so a model
+# appeared to be a third member of a two-person project. The history has been
+# rewritten to remove them. This stops them coming back, because the tooling that
+# added them will keep trying.
+#
+# Enable it once per clone:
+#
+#     git config core.hooksPath .githooks
+#
+# Human co-authors are left alone. Only known AI assistant addresses are matched,
+# so pairing with a person still works exactly as it should.
+
+set -euo pipefail
+
+MSG_FILE="$1"
+
+# Matched on the address rather than the display name. A name is free text and
+# would need a new pattern every time a model is renamed; these addresses are
+# what the tools actually write.
+PATTERN='^[[:space:]]*Co-[Aa]uthored-[Bb]y:.*(noreply@anthropic\.com|@users\.noreply\.github\.com>?[[:space:]]*$.*claude|claude|copilot@|noreply@openai\.com|gemini)'
+
+if grep -qiE "$PATTERN" "$MSG_FILE" 2>/dev/null; then
+    TMP="$(mktemp)"
+    grep -viE "$PATTERN" "$MSG_FILE" > "$TMP"
+    # Collapse the blank lines the removal can leave at the end of the message.
+    awk 'NR==FNR{last=NR; next} FNR<=last' "$TMP" "$TMP" \
+        | sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' > "$MSG_FILE"
+    rm -f "$TMP"
+    echo "commit-msg: removed an AI Co-Authored-By trailer. See CONTRIBUTING.md." >&2
+fi
+
+exit 0
