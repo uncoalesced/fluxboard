@@ -35,7 +35,7 @@ jobs:
           persist-credentials: false
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           # Anything moderate or worse stops the merge. Low findings are reported
           # and do not block, so the gate keeps meaning something.
