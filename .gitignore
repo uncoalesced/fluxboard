@@ -67,4 +67,4 @@ __pycache__/
 keystore.properties
 *.jks
 *.keystore
-*.p12
+*.p12collaboration-workflow.md
