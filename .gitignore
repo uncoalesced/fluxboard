@@ -55,9 +55,9 @@ Thumbs.db
 .agents/
 .agents/skills/
 AGENTS.md
+docs/
 CLAUDE.md
 ARCHITECTURE.md
-AUTHORS.md
 
 # Python (dictionary-tools/ build pipeline)
 __pycache__/
