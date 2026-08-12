@@ -64,10 +64,43 @@ class ThemeFallbackTest {
     }
 
     @Test
-    fun `transparent keys and transparent text together are both restored`() {
+    fun `transparent keys and transparent text restore only the text`() {
+        // Restoring the glyph is enough to make the keyboard readable, and the fill is then
+        // left exactly as the user set it. Resetting both was the reported bug: it wiped a
+        // deliberate fill value that had nothing to do with the edit being made.
         val cleaned = themeWith(KeyStyle(fillOpacity = 0f, textOpacity = 0f)).sanitized()
-        assertEquals(1f, cleaned.keyStyle.fillOpacity, 0.001f)
         assertEquals(1f, cleaned.keyStyle.textOpacity, 0.001f)
+        assertEquals(0f, cleaned.keyStyle.fillOpacity, 0.001f)
+    }
+
+    @Test
+    fun `a low fill survives a later edit that drags the text below the threshold`() {
+        // The reported sequence, exactly: fill to 5% (accepted, saved), then the text slider
+        // dragged down in a separate edit. Every drag tick round-trips through sanitized(),
+        // and this used to snap *both* sliders to 100% because the fill check was reading the
+        // pre-repair text value. Only the text may move.
+        val accepted = themeWith(KeyStyle(fillOpacity = 0.05f)).sanitized()
+        assertEquals(0.05f, accepted.keyStyle.fillOpacity, 0.001f)
+
+        val afterTextDrag =
+            accepted
+                .copy(keyStyle = accepted.keyStyle.copy(textOpacity = 0.05f))
+                .sanitized()
+        assertEquals(0.05f, afterTextDrag.keyStyle.fillOpacity, 0.001f)
+        assertEquals(1f, afterTextDrag.keyStyle.textOpacity, 0.001f)
+    }
+
+    @Test
+    fun `a repaired glyph is still readable over the fill the user kept`() {
+        // The reason the fill may be left alone: whatever it is, the restored glyph has to
+        // remain visible against it, which is the contrast check's job rather than a second
+        // opacity reset. A fully transparent key is the hardest case -- there is no key colour
+        // at all, only the panel behind it.
+        val cleaned = themeWith(KeyStyle(fillOpacity = 0f, textOpacity = 0f)).sanitized()
+        val text = cleaned.keyStyle.resolveText(cleaned.colors.onSurface)
+        val fill = cleaned.keyStyle.resolveFill(cleaned.colors.surface)
+        assertTrue("glyph must be opaque after repair", text.alpha >= 0.99f)
+        assertTrue("fill must be left transparent", fill.alpha <= 0.01f)
     }
 
     @Test
