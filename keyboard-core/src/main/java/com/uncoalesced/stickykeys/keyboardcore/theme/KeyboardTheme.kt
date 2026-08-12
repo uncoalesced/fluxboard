@@ -62,17 +62,25 @@ data class KeyboardTheme(
      * choice keeps every other customization they made.
      */
     fun sanitized(): KeyboardTheme {
-        val fill = keyStyle.resolveFill(colors.surface)
-        val text = keyStyle.resolveText(colors.onSurface)
-
         var safe = keyStyle
-        // An invisible fill alone is survivable -- the key background shows through -- but an
-        // invisible glyph is not, and the two together are a blank panel.
-        if (text.alpha < MIN_VISIBLE_ALPHA) {
+        // An invisible glyph is the one opacity that blanks a keyboard on its own. An invisible
+        // fill is not: the panel behind the key still shows, the glyph is still drawn, and
+        // borderless translucent keys are a look people deliberately choose.
+        //
+        // Repairing the glyph is therefore the whole job, and it has to be *all* that happens.
+        // There used to be a second reset here, firing when fill and text were both below the
+        // threshold, on the theory that a barely-there glyph over no key at all still reads as
+        // broken. It tested the values captured before the repair, so a low fill the user had
+        // set in an earlier, separately-accepted edit was wiped the instant a later drag took
+        // the text below 12% -- two sliders snapping to 100% when only one had been touched.
+        //
+        // Re-deriving those values after the repair would not have salvaged it: resolveText
+        // sets alpha from textOpacity, so a repaired glyph is opaque by construction and the
+        // second condition could never be true again. It is removed rather than corrected. The
+        // contrast check below is what still catches a glyph that is present but indistinguish-
+        // able from its key.
+        if (keyStyle.resolveText(colors.onSurface).alpha < MIN_VISIBLE_ALPHA) {
             safe = safe.copy(textColor = null, textOpacity = 1f)
-        }
-        if (fill.alpha < MIN_VISIBLE_ALPHA && text.alpha < MIN_VISIBLE_ALPHA) {
-            safe = safe.copy(fillColor = null, fillOpacity = 1f)
         }
         // Glyph and key the same colour is the other way to get a blank board, and it is easy
         // to reach by accident with two colour pickers that default to the same swatch.
@@ -102,8 +110,14 @@ data class KeyboardTheme(
     }
 
     companion object {
-        /** Below this a colour is transparent enough to read as absent. */
-        private const val MIN_VISIBLE_ALPHA = 0.12f
+        /**
+         * Below this a colour is transparent enough to read as absent.
+         *
+         * Public because the customization screen floors the text-opacity slider here. A
+         * control that lets the user reach a value this function will immediately rewrite is
+         * a control that fights back, which is what the "sliders bug out" report described.
+         */
+        const val MIN_VISIBLE_ALPHA = 0.12f
 
         /**
          * Minimum glyph-against-key contrast. Deliberately far below the WCAG 4.5:1 text
