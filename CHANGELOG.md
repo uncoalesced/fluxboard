@@ -63,6 +63,21 @@ the v0.1.1 tag".
   keyboard's DEL key and the emoji picker's own backspace button -- route
   through this one method, so both are fixed together.
 
+  Verified on a device (LineageOS, 1080x2400) against the signed release
+  artifact, in two hosts -- the Settings search field and the AOSP Messaging
+  compose box: 32 single presses each removed exactly one character on the first
+  press, at the end of the text and in the middle of it; five-press bursts
+  removed exactly five; an emoji disappeared whole from both the DEL key and the
+  picker's own button, never half; and a selection (both select-all and a
+  double-tap word) went as a unit rather than one character outside it.
+
+  **What that pass does not show:** a control build carrying the old
+  `KeyEvent` body passed the same trials in the same two hosts, so neither of
+  them was dropping the zero-timestamp event. The tester's report came from
+  Discord, which is not installed on this phone, and the drop is host-specific by
+  nature. Treat this as "the new primitive is correct and nothing regressed",
+  not as a reproduction of the original symptom.
+
 - **Every preference silently stopped propagating in release builds.** Settings
   appeared to do nothing: a toggle wrote to disk and nothing in the app or the
   keyboard changed until the process was restarted. The privacy switch in the
