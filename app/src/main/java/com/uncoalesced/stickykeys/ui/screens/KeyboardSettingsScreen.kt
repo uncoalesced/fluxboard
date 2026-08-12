@@ -324,8 +324,10 @@ fun KeyboardSettingsScreen(
                                 value = keyboardHeight.toFloat(),
                                 onValueChange = { viewModel.setKeyboardHeightPercent(it.toInt()) },
                                 valueRange =
-                                    KeyboardPreferences.MIN_KEYBOARD_HEIGHT_PERCENT.toFloat()..
-                                        KeyboardPreferences.MAX_KEYBOARD_HEIGHT_PERCENT.toFloat(),
+                                    percentRange(
+                                        KeyboardPreferences.MIN_KEYBOARD_HEIGHT_PERCENT,
+                                        KeyboardPreferences.MAX_KEYBOARD_HEIGHT_PERCENT,
+                                    ),
                                 steps =
                                     (
                                         KeyboardPreferences.MAX_KEYBOARD_HEIGHT_PERCENT -
@@ -341,8 +343,10 @@ fun KeyboardSettingsScreen(
                                 value = keySizePercent.toFloat(),
                                 onValueChange = { viewModel.setKeySizePercent(it.toInt()) },
                                 valueRange =
-                                    KeyboardPreferences.MIN_KEY_SIZE_PERCENT.toFloat()..
-                                        KeyboardPreferences.MAX_KEY_SIZE_PERCENT.toFloat(),
+                                    percentRange(
+                                        KeyboardPreferences.MIN_KEY_SIZE_PERCENT,
+                                        KeyboardPreferences.MAX_KEY_SIZE_PERCENT,
+                                    ),
                                 steps =
                                     (
                                         KeyboardPreferences.MAX_KEY_SIZE_PERCENT -
@@ -356,8 +360,11 @@ fun KeyboardSettingsScreen(
                                 summary = summaryBottomPadding,
                                 valueLabel = "${keyboardBottomPadding}dp",
                                 value = keyboardBottomPadding.toFloat(),
-                                onValueChange = { viewModel.setKeyboardBottomPaddingDp(it.toInt()) },
-                                valueRange = 0f..KeyboardPreferences.MAX_BOTTOM_PADDING_DP.toFloat(),
+                                onValueChange = {
+                                    viewModel.setKeyboardBottomPaddingDp(it.toInt())
+                                },
+                                valueRange =
+                                    percentRange(0, KeyboardPreferences.MAX_BOTTOM_PADDING_DP),
                                 steps = KeyboardPreferences.MAX_BOTTOM_PADDING_DP / 2 - 1,
                             )
                         }
@@ -779,6 +786,18 @@ private fun SettingsSwitchRow(
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
+
+/**
+ * A percent slider's range, built from the two preference bounds.
+ *
+ * Exists for the formatter rather than for the reader: `..` may not have a line break beside
+ * it, and at this screen's nesting depth two fully-qualified `KeyboardPreferences` constants
+ * either side of one do not fit in 100 columns. A call wraps where an operator cannot.
+ */
+private fun percentRange(
+    min: Int,
+    max: Int,
+): ClosedFloatingPointRange<Float> = min.toFloat()..max.toFloat()
 
 /** One title/value/slider block, with an optional summary line. */
 @Composable
