@@ -66,11 +66,53 @@ the v0.1.1 tag".
   publish is removed), and `scripts/check-source-rules.sh` now refuses to let a
   SharedPreferences listener back into the codebase.
 
+- **Stock Material components fell back to M3's default purple the moment they
+  touched a slot `StickyKeysTheme` didn't forward.** `Theme.kt` mapped only 8 of
+  `StickyKeysColors`' 13 fields into Material3's `colorScheme` -- `secondary`,
+  any container role, `surfaceVariant` and `outline` were never set, so a
+  dialog, a ripple, or the theme/layout dropdown menus were the one place on
+  screen where sticky6 was invisible.
+
+  No new colors needed: `secondary`, `onSecondary`, `primaryContainer`,
+  `onPrimaryContainer`, `secondaryContainer`, `onSecondaryContainer`,
+  `surfaceVariant`, `onSurfaceVariant` and `surfaceContainer` all now forward
+  existing `StickyKeysColors` fields (`primaryContainer` reuses `primaryVariant`
+  -- Sage, the existing "latched" tone -- rather than inventing a new one).
+  `outline` has no `StickyKeysColors` equivalent, so it reads `Taupe` directly;
+  outline and secondary are never adjacent on screen, so sharing the hex is
+  safe.
+
+  Build-verified only (clean release build, `KeyboardRecompositionTest` and
+  `GlideGateTest` pass under `--rerun`); not yet confirmed on a device.
+
+### Added
+
+- **A glide trail.** A tapered, fading stroke now traces the finger's path
+  while swipe-typing, drawn in `TypingKeyboardView`'s own `Canvas` pass over
+  the key grid. Colour follows the active theme's accent, so a custom theme
+  stays on-brand rather than showing a hardcoded colour; the stroke clears on
+  lift or commit instead of decaying on its own.
+
+  It reads `GlideTracker`'s new `trailPoints` -- a list separate from the one
+  the decoder uses, so the two can never be confused -- only inside the
+  `Canvas` draw lambda, which runs in the draw phase rather than composition.
+  The key grid never reads `trailPoints`, so a moving finger repaints the
+  overlay and nothing else; `KeyboardRecompositionTest`'s zero-rebuild
+  assertion still holds with the trail in place. Build-verified only, not yet
+  confirmed on a device.
+
 ### Changed
 
 - `KeyboardLayouts.symbolsPrimaryRows` KDoc said `$` was not on symbols page 1.
   It has been since B4 put the currency key there, twelve lines below the
   sentence saying otherwise.
+
+- **Keyboard Settings regrouped into five labelled cards** (Typing, Size &
+  Feel, Appearance, Privacy, If Something Breaks) instead of one flat list of
+  roughly fifteen rows, plus a search field that filters rows by label text and
+  hides a group entirely once nothing in it matches. Same preferences, same
+  `KeyboardSettingsViewModel` calls -- this changes where a control is, not
+  what it does. Build-verified only, not yet confirmed on a device.
 
 ---
 
