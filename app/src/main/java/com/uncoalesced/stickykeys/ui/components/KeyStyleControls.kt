@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
+import com.uncoalesced.stickykeys.keyboardcore.theme.KeyboardTheme
 
 /**
  * A small fixed palette plus "use the theme's own colour".
@@ -122,6 +123,10 @@ fun KeyStyleControls(
                 label = "Text opacity",
                 value = style.textOpacity,
                 onChange = { v -> onChange { it.copy(textOpacity = v) } },
+                // Glyphs below this are treated as absent and restored to opaque on save, so
+                // the travel below it was only ever a value that snapped back. The fill slider
+                // keeps its full range on purpose: a transparent key is a legitimate look.
+                minValue = KeyboardTheme.MIN_VISIBLE_ALPHA,
             )
         }
 
@@ -264,12 +269,18 @@ private fun SwatchRow(
     }
 }
 
+/**
+ * @param minValue the lowest value the control may reach. Non-zero only where the value below
+ *   it is one `KeyboardTheme.sanitized()` would rewrite -- a slider that can be dragged into a
+ *   value that snaps back is indistinguishable from a broken one.
+ */
 @Composable
 private fun OpacitySlider(
     label: String,
     value: Float,
     onChange: (Float) -> Unit,
     readout: String? = null,
+    minValue: Float = 0f,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -285,9 +296,9 @@ private fun OpacitySlider(
             )
         }
         Slider(
-            value = value.coerceIn(0f, 1f),
+            value = value.coerceIn(minValue, 1f),
             onValueChange = onChange,
-            valueRange = 0f..1f,
+            valueRange = minValue..1f,
             modifier = Modifier.fillMaxWidth(),
         )
     }
