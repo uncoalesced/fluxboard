@@ -36,6 +36,38 @@ the v0.1.1 tag".
 
 ### Fixed
 
+- **Two Key Styling sliders reset each other to 100%.** Setting Fill opacity to
+  5% and then dragging Text opacity down snapped *both* back to full, wiping a
+  value the user had set in an earlier, separately-accepted edit and had not
+  touched since.
+
+  `KeyboardTheme.sanitized()` captured the resolved fill and text once, then ran
+  two checks against those same captured values: one repairing an invisible
+  glyph, and a second resetting the fill when fill *and* text were both below
+  12%. The second still saw the pre-repair text, so any later edit that pushed
+  the text under the threshold also destroyed an unrelated low fill. Every
+  slider tick round-trips through save, reload and `sanitized()` before the
+  control redraws, so it looked like the sliders were fighting the user.
+
+  The second reset is gone rather than corrected. Repairing the glyph is the
+  whole job: an invisible *fill* alone was always allowed -- the panel shows
+  through and translucent keys are a deliberate look -- and `resolveText` sets
+  alpha from `textOpacity`, so a repaired glyph is opaque by construction and
+  the second condition could never have fired again anyway. The contrast check
+  still catches a glyph indistinguishable from its key.
+
+  The Text opacity slider now also stops at 12% instead of running to zero. A
+  control that reaches a value the save path immediately rewrites is
+  indistinguishable from a broken one; the fill slider keeps its full range,
+  because a transparent key is legitimate. `ThemeFallbackTest` gains the
+  reported sequence (fill 5%, then text dragged below the threshold, fill must
+  survive) and was verified to fail when the old reset is put back.
+
+  Device-verified: with fill at 1%, dragging Text opacity to the far left leaves
+  fill at 1% and stops text at its floor, and adjusting Haze afterwards moves
+  nothing else -- which is the same mechanism behind the earlier "messing with
+  the key haze deleted my theme" report.
+
 - **Backspace took several presses to delete a single letter.** Reported by a
   tester: correcting one mistyped character was "really stubborn, takes a few
   tries."
