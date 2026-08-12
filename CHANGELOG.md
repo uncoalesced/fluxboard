@@ -36,6 +36,33 @@ the v0.1.1 tag".
 
 ### Fixed
 
+- **Backspace took several presses to delete a single letter.** Reported by a
+  tester: correcting one mistyped character was "really stubborn, takes a few
+  tries."
+
+  `sendDelete()` was the last edit primitive in `StickyKeysIME` still sending a
+  raw synthetic `KeyEvent` -- a `KEYCODE_DEL` down/up pair built with the
+  two-argument constructor, which leaves `downTime`/`eventTime` at zero. Some
+  host editors treat a zero-timestamp event as stale and drop it, which is
+  exactly why `sendRawEnter` was rewritten to build real timestamps and why
+  `moveCursor` stopped sending `KEYCODE_DPAD_*` entirely: a raw key event's
+  effect belongs to the host, not to this keyboard.
+
+  Nothing here could see the drop. The caret prediction assumed the delete
+  landed regardless, so the keyboard's tracked position drifted by one and the
+  press looked dead; `onUpdateSelection` noticed the mismatch and resynced a
+  moment later, which is why it recovered after a few tries instead of staying
+  broken.
+
+  Backspace is now `deleteSurroundingText`, with `commitText("", 1)` for a
+  selection (`deleteSurroundingText` ignores an active selection by contract, so
+  it is the wrong call there). The character count comes from the new pure
+  `backspaceLengthFor`, which returns 2 for a UTF-16 surrogate pair so pressing
+  backspace on an emoji removes the whole emoji rather than stranding half of
+  it. `BackspaceTest` pins that arithmetic. Both backspace paths -- the typing
+  keyboard's DEL key and the emoji picker's own backspace button -- route
+  through this one method, so both are fixed together.
+
 - **Every preference silently stopped propagating in release builds.** Settings
   appeared to do nothing: a toggle wrote to disk and nothing in the app or the
   keyboard changed until the process was restarted. The privacy switch in the
