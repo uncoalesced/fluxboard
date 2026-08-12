@@ -2,7 +2,9 @@
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlidePoint
@@ -43,6 +45,17 @@ internal class GlideTracker {
     private var keyWidthPx = 1f
 
     /**
+     * Live path for the trail overlay, root coordinates, same space as [move].
+     *
+     * A separate list from [points] rather than the same one, so the overlay's read of it
+     * cannot be mistaken for a dependency of the decoder -- and so a future change to one
+     * (say, downsampling points for decode accuracy) does not silently thin the drawn trail.
+     * Read only by the trail's own draw pass; the key grid never touches it, which is what
+     * keeps a moving finger from recomposing the grid.
+     */
+    val trailPoints: SnapshotStateList<Offset> = mutableStateListOf()
+
+    /**
      * Registers where a letter key currently is.
      *
      * Called from each key's own `onGloballyPositioned`, which already runs for the alternates
@@ -72,6 +85,8 @@ internal class GlideTracker {
     fun begin(at: Offset) {
         points.clear()
         points.add(at)
+        trailPoints.clear()
+        trailPoints.add(at)
         isGliding.value = true
     }
 
@@ -81,11 +96,13 @@ internal class GlideTracker {
         val last = points.lastOrNull()
         if (last != null && (last - to).getDistance() < MIN_SAMPLE_DISTANCE_PX) return
         points.add(to)
+        trailPoints.add(to)
     }
 
     /** Ends the gesture and returns what was drawn, or null if it was not a usable glide. */
     fun finish(): GlideStroke? {
         isGliding.value = false
+        trailPoints.clear()
         if (points.size < 2) {
             points.clear()
             return null
@@ -108,6 +125,7 @@ internal class GlideTracker {
 
     fun cancel() {
         points.clear()
+        trailPoints.clear()
         isGliding.value = false
     }
 

@@ -87,6 +87,17 @@ fun StickyKeysTheme(
     // We still wrap in MaterialTheme just to provide basic defaults to underlying
     // Material components (like Ripple, Dialog, Surface defaults), but we map them
     // conceptually to our tokens to ensure a consistent look.
+    // Nine more M3 slots mapped below, on top of the eight already forwarded. Material
+    // components (dialogs, ripples, dropdown menus) read these directly and previously fell
+    // back to M3's own baseline purple the instant they touched a slot this block did not set
+    // -- visible as an inconsistency between FluxBoard's own drawn UI and anything routed
+    // through stock Material. None of these are new colors: StickyKeysColors already carries
+    // every value used here, this only widens how much of it Material sees.
+    //
+    // outline is the one exception -- StickyKeysColors has no border/divider field, so it
+    // reads Taupe directly rather than adding one. Taupe is already documented in Color.kt as
+    // the "warm neutral," and outline (dividers, unfocused borders) never sits adjacent to
+    // secondary on screen, so reusing the same hex for both is safe.
     val materialColors =
         if (darkTheme) {
             androidx.compose.material3.darkColorScheme(
@@ -98,6 +109,16 @@ fun StickyKeysTheme(
                 onBackground = colors.onBackground,
                 onSurface = colors.onSurface,
                 onError = colors.onError,
+                secondary = colors.secondary,
+                onSecondary = colors.onSecondary,
+                primaryContainer = colors.primaryVariant,
+                onPrimaryContainer = colors.onSurface,
+                secondaryContainer = colors.surfaceVariant,
+                onSecondaryContainer = colors.onSurfaceVariant,
+                surfaceVariant = colors.surfaceVariant,
+                onSurfaceVariant = colors.onSurfaceVariant,
+                surfaceContainer = colors.surface,
+                outline = Taupe,
             )
         } else {
             androidx.compose.material3.lightColorScheme(
@@ -109,6 +130,16 @@ fun StickyKeysTheme(
                 onBackground = colors.onBackground,
                 onSurface = colors.onSurface,
                 onError = colors.onError,
+                secondary = colors.secondary,
+                onSecondary = colors.onSecondary,
+                primaryContainer = colors.primaryVariant,
+                onPrimaryContainer = colors.onSurface,
+                secondaryContainer = colors.surfaceVariant,
+                onSecondaryContainer = colors.onSurfaceVariant,
+                surfaceVariant = colors.surfaceVariant,
+                onSurfaceVariant = colors.onSurfaceVariant,
+                surfaceContainer = colors.surface,
+                outline = Taupe,
             )
         }
 

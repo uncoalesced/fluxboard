@@ -16,6 +16,56 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [Unreleased]
+
+Build-verified only: `clean :app:packageReleaseArtifact` succeeds and
+`KeyboardRecompositionTest`/`GlideGateTest` both pass under `--rerun`. Not yet
+confirmed on a device, so nothing below is claimed as more than that.
+
+### Fixed
+
+- **Stock Material components fell back to M3's default purple the moment they
+  touched a slot `StickyKeysTheme` didn't forward.** `Theme.kt` mapped only 8 of
+  `StickyKeysColors`' 13 fields into Material3's `colorScheme` -- `secondary`,
+  any container role, `surfaceVariant` and `outline` were never set, so a
+  dialog, a ripple, or the theme/layout dropdown menus were the one place on
+  screen where sticky6 was invisible.
+
+  No new colors needed: `secondary`, `onSecondary`, `primaryContainer`,
+  `onPrimaryContainer`, `secondaryContainer`, `onSecondaryContainer`,
+  `surfaceVariant`, `onSurfaceVariant` and `surfaceContainer` all now forward
+  existing `StickyKeysColors` fields (`primaryContainer` reuses `primaryVariant`
+  -- Sage, the existing "latched" tone -- rather than inventing a new one).
+  `outline` has no `StickyKeysColors` equivalent, so it reads `Taupe` directly;
+  outline and secondary are never adjacent on screen, so sharing the hex is
+  safe.
+
+### Added
+
+- **A glide trail.** A tapered, fading stroke now traces the finger's path
+  while swipe-typing, drawn in `TypingKeyboardView`'s own `Canvas` pass over
+  the key grid. Colour follows the active theme's accent, so a custom theme
+  stays on-brand rather than showing a hardcoded colour; the stroke clears on
+  lift or commit instead of decaying on its own.
+
+  It reads `GlideTracker`'s new `trailPoints` -- a list separate from the one
+  the decoder uses, so the two can never be confused -- only inside the
+  `Canvas` draw lambda, which runs in the draw phase rather than composition.
+  The key grid never reads `trailPoints`, so a moving finger repaints the
+  overlay and nothing else; `KeyboardRecompositionTest`'s zero-rebuild
+  assertion still holds with the trail in place.
+
+### Changed
+
+- **Keyboard Settings regrouped into five labelled cards** (Typing, Size &
+  Feel, Appearance, Privacy, If Something Breaks) instead of one flat list of
+  roughly fifteen rows, plus a search field that filters rows by label text and
+  hides a group entirely once nothing in it matches. Same preferences, same
+  `KeyboardSettingsViewModel` calls -- this changes where a control is, not
+  what it does.
+
+---
+
 ## [v0.1.5-BETA] - 2026-08-10
 
 Re-released the same day the beta was cut, because a full device pass found a
