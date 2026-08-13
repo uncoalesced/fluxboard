@@ -16,7 +16,11 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
-## [Unreleased]
+## [v0.1.5.1-BETA] - 2026-08-13
+
+Point release on top of v0.1.5-BETA. Two tester-reported defects, both of them
+data loss rather than cosmetic, plus the ktlint break that was keeping
+`gradlew build` red. `versionCode` 7.
 
 Build-verified only: `clean :app:packageReleaseArtifact` succeeds and
 `KeyboardRecompositionTest`/`GlideGateTest` both pass under `--rerun`. Not yet
