@@ -32,7 +32,11 @@ the v0.1.1 tag".
 
 ---
 
-## [Unreleased]
+## [v0.1.5.1-BETA] - 2026-08-13
+
+Point release on top of v0.1.5-BETA. Two tester-reported defects, both of them
+data loss rather than cosmetic, plus the ktlint break that was keeping
+`gradlew build` red. `versionCode` 7.
 
 ### Fixed
 
