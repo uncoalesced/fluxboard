@@ -16,11 +16,7 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
-## [v0.1.5.1-BETA] - 2026-08-13
-
-Point release on top of v0.1.5-BETA. Two tester-reported defects, both of them
-data loss rather than cosmetic, plus the ktlint break that was keeping
-`gradlew build` red. `versionCode` 7.
+## [Unreleased]
 
 Build-verified only: `clean :app:packageReleaseArtifact` succeeds and
 `KeyboardRecompositionTest`/`GlideGateTest` both pass under `--rerun`. Not yet
@@ -67,6 +63,168 @@ confirmed on a device, so nothing below is claimed as more than that.
   hides a group entirely once nothing in it matches. Same preferences, same
   `KeyboardSettingsViewModel` calls -- this changes where a control is, not
   what it does.
+
+---
+
+## [v0.1.5.1-BETA] - 2026-08-13
+
+Point release on top of v0.1.5-BETA. Two tester-reported defects, both of them
+data loss rather than cosmetic, plus the ktlint break that was keeping
+`gradlew build` red. `versionCode` 7.
+
+### Fixed
+
+- **Two Key Styling sliders reset each other to 100%.** Setting Fill opacity to
+  5% and then dragging Text opacity down snapped *both* back to full, wiping a
+  value the user had set in an earlier, separately-accepted edit and had not
+  touched since.
+
+  `KeyboardTheme.sanitized()` captured the resolved fill and text once, then ran
+  two checks against those same captured values: one repairing an invisible
+  glyph, and a second resetting the fill when fill *and* text were both below
+  12%. The second still saw the pre-repair text, so any later edit that pushed
+  the text under the threshold also destroyed an unrelated low fill. Every
+  slider tick round-trips through save, reload and `sanitized()` before the
+  control redraws, so it looked like the sliders were fighting the user.
+
+  The second reset is gone rather than corrected. Repairing the glyph is the
+  whole job: an invisible *fill* alone was always allowed -- the panel shows
+  through and translucent keys are a deliberate look -- and `resolveText` sets
+  alpha from `textOpacity`, so a repaired glyph is opaque by construction and
+  the second condition could never have fired again anyway. The contrast check
+  still catches a glyph indistinguishable from its key.
+
+  The Text opacity slider now also stops at 12% instead of running to zero. A
+  control that reaches a value the save path immediately rewrites is
+  indistinguishable from a broken one; the fill slider keeps its full range,
+  because a transparent key is legitimate. `ThemeFallbackTest` gains the
+  reported sequence (fill 5%, then text dragged below the threshold, fill must
+  survive) and was verified to fail when the old reset is put back.
+
+  Device-verified: with fill at 1%, dragging Text opacity to the far left leaves
+  fill at 1% and stops text at its floor, and adjusting Haze afterwards moves
+  nothing else -- which is the same mechanism behind the earlier "messing with
+  the key haze deleted my theme" report.
+
+- **Backspace took several presses to delete a single letter.** Reported by a
+  tester: correcting one mistyped character was "really stubborn, takes a few
+  tries."
+
+  `sendDelete()` was the last edit primitive in `StickyKeysIME` still sending a
+  raw synthetic `KeyEvent` -- a `KEYCODE_DEL` down/up pair built with the
+  two-argument constructor, which leaves `downTime`/`eventTime` at zero. Some
+  host editors treat a zero-timestamp event as stale and drop it, which is
+  exactly why `sendRawEnter` was rewritten to build real timestamps and why
+  `moveCursor` stopped sending `KEYCODE_DPAD_*` entirely: a raw key event's
+  effect belongs to the host, not to this keyboard.
+
+  Nothing here could see the drop. The caret prediction assumed the delete
+  landed regardless, so the keyboard's tracked position drifted by one and the
+  press looked dead; `onUpdateSelection` noticed the mismatch and resynced a
+  moment later, which is why it recovered after a few tries instead of staying
+  broken.
+
+  Backspace is now `deleteSurroundingText`, with `commitText("", 1)` for a
+  selection (`deleteSurroundingText` ignores an active selection by contract, so
+  it is the wrong call there). The character count comes from the new pure
+  `backspaceLengthFor`, which returns 2 for a UTF-16 surrogate pair so pressing
+  backspace on an emoji removes the whole emoji rather than stranding half of
+  it. `BackspaceTest` pins that arithmetic. Both backspace paths -- the typing
+  keyboard's DEL key and the emoji picker's own backspace button -- route
+  through this one method, so both are fixed together.
+
+  Verified on a device (LineageOS, 1080x2400) against the signed release
+  artifact, in two hosts -- the Settings search field and the AOSP Messaging
+  compose box: 32 single presses each removed exactly one character on the first
+  press, at the end of the text and in the middle of it; five-press bursts
+  removed exactly five; an emoji disappeared whole from both the DEL key and the
+  picker's own button, never half; and a selection (both select-all and a
+  double-tap word) went as a unit rather than one character outside it.
+
+  **What that pass does not show:** a control build carrying the old
+  `KeyEvent` body passed the same trials in the same two hosts, so neither of
+  them was dropping the zero-timestamp event. The tester's report came from
+  Discord, which is not installed on this phone, and the drop is host-specific by
+  nature. Treat this as "the new primitive is correct and nothing regressed",
+  not as a reproduction of the original symptom.
+
+- **Every preference silently stopped propagating in release builds.** Settings
+  appeared to do nothing: a toggle wrote to disk and nothing in the app or the
+  keyboard changed until the process was restarted. The privacy switch in the
+  quick-access row was the worst of it -- it could be turned on and never off,
+  and because it suppresses suggestions, autocorrect and glide, that left the
+  keyboard's headline feature dead with the only control for it inert.
+
+  `KeyboardPreferences` and `AppPreferences` published changes through a
+  `SharedPreferences.OnSharedPreferenceChangeListener`. SharedPreferences holds
+  its listeners in a `WeakHashMap`, so the `private val listener` field was the
+  only strong reference to ours -- and R8, seeing a field written once and read
+  once, removed the field. The listener was collected at the first GC and no
+  preference change reached any `StateFlow` again for the life of the process.
+
+  Debug builds are not minified, so it worked perfectly everywhere except the
+  artifact that ships. Confirmed against `outputs/mapping/release/mapping.txt`,
+  which lists `prefs` and all sixteen flow fields for the class and no `listener`
+  field at all.
+
+  Both classes are `@Singleton` and every write already goes through their own
+  setters, so the listener was never doing anything a setter could not. Each
+  setter now publishes to its own flow directly, which R8 cannot remove because
+  the flow is read elsewhere. Clamped setters compute the clamped value once and
+  use it for both the write and the flow, so the stored number and the published
+  one cannot drift.
+
+  `PreferencePublishTest` pins the setter contract (verified to fail when a
+  publish is removed), and `scripts/check-source-rules.sh` now refuses to let a
+  SharedPreferences listener back into the codebase.
+
+- **Stock Material components fell back to M3's default purple the moment they
+  touched a slot `StickyKeysTheme` didn't forward.** `Theme.kt` mapped only 8 of
+  `StickyKeysColors`' 13 fields into Material3's `colorScheme` -- `secondary`,
+  any container role, `surfaceVariant` and `outline` were never set, so a
+  dialog, a ripple, or the theme/layout dropdown menus were the one place on
+  screen where sticky6 was invisible.
+
+  No new colors needed: `secondary`, `onSecondary`, `primaryContainer`,
+  `onPrimaryContainer`, `secondaryContainer`, `onSecondaryContainer`,
+  `surfaceVariant`, `onSurfaceVariant` and `surfaceContainer` all now forward
+  existing `StickyKeysColors` fields (`primaryContainer` reuses `primaryVariant`
+  -- Sage, the existing "latched" tone -- rather than inventing a new one).
+  `outline` has no `StickyKeysColors` equivalent, so it reads `Taupe` directly;
+  outline and secondary are never adjacent on screen, so sharing the hex is
+  safe.
+
+  Build-verified only (clean release build, `KeyboardRecompositionTest` and
+  `GlideGateTest` pass under `--rerun`); not yet confirmed on a device.
+
+### Added
+
+- **A glide trail.** A tapered, fading stroke now traces the finger's path
+  while swipe-typing, drawn in `TypingKeyboardView`'s own `Canvas` pass over
+  the key grid. Colour follows the active theme's accent, so a custom theme
+  stays on-brand rather than showing a hardcoded colour; the stroke clears on
+  lift or commit instead of decaying on its own.
+
+  It reads `GlideTracker`'s new `trailPoints` -- a list separate from the one
+  the decoder uses, so the two can never be confused -- only inside the
+  `Canvas` draw lambda, which runs in the draw phase rather than composition.
+  The key grid never reads `trailPoints`, so a moving finger repaints the
+  overlay and nothing else; `KeyboardRecompositionTest`'s zero-rebuild
+  assertion still holds with the trail in place. Build-verified only, not yet
+  confirmed on a device.
+
+### Changed
+
+- `KeyboardLayouts.symbolsPrimaryRows` KDoc said `$` was not on symbols page 1.
+  It has been since B4 put the currency key there, twelve lines below the
+  sentence saying otherwise.
+
+- **Keyboard Settings regrouped into five labelled cards** (Typing, Size &
+  Feel, Appearance, Privacy, If Something Breaks) instead of one flat list of
+  roughly fifteen rows, plus a search field that filters rows by label text and
+  hides a group entirely once nothing in it matches. Same preferences, same
+  `KeyboardSettingsViewModel` calls -- this changes where a control is, not
+  what it does. Build-verified only, not yet confirmed on a device.
 
 ---
 
