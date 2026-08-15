@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import android.view.inputmethod.EditorInfo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -163,8 +163,10 @@ internal fun KeyboardRowsView(
     onKeyPress: (String) -> Unit,
     modifier: Modifier = Modifier,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    onDeleteWord: () -> Unit = {},
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
+    enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
 ) {
     // One strip for the whole grid, not one per key. A popup owned by the key that opened it
     // is dismissed by its own pointer-exit the moment the finger slides across to choose.
@@ -224,11 +226,13 @@ internal fun KeyboardRowsView(
                                     keyOutput = keyDef.output,
                                     displayLabel = keyDef.displayLabel,
                                     shift = shiftRenderingFor(mode),
+                                    enterAction = enterAction,
                                 ),
                             hint = keyDef.hint,
                             keyAlternates = keyDef.alternates,
                             keyAlternatesDefaultIndex = keyDef.alternatesDefaultIndex,
                             mode = mode,
+                            onDeleteWord = onDeleteWord,
                             background = colors.background,
                             foreground = colors.foreground,
                             border = colors.border,
@@ -304,7 +308,7 @@ private fun AlternatesStrip(
             Modifier
                 .offset { IntOffset(left.toInt(), top.toInt()) }
                 .height(stripHeight)
-                .background(palette.surfaceVariant, RoundedCornerShape(8.dp)),
+                .background(palette.surfaceVariant, StickyKeysTheme.shapes.medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         options.forEachIndexed { index, option ->
@@ -317,7 +321,7 @@ private fun AlternatesStrip(
                         .padding(3.dp)
                         .background(
                             if (selected) palette.primary else Color.Transparent,
-                            RoundedCornerShape(6.dp),
+                            StickyKeysTheme.shapes.small,
                         ),
                 contentAlignment = Alignment.Center,
             ) {
