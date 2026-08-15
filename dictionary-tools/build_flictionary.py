@@ -40,10 +40,58 @@ def load_reference_words(paths):
     return words
 
 
-def parse_corpus(words_file, allowed):
-    """Yield (word, freq) for corpus lines that survive the reference filter."""
+# Every English contraction, and the reason this list is written out rather than sourced.
+#
+# The corpus carries no punctuation at all, so "you're" is not in it -- and its stripped
+# form "youre" is then thrown away by the reference intersection, because "youre" is not a
+# word either. The result was that *no* contraction reached the dictionary: "don't",
+# "it's", "can't" and "i'm" were all absent, which is roughly one word in twenty of running
+# English. Typing one produced no suggestion and invited a correction toward something
+# else entirely.
+#
+# Sourcing a list would be the right call for an open-ended set, the way the reference
+# wordlists are vendored. Contractions are not one: they are a closed grammatical class of
+# a few dozen entries that has not changed in a century, so writing it here is a complete
+# statement of it rather than a sample of one.
+#
+# Each takes the corpus frequency of its stripped form, which is what the corpus actually
+# counted. Where that form is also a word in its own right -- "its", "cant", "hell",
+# "were" -- the count covers both meanings and both entries get it. That over-states the
+# rarer sense, but frequencies are log-normalized into 1-255 before they are stored, which
+# compresses a factor of two into about four points. It is not worth a guess at the split.
+CONTRACTIONS = (
+    "ain't", "aren't", "can't", "couldn't", "didn't", "doesn't", "don't", "hadn't",
+    "hasn't", "haven't", "isn't", "mightn't", "mustn't", "needn't", "shan't",
+    "shouldn't", "wasn't", "weren't", "won't", "wouldn't",
+    "i'm",
+    "you're", "we're", "they're",
+    "i've", "you've", "we've", "they've", "could've", "should've", "would've",
+    "must've",
+    "i'll", "you'll", "he'll", "she'll", "it'll", "we'll", "they'll", "that'll",
+    "there'll", "who'll",
+    "i'd", "you'd", "he'd", "she'd", "it'd", "we'd", "they'd", "that'd", "there'd",
+    "who'd",
+    "he's", "she's", "it's", "that's", "there's", "here's", "what's", "who's", "let's",
+    "where's", "when's", "how's", "why's", "one's", "nobody's", "everyone's",
+    "o'clock", "y'all", "ma'am",
+)
+
+#: Stripped form -> contraction, e.g. "youre" -> "you're". Built once, used by this script
+#: and imported by build_bigrams.py so the two assets agree on the same set.
+BARE_TO_CONTRACTION = {c.replace("'", ""): c for c in CONTRACTIONS}
+
+
+def parse_corpus(words_file, allowed, capture=()):
+    """Yield (word, freq) for corpus lines that survive the reference filter.
+
+    `capture` names lowercase forms whose frequency is wanted *whether or not* the
+    filter accepts them. That is how contractions get a real weight rather than an
+    invented one -- see CONTRACTIONS.
+    """
     kept, dropped = 0, 0
     rows = []
+    captured = {}
+    capture = set(capture)
     with open(words_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split()
@@ -54,12 +102,35 @@ def parse_corpus(words_file, allowed):
                 freq = int(parts[1])
             except ValueError:
                 continue
-            if allowed is not None and word.lower() not in allowed:
+            lowered = word.lower()
+            if lowered in capture and freq > captured.get(lowered, 0):
+                captured[lowered] = freq
+            if allowed is not None and lowered not in allowed:
                 dropped += 1
                 continue
             kept += 1
             rows.append((word, freq))
-    return rows, kept, dropped
+    return rows, kept, dropped, captured
+
+
+def contraction_rows(captured):
+    """Rows for every contraction whose stripped form the corpus actually counted."""
+    return [
+        (contraction, captured[bare])
+        for bare, contraction in sorted(BARE_TO_CONTRACTION.items())
+        if captured.get(bare)
+    ]
+
+
+def normalize_freq(freq, max_freq):
+    """Compress a raw corpus count into the 1-255 byte the binary formats store.
+
+    Logarithmic, because raw web counts span six orders of magnitude and a linear
+    squeeze would flatten every word below the top few hundred to 0. Shared with
+    build_bigrams.py rather than duplicated: two copies of this curve would drift and
+    the two assets would then disagree about what "common" means.
+    """
+    return max(1, min(255, int((math.log(freq + 1) / math.log(max_freq + 1)) * 255)))
 
 
 def build_trie(rows):
@@ -77,10 +148,7 @@ def build_trie(rows):
 
     for word, freq in rows:
         # Normalize frequency 1-255 logarithmically
-        norm_freq = max(
-            1,
-            min(255, int((math.log(freq + 1) / math.log(max_freq + 1)) * 255)),
-        )
+        norm_freq = normalize_freq(freq, max_freq)
 
         current = root
         for char in word:
@@ -186,10 +254,19 @@ def main():
     if allowed is not None:
         print(f"Reference wordlist: {len(allowed)} distinct words")
 
-    rows, kept, dropped = parse_corpus(args.corpus, allowed)
+    rows, kept, dropped, captured = parse_corpus(
+        args.corpus, allowed, BARE_TO_CONTRACTION.keys()
+    )
     print(f"Corpus words kept: {kept}, dropped as not-a-word: {dropped}")
     if not rows:
         sys.exit("No words survived filtering -- check the wordlist paths.")
+
+    contractions = contraction_rows(captured)
+    rows.extend(contractions)
+    print(
+        f"Contractions added: {len(contractions)} of {len(CONTRACTIONS)} "
+        f"(the rest have no corpus frequency to weight them)"
+    )
 
     nodes = build_trie(rows)
     write_flictionary(nodes, args.output)
