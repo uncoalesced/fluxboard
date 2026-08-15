@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -36,6 +35,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyboardTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 
 /**
  * A small fixed palette plus "use the theme's own colour".
@@ -314,13 +314,17 @@ fun KeyStylePreviewChip(
     modifier: Modifier = Modifier,
 ) {
     val border = style.resolveBorder(baseText)
+    // The same token the live keyboard draws its keys with, rather than a number that happens
+    // to look similar. A preview whose corners disagree with the real key is worse than no
+    // preview: it is the one surface a user checks their customization against.
+    val keyShape = StickyKeysTheme.shapes.medium
     Box(
         modifier =
             modifier
                 .size(width = 44.dp, height = 40.dp)
-                .background(style.resolveFill(baseFill), RoundedCornerShape(6.dp))
+                .background(style.resolveFill(baseFill), keyShape)
                 .then(
-                    border?.let { Modifier.border(style.borderWidth, it, RoundedCornerShape(6.dp)) }
+                    border?.let { Modifier.border(style.borderWidth, it, keyShape) }
                         ?: Modifier,
                 ),
         contentAlignment = Alignment.Center,
