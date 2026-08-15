@@ -309,6 +309,8 @@ private class FakeController(
 
     override fun sendDelete() = Unit
 
+    override fun deleteBefore(charCount: Int) = Unit
+
     override fun sendEnter() = Unit
 
     override fun handleEditorAction() = Unit
