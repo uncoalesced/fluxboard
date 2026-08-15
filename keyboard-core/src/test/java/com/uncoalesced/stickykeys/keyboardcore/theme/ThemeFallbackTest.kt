@@ -2,6 +2,7 @@
 package com.uncoalesced.stickykeys.keyboardcore.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -164,5 +165,52 @@ class ThemeFallbackTest {
         val restored = KeyboardTheme.fromJson(cleaned.toJson().toString())
         assertEquals(cleaned.keyStyle.textOpacity, restored.keyStyle.textOpacity, 0.001f)
         assertTrue(restored.keyStyle.borderEnabled)
+    }
+
+    /** Loads a preset the way ThemeManager does, from the asset that actually ships. */
+    private fun shippedPreset(name: String): KeyboardTheme {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val json =
+            context.assets
+                .open("themes/$name.json")
+                .bufferedReader()
+                .use { it.readText() }
+        return KeyboardTheme.fromJson(json)
+    }
+
+    @Test
+    fun `the shipped preset files survive sanitization unchanged`() {
+        // The test above covers KeyboardTheme.fallback(), which is the *Kotlin* default. These
+        // are the JSON files, which are what a user actually gets -- and, per this project's
+        // own history, a Kotlin token and the preset that overrides it have disagreed before.
+        listOf("default_dark", "default_light", "amoled_dark").forEach { name ->
+            val preset = shippedPreset(name)
+            assertSame(
+                "Preset '$name' must not be rewritten by sanitization",
+                preset,
+                preset.sanitized(),
+            )
+        }
+    }
+
+    @Test
+    fun `the two depth presets ship haze and the AMOLED one does not`() {
+        // Without this the test above passes vacuously: a keyStyle block that failed to parse
+        // would load as KeyStyle.Default, sanitize to itself, and look perfectly healthy.
+        listOf("default_dark", "default_light").forEach { name ->
+            val style = shippedPreset(name).keyStyle
+            assertTrue("Preset '$name' should carry haze", style.hazeOpacity > 0f)
+            assertNotNull(
+                "Preset '$name' haze must resolve to a drawable colour",
+                style.resolveHaze(Color.Gray),
+            )
+            assertNull(
+                "Preset '$name' must derive its haze from the palette, not a hardcoded hex",
+                style.hazeColor,
+            )
+        }
+        // Flat black with no glow is the entire point of an OLED preset; a shadow behind every
+        // key would light pixels it exists to keep dark.
+        assertEquals(0f, shippedPreset("amoled_dark").keyStyle.hazeOpacity, 0.0001f)
     }
 }
