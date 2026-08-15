@@ -4,7 +4,10 @@ package com.uncoalesced.stickykeys.keyboardcore.ime
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -36,8 +38,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.R
+import com.uncoalesced.stickykeys.keyboardcore.theme.PANEL_FADE_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysColors
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 
@@ -100,7 +104,7 @@ internal fun QuickAccessToggle(
                 // Every small control on the keyboard is standardized this way rather than
                 // each picking its own compromise between fitting and being hittable.
                 .minimumInteractiveComponentSize()
-                .background(palette.surfaceVariant, RoundedCornerShape(16.dp))
+                .background(palette.surfaceVariant, StickyKeysTheme.shapes.pill)
                 .clickable(onClick = onToggle)
                 .semantics {
                     role = Role.Button
@@ -136,16 +140,26 @@ internal fun QuickAccessRow(
     onAction: (QuickAction) -> Unit,
     onMedia: (MediaTransport.Action) -> Unit,
     isMediaPlaying: () -> Boolean,
+    nowPlaying: () -> NowPlaying? = { null },
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
         visible = expanded,
-        enter = expandVertically(),
-        exit = shrinkVertically(),
+        // The height animation was already here; the fade was not. Expanding alone drew the
+        // icons at full strength from the first frame, so they appeared to slide out from
+        // behind the strip fully formed while the window was still growing to fit them.
+        // Fading over the same gesture lets the row arrive with the space it needs.
+        enter = expandVertically() + fadeIn(tween(PANEL_FADE_MS)),
+        exit = shrinkVertically() + fadeOut(tween(PANEL_FADE_MS)),
         modifier = modifier,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            MediaRow(palette = palette, onMedia = onMedia, isMediaPlaying = isMediaPlaying)
+            MediaRow(
+                palette = palette,
+                onMedia = onMedia,
+                isMediaPlaying = isMediaPlaying,
+                nowPlaying = nowPlaying,
+            )
             Row(
                 modifier =
                     Modifier
@@ -164,7 +178,7 @@ internal fun QuickAccessRow(
                                 .minimumInteractiveComponentSize()
                                 .background(
                                     if (on) palette.primary else Color.Transparent,
-                                    RoundedCornerShape(18.dp),
+                                    StickyKeysTheme.shapes.pill,
                                 ).clickable { onAction(action) }
                                 .semantics {
                                     role = Role.Button
@@ -214,12 +228,19 @@ private fun MediaRow(
     palette: StickyKeysColors,
     onMedia: (MediaTransport.Action) -> Unit,
     isMediaPlaying: () -> Boolean,
+    nowPlaying: () -> NowPlaying? = { null },
 ) {
     // Re-read on each press rather than polled. There is no callback to subscribe to without
     // the notification-listener permission, and a timer ticking inside an IME to keep a glyph
     // fresh would cost battery in every session for a row most of them never open.
     var playing by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { playing = isMediaPlaying() }
+    // Read once per open, exactly like `playing`, and held nowhere else. Nothing about the
+    // track is persisted: no history, no recently-played, no writes at all.
+    var track by remember { mutableStateOf<NowPlaying?>(null) }
+    LaunchedEffect(Unit) {
+        playing = isMediaPlaying()
+        track = nowPlaying()
+    }
 
     Row(
         modifier =
@@ -230,6 +251,26 @@ private fun MediaRow(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Additive, never a replacement. With the opt-in off, or the grant absent, or nothing
+        // playing, this is simply not drawn and the row looks exactly as it always has --
+        // declining the permission is not a degraded state.
+        track?.let { current ->
+            val caption = listOfNotNull(current.title, current.artist).joinToString(" - ")
+            if (caption.isNotEmpty()) {
+                Text(
+                    text = caption,
+                    color = palette.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = StickyKeysTheme.typography.labelMedium,
+                    modifier =
+                        Modifier
+                            .weight(1f, fill = false)
+                            .padding(end = 10.dp)
+                            .semantics { contentDescription = "Now playing: $caption" },
+                )
+            }
+        }
         mediaButtons.forEach { (action, label) ->
             val isPlayPause = action == MediaTransport.Action.PLAY_PAUSE
             val icon =
@@ -301,7 +342,7 @@ internal fun ComingSoonNotice(
         Box(
             modifier =
                 Modifier
-                    .background(palette.surfaceVariant, RoundedCornerShape(10.dp))
+                    .background(palette.surfaceVariant, StickyKeysTheme.shapes.medium)
                     .clickable(onClick = onDismiss)
                     .padding(horizontal = 18.dp, vertical = 14.dp),
         ) {
