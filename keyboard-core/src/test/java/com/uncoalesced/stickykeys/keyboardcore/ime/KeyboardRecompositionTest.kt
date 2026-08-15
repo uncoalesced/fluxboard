@@ -273,6 +273,8 @@ private class NoOpController : KeyboardController {
 
     override fun sendDelete() = Unit
 
+    override fun deleteBefore(charCount: Int) = Unit
+
     override fun sendEnter() = Unit
 
     override fun handleEditorAction() = Unit
