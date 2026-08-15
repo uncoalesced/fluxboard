@@ -254,6 +254,8 @@ class StickyKeysIME :
             noPersonalizedLearning = noPersonalizedLearning(info),
             enterIsNewline =
                 info != null && enterInsertsNewline(info.inputType, info.imeOptions),
+            enterAction =
+                (info?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION,
         )
         // A field can be focused with the caret already inside a word -- editing an existing
         // draft, or a search box being corrected. onInputStarted clears the word tracker, so
@@ -413,6 +415,19 @@ class StickyKeysIME :
         val before = ic.getTextBeforeCursor(2, 0)?.toString() ?: ""
         val charCount = backspaceLengthFor(before)
         if (charCount == 0) return
+        ic.deleteSurroundingText(charCount, 0)
+        predictCaret((selEnd - charCount).coerceAtLeast(0))
+    }
+
+    override fun deleteBefore(charCount: Int) {
+        if (charCount <= 0) return
+        val ic = currentInputConnection ?: return
+        if (selStart != selEnd) {
+            // A selection deletes as a unit and its size is its own, not the caller's.
+            ic.commitText("", 1)
+            predictCaret(minOf(selStart, selEnd))
+            return
+        }
         ic.deleteSurroundingText(charCount, 0)
         predictCaret((selEnd - charCount).coerceAtLeast(0))
     }
