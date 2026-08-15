@@ -91,8 +91,37 @@ if [ -n "$listener_hits" ]; then
   fail=1
 fi
 
+# --- 4. Notification-listener scope boundary ---------------------------------
+# MediaMetadataListenerService exists for one reason: the platform will not answer
+# MediaSessionManager.getActiveSessions() unless a NotificationListenerService is
+# bound. The permission that buys is BIND_NOTIFICATION_LISTENER_SERVICE, which
+# hands the app the text of every notification on the device.
+#
+# The feature reads track title and artist and nothing else, and the way that stays
+# true is that the service never overrides a notification-content callback. The base
+# class delivers every notification on the device to onNotificationPosted and
+# onNotificationRemoved whether or not they are overridden, so not overriding them
+# is the boundary -- and a later edit adding one would cross it silently.
+#
+# Only the two connection lifecycle hooks are allowed. If a content callback is ever
+# genuinely needed, this check must be given a documented exemption and the consent
+# screen's wording revisited, rather than the check being deleted.
+listener_service="keyboard-core/src/main/java/com/uncoalesced/stickykeys/keyboardcore/ime/MediaMetadataListenerService.kt"
+if [ -f "$listener_service" ]; then
+  notif_hits=$(grep -n "override fun onNotification" "$listener_service" 2>/dev/null || true)
+  if [ -n "$notif_hits" ]; then
+    echo "NOTIFICATION SCOPE VIOLATION -- MediaMetadataListenerService must never read"
+    echo "notification content. It exists only to satisfy the binding requirement for"
+    echo "MediaSessionManager.getActiveSessions():"
+    echo "$notif_hits"
+    echo
+    fail=1
+  fi
+fi
+
 if [ "$fail" -eq 0 ]; then
-  echo "Source rule check passed: no emoji, all source files watermarked, no prefs listeners."
+  echo "Source rule check passed: no emoji, all source files watermarked, no prefs listeners,"
+  echo "no notification-content reads."
 fi
 
 exit "$fail"
