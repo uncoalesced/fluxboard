@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.layout
 
+import android.view.inputmethod.EditorInfo
 import androidx.annotation.DrawableRes
 import com.uncoalesced.stickykeys.keyboardcore.R
 
@@ -44,6 +45,7 @@ fun keyGlyph(
     keyOutput: String,
     displayLabel: String? = null,
     shift: ShiftRendering = ShiftRendering.OFF,
+    enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
 ): KeyGlyph {
     displayLabel?.let { return KeyGlyph.Label(it) }
     return when (keyOutput) {
@@ -54,7 +56,23 @@ fun keyGlyph(
                 ShiftRendering.LOCKED -> KeyGlyph.Icon(R.drawable.ic_key_shift_lock, "Caps lock")
             }
         "DEL" -> KeyGlyph.Icon(R.drawable.ic_key_backspace, "Backspace")
-        "ENTER" -> KeyGlyph.Icon(R.drawable.ic_key_enter, "Enter")
+        // What the key will actually do, drawn on the key.
+        //
+        // Deliberately not gated on `enterInsertsNewline` being false: a field may both
+        // accept newlines and declare an action, and the specific icon is still the honest
+        // one there. The newline case is exactly IME_ACTION_UNSPECIFIED or IME_ACTION_NONE,
+        // which fall to the branch below on their own -- and those two are a trap worth
+        // naming, because UNSPECIFIED is 0 while NONE is 1, so the obvious
+        // `action != IME_ACTION_NONE` test treats a plain text field as actionable.
+        "ENTER" ->
+            when (enterAction) {
+                EditorInfo.IME_ACTION_SEND -> KeyGlyph.Icon(R.drawable.ic_key_enter_send, "Send")
+                EditorInfo.IME_ACTION_SEARCH -> KeyGlyph.Icon(R.drawable.ic_key_search, "Search")
+                EditorInfo.IME_ACTION_GO -> KeyGlyph.Icon(R.drawable.ic_key_enter_go, "Go")
+                EditorInfo.IME_ACTION_NEXT -> KeyGlyph.Icon(R.drawable.ic_key_enter_next, "Next")
+                EditorInfo.IME_ACTION_DONE -> KeyGlyph.Icon(R.drawable.ic_key_enter_done, "Done")
+                else -> KeyGlyph.Icon(R.drawable.ic_key_enter, "Enter")
+            }
         "STICKERS" -> KeyGlyph.Icon(R.drawable.ic_key_emoji, "Stickers and emoji")
         "CLIPBOARD" -> KeyGlyph.Icon(R.drawable.ic_key_clipboard, "Clipboard history")
         "MIC" -> KeyGlyph.Icon(R.drawable.ic_key_mic, "Voice input")
