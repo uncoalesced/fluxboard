@@ -16,11 +16,208 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [v0.1.6-BETA] - 2026-08-16
+
+versionCode 8. Signed release APK is 8,112,436 bytes (7.74 MB). Device-verified on
+the LineageOS test phone (Redmi Note 11, Android 15) against the signed artifact,
+installed in place so no app data was lost. Items a phone could not settle are
+listed as such at the end rather than claimed.
+
+### Fixed -- contractions were missing from the dictionary entirely
+
+Reported as "punctuation in a word is not detected". The word-boundary code was
+never the problem: `wordUnderCaret` has always kept an apostrophe inside a word.
+**Not one contraction was in the shipped dictionary.** `you're`, `don't`, `it's`,
+`can't`, `i'm` were all absent, and so were their apostrophe-less spellings.
+
+Both halves of the pipeline behaved exactly as designed and their intersection was
+empty: the corpus that builds `base_dict.bin` carries no punctuation at all, so
+"you're" was never in it, and the form the corpus *did* count -- "youre" -- was then
+dropped by the SCOWL spelling filter because "youre" is not a word either. That is
+roughly one word in twenty of running English typed with no suggestion behind it,
+and an open invitation for autocorrect to reach for something else.
+
+- `dictionary-tools/build_flictionary.py` now emits every English contraction,
+  weighted by the corpus frequency of its stripped form. 63 of 71 landed;
+  `base_dict.bin` grew 1,260 bytes. The list is written out rather than sourced
+  because contractions are a closed grammatical class, not an open-ended set.
+- `build_bigrams.py` rewrites a stripped contraction the corpus counted into the
+  spelling users type, so `don't know`, `i'm not` and `that's what` are real
+  context now. Deliberately not applied where the stripped form is a word in its
+  own right -- "its", "cant", "were" -- because there the count belongs to the
+  plain word too; `boostFor` retries an apostrophe-stripped lookup for those.
+- New `PredictionEngine.restoreApostrophe`: "youre" to "you're", "dont" to "don't".
+  A targeted repair, tried ahead of the general search for the same reason
+  `splitOnMispressedSpace` is. Edit distance cannot get this right at any cost
+  setting -- inserting an apostrophe and deleting a letter are both one gap, so
+  "youre" reaches "you're" and "your" for the same price and frequency decides,
+  which "your" wins by three orders of magnitude. Cheapening the apostrophe until
+  "you're" won would have let "were" reach "we're" for nothing, which is real-word
+  correction. Fires only for a word not already in the dictionary, which is what
+  leaves every contraction homograph alone.
+- **Device-verified:** `dont` commits `Don't `, `youre` commits `You're `, and
+  `its` stays `Its `.
+
+### Fixed -- a bundled asset was never refreshed after an app update
+
+Found on the phone, and findable nowhere else. Both engines extracted their data
+file to private storage under `if (!file.exists())`, which is right on a first
+launch and wrong on every update after one: the previous version's copy survives
+and the new asset shipped in the APK is never read. The first v0.1.6 build
+installed over v0.1.5.1 still typed `Font ` for "dont", because the rebuilt
+dictionary was sitting unread inside the APK.
+
+New `assetBackedFile` stamps each extracted copy with the app's version code and
+re-extracts when it changes, so an asset update happens once per install and never
+on an ordinary launch. `AssetCacheTest` pins it. A unit test could not have caught
+this: it gets a clean app directory every run, so the stale branch cannot occur.
+
+### Fixed -- the suggestion pool was chosen by word length, not frequency
+
+Recorded as a known limitation during the v0.1.5.1 device pass and fixed here.
+`getBaseSuggestions` bounded its walk by *terminals found*, and because the walk is
+breadth-first that means it stopped near the top of the subtree, where the short
+words are. Prefix `ma` offered `map` and `mar` while `many` -- more frequent than
+both -- never entered the pool at all.
+
+The budget now counts nodes visited (20,000), sized against the real dictionary:
+the widest single-letter subtree is `s` at 15,716 nodes, so every prefix a user
+actually types is walked in full. The queue was also a list popped with
+`removeAt(0)`, harmless at the old budget and quadratic at this one; it is an
+`ArrayDeque` now. This is what limited sentence context, which re-ranks the pool
+and never adds to it.
+
+### Added
+
+- **Word-wise backspace, two ways.** A backspace straight after a glide takes the
+  whole word back, because one gesture put it there; the state this needs already
+  existed in `consumeGlideCommit`. Holding backspace and dragging left switches
+  from character repeat to word repeat, on its own 24dp activation distance --
+  deliberately further than the space-bar scrub's 18dp, because the repeat path has
+  never had an activation distance and a resting thumb drifts. **Device-verified:**
+  a drag turned `alpha bravo charlie delta echo` into `alpha bravo `, while a plain
+  450ms hold removed exactly three characters.
+- **Glide typing obeys shift.** A glide at a sentence start capitalizes and one with
+  caps lock engaged uppercases. A rendering fix, not a decoder one: `GlideTracker`
+  lowercases every key it records and has to, so case is applied at commit the same
+  way `matchCase` applies it to an autocorrection.
+- **The Enter key shows what it will do** -- send, search, go, next or done, read
+  from the field's own `EditorInfo`. Behaviour is unchanged; only the artwork was
+  ever static. **Device-verified** in an SMS compose field. UNSPECIFIED (0) and NONE
+  (1) both fall back to the return arrow, which is the trap this pairing always sets.
+- **Emoji search.** Filters the grid on the catalogue's own names. Typed on a pad the
+  picker owns rather than a text field: this *is* the keyboard, so a focusable field
+  has nothing to type into it. That also keeps the whole feature off the typing path
+  -- no autocorrect, no glide, no learning, and nothing that can reach the host
+  editor. **Device-verified:** `cat` filters the grid and the message field stays
+  untouched.
+- **The Recents grid holds still during a burst of emoji taps** for three seconds.
+  The write is *not* delayed, only the displayed order: an IME is killed freely and
+  the usual flow is tap-emoji-then-send, so a deferred write would have dropped most
+  emoji out of Recents.
+- **The layout editor reaches the symbol pages**, which have been part of the saved
+  layout since v0.1.4 with nothing able to edit them. The remap dialog is a preset
+  picker with free text kept as an escape hatch, and it now refuses a control token:
+  mapping a key to the literal string "SPACE" produced a key that drew blank and
+  typed nothing. The number row is deliberately not offered -- it is generated at
+  render time, not stored, so a tab for it would discard what the user did.
+- **An expanding pill dock** replaces the app's bottom navigation bar: icon-only at
+  rest, the active one growing to show its name. Four destinations, not the
+  reference image's five. Its spring lives in `theme/MotionTokens.kt` with the rest
+  of the motion language.
+- **Media metadata, opt-in and off by default.** Reopens a permission this project
+  refused on its merits -- `BIND_NOTIFICATION_LISTENER_SERVICE` grants the text of
+  every notification on the device -- so the trade is visible at every layer. The
+  consent screen states what the *permission* grants, not what the feature does.
+  The listener service overrides no notification-content callback, and
+  `check-source-rules.sh` now fails the build if one is ever added; that rule was
+  proven to bite by crossing the boundary on purpose. `MediaTransport`'s
+  permission-free path is untouched, so declining costs nothing that exists today.
+- **The editing panel's chips answer a press** with the same scale and fill as a key,
+  read from `MotionTokens` rather than redefined.
+
+### Not settled by this pass
+
+- **Media metadata against a real session** is unverified: granting notification
+  access is a system permission change on the owner's phone and was not taken during
+  a test pass. `NEEDS DEVICE`.
+- **Glide gestures** were not driven on device. `adb` cannot produce one faithfully
+  -- each `input motionevent` costs about 100ms, so a simulated finger is correctly
+  read as a hold. Covered by unit tests.
+- **Grid-level hit testing** (`n`/`b` near the space bar) ships as a design document
+  at `docs/planning/grid-hit-testing-plan.md`, not a diff. A materially smaller path
+  than the last investigation found is recorded there, gated on a device measurement.
+- **Profanity filtering of the dictionary** is not implemented, by decision rather
+  than deferral: no words are removed.
+
 ## [Unreleased]
 
 Build-verified only: `clean :app:packageReleaseArtifact` succeeds and
 `KeyboardRecompositionTest`/`GlideGateTest` both pass under `--rerun`. Not yet
-confirmed on a device, so nothing below is claimed as more than that.
+confirmed on a device, so nothing below is claimed as more than that -- except
+the v0.1.6 block immediately following, which records what a device pass did and
+did not cover.
+
+### Added -- v0.1.6 work: sentence context, beam-search glide, visual pass
+
+Implemented from `V0.1.6-AUTOCORRECT-GLIDE-UPGRADE.md` (a Cowork-written spec).
+Device-verified on the LineageOS test phone against the signed release artifact,
+installed in place so no app data was lost.
+
+- **Autocorrect and suggestions now see the previous word.** New asset
+  `keyboard-core/src/main/assets/bigram_lm.bin` -- **485,367 bytes (474 KB) raw,
+  223,284 bytes in the APK** -- built offline by the new
+  `dictionary-tools/build_bigrams.py` from Norvig's `count_2w.txt` (5.31 MB,
+  286,358 lines, **tab**-separated unlike `count_1w.txt`), filtered through the
+  same SCOWL intersection that keeps `base_dict.bin` typo-free. Caps chosen:
+  `N_PREV_WORDS = 60_000` (59,637 filled), `MAX_FOLLOWERS = 8`; 266,455 pairs
+  survive, giving 15,471 previous-words with a record. Signed release APK is
+  8,106,996 bytes (7.73 MB) with it included.
+  - Weights are normalized **per previous-word**, not globally. The spec called
+    for `build_trie`'s global log normalization; against a global maximum of
+    2.77e9 that compresses every surviving pair into roughly 100-214, so the
+    stored weight would have degenerated into a flag meaning "this pair exists".
+  - **Device-verified:** typing `we` alone offers `we, web, were`; typing
+    `Very we` offers `well, we, web` -- `well` promoted from fourth to first.
+- **Glide decoding is a bounded beam search** rather than unbounded recursion,
+  `MAX_GLIDE_BEAM = 40`. Partial readings are ranked by `cost - pivotCredit`,
+  an estimate of the final score, **not** by cost alone: a glide crosses its keys
+  exactly, so nearly every branch sits at cost 0 and a stable sort by cost keeps
+  whichever subtries the trie lists first. Measured with cost-only ranking, the
+  h-e-l-o path decoded to `[ho, go, hi]` -- "hello" was gone.
+  - **Device-verified:** a synthetic h-e-l-o path commits `hello`, leaving
+    `ho, hero, no` in the strip as losing readings.
+- **Corners are graded rather than counted.** `GlideStroke` carries `dwell` and
+  `pivotStrength`; the 60-degree boolean cutoff becomes a continuous confidence
+  combining turn sharpness with how long the finger lingered, and an unexplained
+  corner now costs in proportion to how sure it was. Both new fields default to
+  empty, and an empty stroke reproduces the old arithmetic exactly -- which is
+  what let every existing `GlideStrokeTest` assertion pass unmodified.
+- **`LanguageModel` seam.** `PredictionEngine` depends on the interface;
+  `LanguageModelModule` binds it to `BigramLanguageModel`. No model is bundled
+  and no TFLite dependency was added.
+- **Press physicality, theme shapes, rounded system font.** Keys gained a spring
+  scale and an elevation that compresses under the finger, driven off the theme's
+  own `hazeRadius` rather than a constant. `KEY_CORNER_RADIUS` is gone in favour
+  of `StickyKeysTheme.shapes.medium`; typography moved to the platform's
+  `sans-serif-rounded` alias (no bundled font, falls back to the system sans);
+  `default_dark`/`default_light` now ship a subtle `keyStyle` haze while
+  `amoled_dark` deliberately stays flat. New `theme/MotionTokens.kt` is the one
+  definition of the press constants, shared by the key grid and the strip.
+- **Suggestion-strip chips.** Previously a bare `Text` with a hit box; now pill
+  shaped with the same press scale and fill as a key, no ripple.
+
+### Known limitation found during the v0.1.6 device pass
+
+- **`getBaseSuggestions` truncates its candidate search by terminal count during
+  a breadth-first walk**, so the 30-terminal budget is spent on short words and
+  common longer ones never enter the pool at all. Verified against the shipped
+  dictionary: prefix `ma` offers `may, make, map, made, mail, main, man, mar,
+  male, ma` and **not** `many`, whose frequency (209) is higher than both `map`
+  and `mar`. Pre-existing, unrelated to the bigram work, and not fixed here --
+  but it is what limits how often sentence context can visibly change the strip,
+  because context re-ranks the pool and never adds to it. This is why `How m`
+  produces the same suggestions as a bare `m` on device.
 
 ### Fixed
 
