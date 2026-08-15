@@ -151,6 +151,12 @@
     <string name="text_beta_notice_body">Not a finished release. Expect rough edges, and please report anything that looks wrong, however small. Your typing stays on this device as always.</string>
     <string name="text_glide_typing">Glide typing</string>
     <string name="text_glide_typing_summary">Swipe across the letters to type a word instead of tapping each one. Tapping works exactly as before either way.</string>
+    <string name="text_media_info">Show what is playing</string>
+    <string name="text_media_info_summary">Adds the track and artist beside the media buttons in the quick-access row. Off by default, and the buttons work without it.</string>
+    <string name="text_media_info_consent_grant">Android has no permission for just media info. The only way to read it is notification access, which lets an app read the text of every notification on this device, not only media ones.</string>
+    <string name="text_media_info_consent_scope">FluxBoard reads the track title and artist and nothing else. It keeps no history of what you played, and stores none of it anywhere.</string>
+    <string name="text_media_info_consent_offline">Nothing is sent anywhere, the same as everything else in this app. If you would rather not grant this, the media buttons keep working exactly as they do now.</string>
+    <string name="text_media_info_consent_continue">Open Android settings</string>
     <string name="text_key_hints">Symbols on keys</string>
     <string name="text_key_hints_summary">Show the small symbol in the top-left corner of each key. Turn this off for a plainer keyboard. Holding a key still types its symbol either way.</string>
     <string name="text_private_mode">Private mode</string>
