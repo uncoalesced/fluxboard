@@ -2,6 +2,7 @@
 package com.uncoalesced.stickykeys.ui.screens
 
 import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -51,6 +51,7 @@ import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.data.local.dao.ClipboardDao
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.keyboardcore.theme.ThemeManager
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -102,6 +103,7 @@ class KeyboardSettingsViewModel
         val privateMode = preferences.privateModeEnabled
         val showKeyHints = preferences.showKeyHints
         val glideTyping = preferences.glideTypingEnabled
+        val mediaMetadata = preferences.mediaMetadataEnabled
 
         fun setKeySizePercent(percent: Int) = preferences.setKeySizePercent(percent)
 
@@ -117,6 +119,8 @@ class KeyboardSettingsViewModel
 
         /** Turns swipe-to-type on or off. */
         fun setGlideTyping(enabled: Boolean) = preferences.setGlideTyping(enabled)
+
+        fun setMediaMetadata(enabled: Boolean) = preferences.setMediaMetadataEnabled(enabled)
 
         val keyboardHeightPercent = preferences.keyboardHeightPercent
         val keyboardBottomPaddingDp = preferences.keyboardBottomPaddingDp
@@ -187,6 +191,8 @@ fun KeyboardSettingsScreen(
             val privateMode by viewModel.privateMode.collectAsState()
             val showKeyHints by viewModel.showKeyHints.collectAsState()
             val glideTyping by viewModel.glideTyping.collectAsState()
+            val mediaMetadata by viewModel.mediaMetadata.collectAsState()
+            var showMediaConsent by remember { mutableStateOf(false) }
             val keyboardHeight by viewModel.keyboardHeightPercent.collectAsState()
             val keyboardBottomPadding by viewModel.keyboardBottomPaddingDp.collectAsState()
 
@@ -214,6 +220,8 @@ fun KeyboardSettingsScreen(
             val labelAutoCorrect = stringResource(R.string.text_auto_correction)
             val labelGlideTyping = stringResource(R.string.text_glide_typing)
             val summaryGlideTyping = stringResource(R.string.text_glide_typing_summary)
+            val labelMediaInfo = stringResource(R.string.text_media_info)
+            val summaryMediaInfo = stringResource(R.string.text_media_info_summary)
             val labelDoubleSpace = stringResource(R.string.text_double_space_period)
             val summaryDoubleSpace = stringResource(R.string.text_double_space_period_summary)
 
@@ -308,6 +316,23 @@ fun KeyboardSettingsScreen(
                                 summary = summaryDoubleSpace,
                                 checked = doubleSpacePeriod,
                                 onCheckedChange = { viewModel.setDoubleSpacePeriod(it) },
+                            )
+                        }
+                        if (matches(labelMediaInfo, summaryMediaInfo)) {
+                            // Switching on opens the explanation first, never the OS screen
+                            // directly. Switching off needs neither: it is the safe direction,
+                            // and the row simply stops showing anything.
+                            SettingsSwitchRow(
+                                title = labelMediaInfo,
+                                summary = summaryMediaInfo,
+                                checked = mediaMetadata,
+                                onCheckedChange = { wanted ->
+                                    if (wanted) {
+                                        showMediaConsent = true
+                                    } else {
+                                        viewModel.setMediaMetadata(false)
+                                    }
+                                },
                             )
                         }
                     }
@@ -720,6 +745,51 @@ fun KeyboardSettingsScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
+
+            // Consent, before the OS screen and before the preference is written.
+            //
+            // The wording names what the *permission* grants, not what the feature does. There
+            // is no runtime-permission dialog for a notification listener -- it is a Settings
+            // screen grant -- so this is the only place FluxBoard can say, in its own words,
+            // that the key to the media session is also the key to every notification on the
+            // device. Saying only "shows the track name" would be true and dishonest.
+            if (showMediaConsent) {
+                AlertDialog(
+                    onDismissRequest = { showMediaConsent = false },
+                    title = { Text(labelMediaInfo) },
+                    text = {
+                        Column {
+                            Text(stringResource(R.string.text_media_info_consent_grant))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(stringResource(R.string.text_media_info_consent_scope))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(stringResource(R.string.text_media_info_consent_offline))
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            // The preference records the intent; the OS screen is where the
+                            // grant is actually made. If the user backs out there, the reader
+                            // asks the OS and finds nothing, and the row stays as it was.
+                            viewModel.setMediaMetadata(true)
+                            showMediaConsent = false
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            }
+                        }) {
+                            Text(stringResource(R.string.text_media_info_consent_continue))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showMediaConsent = false }) {
+                            Text(stringResource(R.string.text_cancel))
+                        }
+                    },
+                )
+            }
         }
     }
 }
@@ -747,7 +817,7 @@ private fun SettingsGroup(
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = StickyKeysTheme.shapes.large,
             colors =
                 CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
