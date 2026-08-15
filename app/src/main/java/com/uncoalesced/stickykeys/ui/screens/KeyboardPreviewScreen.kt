@@ -70,6 +70,16 @@ private class PreviewKeyboardController(
         return current.text.substring((cursor - maxChars).coerceAtLeast(0), cursor)
     }
 
+    override fun deleteBefore(charCount: Int) {
+        if (charCount <= 0) return
+        val current = state.value
+        val cursor = current.selection.start.coerceIn(0, current.text.length)
+        val from = (cursor - charCount).coerceAtLeast(0)
+        if (from == cursor) return
+        state.value =
+            TextFieldValue(current.text.replaceRange(from, cursor, ""), TextRange(from))
+    }
+
     override fun sendDelete() {
         val current = state.value
         val cursor = current.selection.start.coerceIn(0, current.text.length)
