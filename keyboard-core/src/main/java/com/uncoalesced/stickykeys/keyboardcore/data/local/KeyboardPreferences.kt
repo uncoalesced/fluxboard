@@ -176,6 +176,29 @@ class KeyboardPreferences
             MutableStateFlow(prefs.getBoolean("glide_typing", true))
         val glideTypingEnabled: StateFlow<Boolean> = _glideTypingEnabled.asStateFlow()
 
+        /**
+         * Whether the quick-access media row may show what is playing. Off by default.
+         *
+         * Its own flag, not folded into any existing setting and never enabled by installing an
+         * update. The feature needs `BIND_NOTIFICATION_LISTENER_SERVICE`, which grants the app
+         * the text of every notification on the device -- a trade this project refused outright
+         * for two releases and reopened only as something the user asks for explicitly, having
+         * been told what it actually costs.
+         *
+         * This records the user's intent, and is deliberately not the source of truth for
+         * whether the feature works: `MediaMetadataReader.listenerGranted` asks the OS, because
+         * the grant can be withdrawn in system Settings without the app being told.
+         */
+        private val _mediaMetadataEnabled =
+            MutableStateFlow(prefs.getBoolean("media_metadata", false))
+        val mediaMetadataEnabled: StateFlow<Boolean> = _mediaMetadataEnabled.asStateFlow()
+
+        /** See [mediaMetadataEnabled]. Turning this on does not itself grant anything. */
+        fun setMediaMetadataEnabled(enabled: Boolean) {
+            prefs.edit().putBoolean("media_metadata", enabled).apply()
+            _mediaMetadataEnabled.value = enabled
+        }
+
         /** Turns glide typing on or off. */
         fun setGlideTyping(enabled: Boolean) {
             prefs.edit().putBoolean("glide_typing", enabled).apply()
@@ -233,21 +256,66 @@ class KeyboardPreferences
          * and the same reasoning that keeps clipboard capture out of a password field does not
          * apply to tapping a smiley. Flagged here rather than assumed -- say so if that is
          * the wrong call.
+         *
+         * The order returned is deliberately held still for [EMOJI_PROMOTION_DELAY_MS] after a
+         * use. Promoting on every tap moved the grid out from under the finger mid-burst, and
+         * a burst is the common case -- reacting with three emoji in a row meant the second
+         * and third taps landed on a strip that had just reflowed. Only the *read* is held
+         * back; see [recordEmojiUse] for why the write is not.
          */
-        fun recentEmoji(): List<String> =
-            prefs
-                .getString("recent_emoji", "")
-                .orEmpty()
-                .split("")
-                .filter { it.isNotEmpty() }
+        fun recentEmoji(): List<String> {
+            val frozen = frozenRecentOrder ?: return storedRecentEmoji()
+            if (clock() - frozenRecentAt >= EMOJI_PROMOTION_DELAY_MS) {
+                frozenRecentOrder = null
+                return storedRecentEmoji()
+            }
+            // A glyph used during the freeze is already stored and appears the moment the
+            // freeze lifts. It is deliberately not spliced in here: inserting it would move
+            // every other cell, which is the exact thing the freeze exists to prevent.
+            return frozen
+        }
 
+        /**
+         * Records a use immediately, and freezes the order [recentEmoji] reports.
+         *
+         * The write is not deferred, which is a deliberate departure from the original sketch
+         * for this feature -- that one held the promotion in memory and applied it after the
+         * delay had passed. An IME is a service the system kills freely, and the most common
+         * emoji flow is tap-emoji-then-send, which closes the keyboard within a second, so a
+         * deferred write would have dropped most emoji out of Recents altogether. Freezing the
+         * read gives the same steady grid with nothing at risk.
+         */
         fun recordEmojiUse(glyph: String) {
             if (glyph.isEmpty()) return
+            val now = clock()
+            // Snapshot once per burst, before the write, so the held order is the one the
+            // finger was aiming at rather than one a previous tap had already moved.
+            if (frozenRecentOrder == null || now - frozenRecentAt >= EMOJI_PROMOTION_DELAY_MS) {
+                frozenRecentOrder = storedRecentEmoji()
+            }
+            // Each further tap restarts the window, so a burst settles once, after it ends.
+            frozenRecentAt = now
             val updated =
-                (listOf(glyph) + recentEmoji().filterNot { it == glyph })
+                (listOf(glyph) + storedRecentEmoji().filterNot { it == glyph })
                     .take(MAX_RECENT_EMOJI)
-            prefs.edit().putString("recent_emoji", updated.joinToString("")).apply()
+            prefs
+                .edit()
+                .putString(KEY_RECENT_EMOJI, updated.joinToString(EMOJI_SEPARATOR))
+                .apply()
         }
+
+        private var frozenRecentOrder: List<String>? = null
+        private var frozenRecentAt: Long = 0L
+
+        /** Swappable so the freeze window is testable without sleeping in a unit test. */
+        internal var clock: () -> Long = System::currentTimeMillis
+
+        private fun storedRecentEmoji(): List<String> =
+            prefs
+                .getString(KEY_RECENT_EMOJI, "")
+                .orEmpty()
+                .split(EMOJI_SEPARATOR)
+                .filter { it.isNotEmpty() }
 
         fun setDoubleSpacePeriod(enabled: Boolean) {
             prefs.edit().putBoolean("double_space_period", enabled).apply()
@@ -306,6 +374,24 @@ class KeyboardPreferences
         companion object {
             /** One screenful of the picker grid; beyond that the tab stops being "recent". */
             const val MAX_RECENT_EMOJI = 32
+
+            /**
+             * How long the Recents grid holds its order after a use.
+             *
+             * Long enough to cover a multi-emoji reaction typed at speed, short enough
+             * that the grid has settled by the next time the picker is opened.
+             */
+            const val EMOJI_PROMOTION_DELAY_MS = 3_000L
+
+            /**
+             * ASCII unit separator. No emoji, ZWJ sequence or skin-tone modifier can
+             * contain it, so a glyph can never be split across two entries. Written as
+             * an escape rather than the literal control byte it replaces, which was
+             * invisible in a diff and in most editors.
+             */
+            private const val EMOJI_SEPARATOR = "\u001F"
+
+            private const val KEY_RECENT_EMOJI = "recent_emoji"
 
             const val DEFAULT_KEY_SIZE_PERCENT = 100
 
