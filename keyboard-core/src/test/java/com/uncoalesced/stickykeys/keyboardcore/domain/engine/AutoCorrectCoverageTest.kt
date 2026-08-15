@@ -42,7 +42,7 @@ class AutoCorrectCoverageTest {
                 .allowMainThreadQueries()
                 .build()
         dao = database.personalDictionaryDao()
-        engine = PredictionEngine(context, dao)
+        engine = PredictionEngine(context, dao, FakeLanguageModel())
         runBlocking { engine.initialize() }
     }
 
