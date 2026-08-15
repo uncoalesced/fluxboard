@@ -3,6 +3,7 @@ package com.uncoalesced.stickykeys.keyboardcore.domain.engine
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import java.io.File
 
 /**
@@ -34,9 +35,8 @@ internal fun assetBackedFile(
     val stamp = File(dir, "$name.version")
     val version = appVersion(context)
 
-    if (target.exists() && stamp.exists() && runCatching { stamp.readText() }.getOrNull() == version) {
-        return target
-    }
+    val stamped = runCatching { stamp.readText() }.getOrNull()
+    if (target.exists() && stamped == version) return target
 
     return try {
         // Extract via a temp file and rename, so a process death mid-copy cannot leave a
@@ -69,7 +69,15 @@ internal fun assetBackedFile(
 private fun appVersion(context: Context): String =
     try {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
-        info.longVersionCode.toString()
+        // longVersionCode is API 28 and this module ships to 26, so the deprecated int is
+        // the only thing available on Android 8. The two never disagree below the point
+        // where the high bits are used, which this project does not use.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode.toString()
+        } else {
+            @Suppress("DEPRECATION")
+            info.versionCode.toString()
+        }
     } catch (e: PackageManager.NameNotFoundException) {
         "unknown"
     }
