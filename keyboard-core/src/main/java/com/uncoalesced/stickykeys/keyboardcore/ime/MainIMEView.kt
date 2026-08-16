@@ -61,6 +61,8 @@ internal fun rememberInterceptingController(
 
             override fun sendDelete() = delegate.sendDelete()
 
+            override fun deleteBefore(charCount: Int) = delegate.deleteBefore(charCount)
+
             override fun sendEnter() = delegate.sendEnter()
 
             override fun handleEditorAction() = delegate.handleEditorAction()

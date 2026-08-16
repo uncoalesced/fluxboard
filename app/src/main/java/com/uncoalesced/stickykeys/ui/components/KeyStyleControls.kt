@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -35,6 +34,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
+import com.uncoalesced.stickykeys.keyboardcore.theme.KeyboardTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 
 /**
  * A small fixed palette plus "use the theme's own colour".
@@ -122,6 +123,10 @@ fun KeyStyleControls(
                 label = "Text opacity",
                 value = style.textOpacity,
                 onChange = { v -> onChange { it.copy(textOpacity = v) } },
+                // Glyphs below this are treated as absent and restored to opaque on save, so
+                // the travel below it was only ever a value that snapped back. The fill slider
+                // keeps its full range on purpose: a transparent key is a legitimate look.
+                minValue = KeyboardTheme.MIN_VISIBLE_ALPHA,
             )
         }
 
@@ -264,12 +269,18 @@ private fun SwatchRow(
     }
 }
 
+/**
+ * @param minValue the lowest value the control may reach. Non-zero only where the value below
+ *   it is one `KeyboardTheme.sanitized()` would rewrite -- a slider that can be dragged into a
+ *   value that snaps back is indistinguishable from a broken one.
+ */
 @Composable
 private fun OpacitySlider(
     label: String,
     value: Float,
     onChange: (Float) -> Unit,
     readout: String? = null,
+    minValue: Float = 0f,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -285,9 +296,9 @@ private fun OpacitySlider(
             )
         }
         Slider(
-            value = value.coerceIn(0f, 1f),
+            value = value.coerceIn(minValue, 1f),
             onValueChange = onChange,
-            valueRange = 0f..1f,
+            valueRange = minValue..1f,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -303,13 +314,17 @@ fun KeyStylePreviewChip(
     modifier: Modifier = Modifier,
 ) {
     val border = style.resolveBorder(baseText)
+    // The same token the live keyboard draws its keys with, rather than a number that happens
+    // to look similar. A preview whose corners disagree with the real key is worse than no
+    // preview: it is the one surface a user checks their customization against.
+    val keyShape = StickyKeysTheme.shapes.medium
     Box(
         modifier =
             modifier
                 .size(width = 44.dp, height = 40.dp)
-                .background(style.resolveFill(baseFill), RoundedCornerShape(6.dp))
+                .background(style.resolveFill(baseFill), keyShape)
                 .then(
-                    border?.let { Modifier.border(style.borderWidth, it, RoundedCornerShape(6.dp)) }
+                    border?.let { Modifier.border(style.borderWidth, it, keyShape) }
                         ?: Modifier,
                 ),
         contentAlignment = Alignment.Center,

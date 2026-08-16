@@ -43,7 +43,7 @@ class PredictionEngineConcurrencyTest {
                 .inMemoryDatabaseBuilder(context, KeyboardDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        engine = PredictionEngine(context, database.personalDictionaryDao())
+        engine = PredictionEngine(context, database.personalDictionaryDao(), FakeLanguageModel())
         runBlocking { engine.initialize() }
     }
 
@@ -142,7 +142,12 @@ class PredictionEngineConcurrencyTest {
         runBlocking {
             // Second engine, initialized from many threads at once.
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-            val other = PredictionEngine(context, database.personalDictionaryDao())
+            val other =
+                PredictionEngine(
+                    context,
+                    database.personalDictionaryDao(),
+                    FakeLanguageModel(),
+                )
 
             withContext(Dispatchers.Default) {
                 coroutineScope {

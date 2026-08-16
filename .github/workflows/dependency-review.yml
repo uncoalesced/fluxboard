@@ -3,7 +3,7 @@
 # Reviews dependencies a pull request adds, before they are merged rather than after.
 #
 # This project already has a written vetting checklist in
-# `.agent/rules/privacy-and-scope.md`: no analytics or phone-home SDK, a licence that
+# CONTRIBUTING.md: no analytics or phone-home SDK, a licence that
 # suits a fully open-source project, and a known size impact. Two of those three can
 # be checked mechanically, so they are.
 #
@@ -49,6 +49,6 @@ jobs:
           # identically in the run list. `Commons-Clause` was here and is not SPDX at
           # all; it is a rider bolted onto another licence, so it cannot be matched
           # this way and has to be caught by the human vetting step in
-          # `.agent/rules/privacy-and-scope.md`.
+          # CONTRIBUTING.md.
           deny-licenses: AGPL-3.0-only, AGPL-3.0-or-later, SSPL-1.0, BUSL-1.1
           comment-summary-in-pr: on-failure

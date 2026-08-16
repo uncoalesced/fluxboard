@@ -1,0 +1,20 @@
+# Engineered by uncoalesced
+#
+# Blank issues stay enabled. A template that does not fit should not stop someone
+# telling us something is broken.
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security or privacy problem privately
+    url: https://github.com/uncoalesced/fluxboard/security/advisories/new
+    about: >
+      Anything that could expose typed input, the personal dictionary, or the
+      clipboard. A public issue describing that is a working exploit, so please use
+      this instead.
+  - name: How the app handles your data
+    url: https://github.com/uncoalesced/fluxboard/blob/main/PRIVACY.md
+    about: What is stored, where, which permissions exist, and how to verify it.
+  - name: Known gaps in this beta
+    url: https://github.com/uncoalesced/fluxboard/blob/main/README.md#what-does-not-work-yet
+    about: >
+      Automatic cutout, off-network link sharing, voice input, and other languages
+      are all known to be missing. Worth a look before filing.

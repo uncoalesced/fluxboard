@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import android.view.inputmethod.EditorInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
@@ -14,6 +15,7 @@ import com.uncoalesced.stickykeys.keyboardcore.theme.ThemeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -70,6 +72,10 @@ class TypingViewModel
         /** Whether swiping across the letters decodes into a word. */
         val glideTypingEnabled: StateFlow<Boolean> = keyboardPreferences.glideTypingEnabled
 
+        /** Whether the media row may show what is playing. Off unless the user asked. */
+        val mediaMetadataEnabled: StateFlow<Boolean> =
+            keyboardPreferences.mediaMetadataEnabled
+
         /** Panel sizing, chosen by the user rather than fixed. See `ImePanelHeight`. */
         val keyboardHeightPercent: StateFlow<Int> = keyboardPreferences.keyboardHeightPercent
         val keyboardBottomPaddingDp: StateFlow<Int> = keyboardPreferences.keyboardBottomPaddingDp
@@ -82,6 +88,22 @@ class TypingViewModel
             keyboardPreferences.doubleSpacePeriodEnabled
 
         private var currentWord = ""
+
+        /**
+         * The word the user last finished, used to rank what comes next.
+         *
+         * Exactly the same tier as [currentWord]: in memory, in this ViewModel, for this input
+         * session. Never persisted, never in a backup scope, never anywhere a dictionary write
+         * would go -- it is one word of sentence context, and the moment it outlives the
+         * session it becomes a record of what was typed.
+         *
+         * Set only from [learn], which is the single write gate into the personal dictionary.
+         * That placement is the whole safety argument: on a password field, or in incognito,
+         * or with the manual privacy switch on, [learn] returns before assigning, so context
+         * tracking inherits every existing gate without adding a check that could disagree
+         * with them later.
+         */
+        private var previousWord: String? = null
 
         init {
             viewModelScope.launch {
@@ -142,14 +164,20 @@ class TypingViewModel
             fieldKind: FieldKind = FieldKind.NORMAL,
             noPersonalizedLearning: Boolean = false,
             enterIsNewline: Boolean = false,
+            enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
         ) {
             currentWord = ""
+            // A different field is a different sentence, in a different app. Carrying the last
+            // word over would rank the first suggestion of a new message off whatever the user
+            // happened to be writing somewhere else.
+            previousWord = null
             _suggestions.value = emptyList()
             _undoState.value = null
             generation++
             detectedFieldKind = fieldKind
             hostNoLearning = noPersonalizedLearning
             enterInsertsNewline = enterIsNewline
+            _enterAction.value = enterAction
             publishPrivacy()
             atSentenceStart = initialCapsMode != 0
             publishAutoCapitalize()
@@ -171,6 +199,16 @@ class TypingViewModel
          * ended exactly the way the space bar ends one.
          */
         private var enterInsertsNewline = false
+
+        /**
+         * The action this field declared, straight from `EditorInfo.IME_MASK_ACTION`.
+         *
+         * Drives the Enter key's artwork only; what the key *does* is still decided in
+         * `StickyKeysIME.sendEnter` from the same EditorInfo, so the two cannot disagree
+         * about the field. Published per session because that is when it can change.
+         */
+        private val _enterAction = MutableStateFlow(EditorInfo.IME_ACTION_UNSPECIFIED)
+        val enterAction: StateFlow<Int> = _enterAction.asStateFlow()
 
         fun enterEndsAWord(): Boolean = enterInsertsNewline
 
@@ -220,7 +258,7 @@ class TypingViewModel
             stroke: com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke,
         ): List<String> {
             if (_fieldKind.value.isSensitive) return emptyList()
-            return predictionEngine.decodeGlide(stroke)
+            return predictionEngine.decodeGlide(stroke, previousWord)
         }
 
         /**
@@ -345,9 +383,15 @@ class TypingViewModel
         /**
          * The single write path into the personal dictionary. Reading (suggestions,
          * autocorrect) is unaffected by incognito -- only writes are suspended.
+         *
+         * Also where [previousWord] is set, deliberately after the incognito gate rather than
+         * beside it. Every path that finishes a word already routes through here, so context
+         * tracking picks up all of them at once and none of them can grow a second, divergent
+         * privacy check later.
          */
         private fun learn(word: String) {
             if (incognitoState.active.value) return
+            previousWord = word.lowercase()
             viewModelScope.launch {
                 predictionEngine.learnWord(word)
             }
@@ -391,9 +435,34 @@ class TypingViewModel
             return ++generation
         }
 
-        fun onDelete(): Boolean {
+        /**
+         * How many characters this backspace should remove.
+         *
+         * Normally 1, meaning an ordinary single-character delete. Immediately after a glide
+         * it is the whole committed word plus the space the glide wrote, so one gesture is
+         * undone by one press -- a glide put the word there in a single movement and taking
+         * it back letter by letter is eight presses to undo one.
+         *
+         * The count is returned rather than issued here because a ViewModel holds no
+         * controller. A caller seeing 1 must still go through `sendDelete`, which sizes the
+         * delete against the text itself so a surrogate pair does not lose half of itself.
+         */
+        fun onDelete(): Int {
             usageLog.onBackspace()
+            // Read before the token moves. `consumeGlideCommit` is valid only while the
+            // generation still matches the one the glide committed under, so bumping first
+            // would make this return null every time -- and the whole feature silently
+            // degrade to an ordinary backspace with nothing looking broken.
+            val glided = consumeGlideCommit()
             generation++
+            if (glided != null) {
+                // A glide clears currentWord and commits its own trailing space, so there is
+                // no partial word here to fall through to.
+                atSentenceStart = true
+                publishAutoCapitalize()
+                _suggestions.value = emptyList()
+                return glided.length + 1
+            }
             if (currentWord.isNotEmpty()) {
                 currentWord = currentWord.dropLast(1)
                 // Deleting back to nothing puts the caret where a sentence would start again,
@@ -403,11 +472,11 @@ class TypingViewModel
                 atSentenceStart = currentWord.isEmpty()
                 publishAutoCapitalize()
                 updateSuggestions()
-                return true // handled internally
+                return 1
             }
             atSentenceStart = true
             publishAutoCapitalize()
-            return false // let controller handle delete
+            return 1
         }
 
         /**
@@ -441,6 +510,11 @@ class TypingViewModel
          */
         fun onSentenceStarted(): Int {
             currentWord = ""
+            // The last word of the previous sentence does not predict the first word of the
+            // next one -- a bigram across a full stop is two unrelated words that happened to
+            // be adjacent, which is exactly the pairing the corpus counts and the user did not
+            // mean.
+            previousWord = null
             _suggestions.value = emptyList()
             _undoState.value = null
             atSentenceStart = true
@@ -462,7 +536,7 @@ class TypingViewModel
             // the user typed into a field where they cannot see it to check.
             if (_fieldKind.value.isSensitive) return null
             if (word.isBlank() || !keyboardPreferences.autoCorrectEnabled.value) return null
-            return predictionEngine.getAutoCorrection(word)
+            return predictionEngine.getAutoCorrection(word, previousWord)
         }
 
         fun onAutoCorrected(
@@ -541,6 +615,11 @@ class TypingViewModel
          */
         fun onEditorContextChanged(textBeforeCursor: String) {
             currentWord = wordUnderCaret(textBeforeCursor)
+            // Re-derived from the editor for the same reason [currentWord] is: after a caret
+            // tap or a paste, whatever this keyboard last learned describes a sentence the
+            // caret is no longer in, and ranking the next word off it is worse than having no
+            // context at all.
+            previousWord = precedingWord(textBeforeCursor)
             // Anything in flight was computed against text that has since moved.
             generation++
             _undoState.value = null
@@ -578,7 +657,7 @@ class TypingViewModel
                 return
             }
             viewModelScope.launch {
-                _suggestions.value = predictionEngine.getSuggestions(currentWord)
+                _suggestions.value = predictionEngine.getSuggestions(currentWord, previousWord)
             }
         }
     }
@@ -602,6 +681,58 @@ internal fun wordUnderCaret(textBeforeCursor: String): String =
         // A leading apostrophe is a quotation mark, not part of the word. Keeping it would
         // add one to the replacement length and swallow the quote the user typed.
         .dropWhile { it == '\'' }
+
+/**
+ * How many characters a word-wise backspace should remove, given the text before the caret.
+ *
+ * Trailing whitespace first, then the run of non-whitespace before it -- so a caret just after
+ * "hello world " takes back "world " whole, and one sitting mid-word takes back the part that
+ * has been typed. That is what ctrl-backspace does in every editor, and matching it is the
+ * point: the gesture is new, what counts as a word should not be.
+ *
+ * Sized from text read at the moment of the edit rather than from `currentWord`. That mirror is
+ * built by appending on each key press and is correct only while this keyboard is the sole
+ * editor -- a caret tap, a paste or a host-side edit leaves it describing text that is gone, and
+ * a destructive edit trusting it would delete the wrong span.
+ *
+ * Whitespace rather than letters decides the boundary, unlike [wordUnderCaret]. A backspace
+ * swipe over "don't" or "e-mail" should take the whole thing, and over ", and" should take the
+ * punctuation with it, because that is what the finger passed over.
+ *
+ * Pure, so the boundary walk is assertable without an InputConnection.
+ */
+internal fun wordDeleteLength(textBeforeCursor: String): Int {
+    val trailingSpace = textBeforeCursor.takeLastWhile { it.isWhitespace() }.length
+    val word =
+        textBeforeCursor
+            .dropLast(trailingSpace)
+            .takeLastWhile { !it.isWhitespace() }
+            .length
+    return trailingSpace + word
+}
+
+/**
+ * The finished word before the one the caret is in, or null when there is none.
+ *
+ * Pure and separate for the same reason [wordUnderCaret] is, though for a gentler failure: an
+ * off-by-one here mis-ranks a suggestion rather than eating a character. Null is returned
+ * across a sentence boundary as well as at the start of the text, because a word on the far
+ * side of a full stop is not context for this one -- see the reset in `onSentenceStarted`,
+ * which this has to agree with or a caret tap would resurrect context that typing had dropped.
+ */
+internal fun precedingWord(textBeforeCursor: String): String? {
+    val beforeCurrent = textBeforeCursor.dropLast(wordUnderCaret(textBeforeCursor).length)
+    val trimmed = beforeCurrent.trimEnd { it == ' ' }
+    if (trimmed.isEmpty()) return null
+    // Checked before any further trimming, or the terminator would be stripped as ordinary
+    // punctuation and the sentence boundary would vanish along with it.
+    if (trimmed.last() in SENTENCE_ENDINGS || trimmed.last() == '\n') return null
+    // A comma, a bracket or a quote ends a word without ending a sentence, so the word it
+    // follows is still context. wordUnderCaret stops at the first non-letter, so without this
+    // "well, th" would report no previous word at all.
+    val word = wordUnderCaret(trimmed.trimEnd { !it.isLetter() && it != '\'' })
+    return word.ifEmpty { null }?.lowercase()
+}
 
 /**
  * Whether the caret sits where a new sentence begins.

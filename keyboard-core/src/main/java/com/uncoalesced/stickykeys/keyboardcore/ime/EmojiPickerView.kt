@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,7 +19,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -78,6 +79,9 @@ internal fun EmojiPickerView(
     val stickers by viewModel.stickers.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
     val recent by viewModel.recentEmoji.collectAsState()
+    val query by viewModel.searchQuery.collectAsState()
+    val filtered by viewModel.filteredEmojiGroups.collectAsState()
+    var searchActive by remember { mutableStateOf(false) }
     // Remembered instances, not fresh ones per recomposition: the gesture machine
     // writes into them and a reallocated holder loses the press mid-gesture.
     val emojiBackspacePressed = remember { mutableStateOf(false) }
@@ -123,45 +127,111 @@ internal fun EmojiPickerView(
                 )
             }
 
-            LazyRow(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                items(tabLabels.size) { index ->
-                    val label = tabLabels[index]
-                    val selected = index == selectedTab
-                    Box(
-                        modifier =
-                            Modifier
-                                .clickable { viewModel.selectTab(index) }
-                                .background(
-                                    if (selected) {
-                                        StickyKeysTheme.colors.primary
-                                    } else {
-                                        Color.Transparent
+            if (searchActive) {
+                // The query, drawn rather than edited. A focusable text field cannot work
+                // here: this *is* the keyboard, so there is nothing to type into it. The
+                // letter pad below feeds this string directly, which also keeps the whole
+                // feature off the typing path -- no autocorrect, no glide, no learning, and
+                // nothing that could reach the host editor.
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(horizontal = 6.dp)
+                            .background(
+                                StickyKeysTheme.colors.surfaceVariant,
+                                StickyKeysTheme.shapes.small,
+                            ).padding(horizontal = 10.dp, vertical = 6.dp)
+                            .semantics {
+                                contentDescription =
+                                    if (query.isEmpty()) SEARCH_HINT else "Searching $query"
+                            },
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Text(
+                        text = query.ifEmpty { SEARCH_HINT },
+                        maxLines = 1,
+                        color =
+                            if (query.isEmpty()) {
+                                StickyKeysTheme.colors.onSurfaceVariant
+                            } else {
+                                StickyKeysTheme.colors.onSurface
+                            },
+                        style = StickyKeysTheme.typography.labelMedium,
+                    )
+                }
+            } else {
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    items(tabLabels.size) { index ->
+                        val label = tabLabels[index]
+                        val selected = index == selectedTab
+                        Box(
+                            modifier =
+                                Modifier
+                                    .clickable { viewModel.selectTab(index) }
+                                    .background(
+                                        if (selected) {
+                                            StickyKeysTheme.colors.primary
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                        StickyKeysTheme.shapes.small,
+                                    ).padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .semantics {
+                                        role = Role.Tab
+                                        contentDescription = label
+                                        stateDescription =
+                                            if (selected) "Selected" else "Not selected"
                                     },
-                                    RoundedCornerShape(6.dp),
-                                ).padding(horizontal = 10.dp, vertical = 6.dp)
-                                .semantics {
-                                    role = Role.Tab
-                                    contentDescription = label
-                                    stateDescription = if (selected) "Selected" else "Not selected"
-                                },
-                    ) {
-                        Text(
-                            text = label,
-                            maxLines = 1,
-                            color =
-                                if (selected) {
-                                    StickyKeysTheme.colors.onPrimary
-                                } else {
-                                    StickyKeysTheme.colors.onSurfaceVariant
-                                },
-                            style = StickyKeysTheme.typography.labelMedium,
-                        )
+                        ) {
+                            Text(
+                                text = label,
+                                maxLines = 1,
+                                color =
+                                    if (selected) {
+                                        StickyKeysTheme.colors.onPrimary
+                                    } else {
+                                        StickyKeysTheme.colors.onSurfaceVariant
+                                    },
+                                style = StickyKeysTheme.typography.labelMedium,
+                            )
+                        }
                     }
                 }
+            }
+
+            // Search toggle, between the categories and the way out.
+            Box(
+                modifier =
+                    Modifier
+                        .size(34.dp)
+                        .minimumInteractiveComponentSize()
+                        .clickable(role = Role.Button) {
+                            searchActive = !searchActive
+                            if (!searchActive) viewModel.onSearchQueryChanged("")
+                        }.semantics {
+                            contentDescription =
+                                if (searchActive) "Close emoji search" else "Search emoji"
+                        },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter =
+                        painterResource(
+                            if (searchActive) {
+                                R.drawable.ic_key_search_close
+                            } else {
+                                R.drawable.ic_key_search
+                            },
+                        ),
+                    contentDescription = null,
+                    tint = StickyKeysTheme.colors.onSurface,
+                    modifier = Modifier.size(18.dp),
+                )
             }
 
             // The way out, at the strip's trailing edge.
@@ -178,7 +248,7 @@ internal fun EmojiPickerView(
                         .minimumInteractiveComponentSize()
                         .background(
                             StickyKeysTheme.colors.surfaceVariant,
-                            RoundedCornerShape(6.dp),
+                            StickyKeysTheme.shapes.small,
                         ).clickable(role = Role.Button, onClick = onBackToKeyboard)
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                         .semantics { contentDescription = "Back to letters" },
@@ -193,7 +263,47 @@ internal fun EmojiPickerView(
             }
         }
 
-        if (selectedTab == EmojiPickerViewModel.RECENT_TAB) {
+        if (searchActive) {
+            val results = filtered.firstOrNull()?.emoji.orEmpty()
+            if (results.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (query.isEmpty()) SEARCH_PROMPT else "Nothing matches $query",
+                        color = StickyKeysTheme.colors.onSurfaceVariant,
+                        style = StickyKeysTheme.typography.labelLarge,
+                    )
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(EMOJI_CELL),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    items(items = results, key = { it.glyph }) { emoji ->
+                        Box(
+                            modifier =
+                                Modifier
+                                    .aspectRatio(1f)
+                                    .clickable(role = Role.Button) { onEmojiClick(emoji.glyph) }
+                                    .semantics { contentDescription = emoji.name },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = emoji.glyph,
+                                fontSize = 24.sp,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            }
+            EmojiSearchPad(
+                onLetter = { viewModel.onSearchQueryChanged(query + it) },
+                onDelete = { viewModel.onSearchQueryChanged(query.dropLast(1)) },
+            )
+        } else if (selectedTab == EmojiPickerViewModel.RECENT_TAB) {
             if (recent.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -284,7 +394,7 @@ internal fun EmojiPickerView(
                         .minimumInteractiveComponentSize()
                         .background(
                             StickyKeysTheme.colors.surfaceVariant,
-                            RoundedCornerShape(6.dp),
+                            StickyKeysTheme.shapes.small,
                         ).keyGestures(
                             keyOutput = "DEL",
                             longPress = LongPress.Repeat,
@@ -313,6 +423,95 @@ internal fun EmojiPickerView(
         }
     }
 }
+
+/**
+ * The letter pad that drives emoji search.
+ *
+ * A private, deliberately plain keypad rather than the real key grid. Search here matches
+ * the English names in `emoji_data.txt`, so a remapped or non-Latin layout would make the
+ * feature unusable rather than personal -- and routing the real keyboard's output into a
+ * query would mean teaching the typing path about a second destination for every keystroke,
+ * which is the one part of this codebase where a mistake reaches the user's actual message.
+ *
+ * No long press, no glide, no alternates: there is nothing to reach for behind a letter
+ * when the whole vocabulary is a-z.
+ */
+@Composable
+private fun EmojiSearchPad(
+    onLetter: (String) -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        SEARCH_PAD_ROWS.forEachIndexed { index, row ->
+            Row(
+                modifier = Modifier.fillMaxWidth().height(SEARCH_PAD_KEY_HEIGHT),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                row.forEach { letter ->
+                    SearchPadKey(
+                        label = letter,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onLetter(letter) },
+                    )
+                }
+                // Backspace shares the last row, where a thumb already expects it.
+                if (index == SEARCH_PAD_ROWS.lastIndex) {
+                    SearchPadKey(
+                        label = SEARCH_PAD_DELETE,
+                        modifier = Modifier.weight(1.6f),
+                        onClick = onDelete,
+                        description = "Delete",
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchPadKey(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    description: String = label,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxHeight()
+                .background(
+                    StickyKeysTheme.colors.surfaceVariant,
+                    StickyKeysTheme.shapes.small,
+                ).clickable(role = Role.Button, onClick = onClick)
+                .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = StickyKeysTheme.colors.onSurfaceVariant,
+            style = StickyKeysTheme.typography.labelLarge,
+        )
+    }
+}
+
+private val SEARCH_PAD_ROWS =
+    listOf(
+        "qwertyuiop".map { it.toString() },
+        "asdfghjkl".map { it.toString() },
+        "zxcvbnm".map { it.toString() },
+    )
+
+private val SEARCH_PAD_KEY_HEIGHT = 34.dp
+
+/** Drawn rather than an icon: the pad has no icon vocabulary of its own. */
+private const val SEARCH_PAD_DELETE = "del"
+
+private const val SEARCH_HINT = "Search emoji"
+private const val SEARCH_PROMPT = "Type a name, like heart or cat"
 
 private const val STICKERS_TAB = "Stickers"
 

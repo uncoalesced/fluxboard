@@ -2,9 +2,26 @@
 package com.uncoalesced.stickykeys.keyboardcore.theme
 
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.DeviceFontFamilyName
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+
+/**
+ * The keyboard's type face: the system's rounded sans, where the system has one.
+ *
+ * A device font family alias rather than a bundled file, which is what makes this free. There
+ * is no font to ship, so nothing lands on the 100 MB budget, and nothing has a licence to
+ * check. `sans-serif-rounded` has been a standard alias since API 16; where an OEM skin does
+ * not provide it, the platform resolves the request to the ordinary system sans, which is
+ * exactly what this project drew before -- so the failure mode is "no change", not "tofu".
+ *
+ * Resolved once at file scope rather than per TextStyle: the family is identical for all
+ * seven, and building it seven times per typography call is seven Typeface lookups for one
+ * answer.
+ */
+private val SystemRounded = FontFamily(Font(DeviceFontFamilyName("sans-serif-rounded")))
 
 /**
  * Plain Kotlin data class for StickyKeys typography.
@@ -36,7 +53,7 @@ fun stickyKeysTypography(scale: TypeScale = TypeScale.MEDIUM): StickyKeysTypogra
     return StickyKeysTypography(
         titleLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = SystemRounded,
                 fontWeight = FontWeight.Bold,
                 fontSize = (22 * scaleFactor).sp,
                 lineHeight = (28 * scaleFactor).sp,
@@ -44,7 +61,7 @@ fun stickyKeysTypography(scale: TypeScale = TypeScale.MEDIUM): StickyKeysTypogra
             ),
         titleMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = SystemRounded,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = (18 * scaleFactor).sp,
                 lineHeight = (24 * scaleFactor).sp,
@@ -52,7 +69,7 @@ fun stickyKeysTypography(scale: TypeScale = TypeScale.MEDIUM): StickyKeysTypogra
             ),
         bodyLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = SystemRounded,
                 fontWeight = FontWeight.Normal,
                 fontSize = (16 * scaleFactor).sp,
                 lineHeight = (24 * scaleFactor).sp,
@@ -60,7 +77,7 @@ fun stickyKeysTypography(scale: TypeScale = TypeScale.MEDIUM): StickyKeysTypogra
             ),
         bodyMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = SystemRounded,
                 fontWeight = FontWeight.Normal,
                 fontSize = (14 * scaleFactor).sp,
                 lineHeight = (20 * scaleFactor).sp,
@@ -68,7 +85,7 @@ fun stickyKeysTypography(scale: TypeScale = TypeScale.MEDIUM): StickyKeysTypogra
             ),
         labelLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = SystemRounded,
                 fontWeight = FontWeight.Medium,
                 fontSize = (14 * scaleFactor).sp,
                 lineHeight = (20 * scaleFactor).sp,
@@ -76,7 +93,7 @@ fun stickyKeysTypography(scale: TypeScale = TypeScale.MEDIUM): StickyKeysTypogra
             ),
         labelMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = SystemRounded,
                 fontWeight = FontWeight.Medium,
                 fontSize = (12 * scaleFactor).sp,
                 lineHeight = (16 * scaleFactor).sp,
@@ -84,7 +101,7 @@ fun stickyKeysTypography(scale: TypeScale = TypeScale.MEDIUM): StickyKeysTypogra
             ),
         keyboardKey =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = SystemRounded,
                 fontWeight = FontWeight.Medium,
                 fontSize = (24 * scaleFactor).sp,
                 lineHeight = (32 * scaleFactor).sp,

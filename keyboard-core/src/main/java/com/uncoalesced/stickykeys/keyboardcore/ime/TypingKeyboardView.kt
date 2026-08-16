@@ -2,11 +2,15 @@
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
@@ -33,13 +36,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -61,8 +68,13 @@ import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
+import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_COLOR_ANIM_MS
+import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_ELEVATION_SINK
+import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_SCALE
+import com.uncoalesced.stickykeys.keyboardcore.theme.PressSpring
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.keyboardcore.theme.TypeScale
+import com.uncoalesced.stickykeys.keyboardcore.theme.pressedFill
 import kotlinx.coroutines.launch
 
 @Composable
@@ -177,6 +189,32 @@ fun TypingKeyboardView(
     // Remembered for the same reason as the key-press handler: an unmemoized lambda here is
     // a fresh instance every recomposition, which hands the space bar a changed parameter and
     // takes the whole grid out of skipping.
+    // Backspace held and dragged left: delete by words instead of by characters.
+    //
+    // Hoisted and remembered like every other key handler here. A lambda rebuilt per
+    // recomposition is captured by every key's gesture modifier and takes the whole grid out
+    // of skipping, which is the invariant KeyboardRecompositionTest measures.
+    val onDeleteWord =
+        remember(keyboardController, typingViewModel) {
+            {
+                // Read the editor now rather than trusting the in-memory word mirror. This is
+                // a destructive edit, and the mirror is only correct while this keyboard is
+                // the sole editor of the field.
+                val before = keyboardController.textBeforeCursor(MAX_WORD_DELETE_LOOKBEHIND)
+                val length = wordDeleteLength(before)
+                if (length > 0) {
+                    keyboardController.deleteBefore(length)
+                    // The tracked word is gone along with the text, and anything downstream
+                    // still holding it would size its next edit against text that no longer
+                    // exists. Abandoned rather than finished: the user is deleting it, which
+                    // is the clearest possible signal not to learn it.
+                    typingViewModel.onWordAbandoned()
+                    typingViewModel.performKeyPressHaptic()
+                }
+                Unit
+            }
+        }
+
     val onScrub =
         remember(keyboardController, typingViewModel) {
             { direction: Int, withHaptic: Boolean ->
@@ -215,6 +253,8 @@ fun TypingKeyboardView(
     // and a reallocated instance would lose the map mid-gesture.
     val glideTracker = remember { GlideTracker() }
     val glideEnabled by typingViewModel.glideTypingEnabled.collectAsState()
+    val enterAction by typingViewModel.enterAction.collectAsState()
+    val mediaMetadataEnabled by typingViewModel.mediaMetadataEnabled.collectAsState()
 
     // Hoisted for the same reason every other handler here is: an unmemoized lambda handed to
     // every key is a fresh instance per recomposition, which takes the grid out of skipping.
@@ -223,13 +263,22 @@ fun TypingKeyboardView(
             { stroke: com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke ->
                 coroutineScope.launch {
                     val candidates = typingViewModel.decodeGlide(stroke)
-                    val word = candidates.firstOrNull() ?: return@launch
+                    val decoded = candidates.firstOrNull() ?: return@launch
+                    // The decoder only ever returns lower case -- the dictionary is lower case
+                    // and the tracker lowercases every key it records -- so the case the user
+                    // actually asked for is applied here. Read from the flow rather than the
+                    // composable's snapshot of it: this lambda is remembered, so a captured
+                    // local would still hold whatever the value was when it was built.
+                    val atSentenceStart = typingViewModel.shouldAutoCapitalize.value
+                    val word = glideCase(decoded, modeState.value, atSentenceStart)
+                    val alternatives =
+                        candidates.map { glideCase(it, modeState.value, atSentenceStart) }
                     // A glide replaces nothing -- it starts a new word -- so whatever partial
                     // word the finger crossed on the way is dropped rather than deleted. The
                     // keys were never committed; only the tracker saw them.
                     typingViewModel.onWordAbandoned()
                     keyboardController.commitText("$word ")
-                    typingViewModel.onGlideCommitted(word, candidates)
+                    typingViewModel.onGlideCommitted(word, alternatives)
                 }
                 Unit
             }
@@ -331,6 +380,12 @@ fun TypingKeyboardView(
                 },
                 onMedia = { action -> MediaTransport.dispatch(context, action) },
                 isMediaPlaying = { MediaTransport.isPlaying(context) },
+                // Gated twice on purpose. The preference is the user's intent; the reader
+                // then asks the OS whether the grant actually exists, because it can be
+                // withdrawn from system Settings without the app being told.
+                nowPlaying = {
+                    if (mediaMetadataEnabled) MediaMetadataReader.currentTrack(context) else null
+                },
             )
 
             // Everything below here is the unchanging part: one fixed height, shared with the
@@ -447,41 +502,30 @@ fun TypingKeyboardView(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 if (undo != null) {
-                                    Text(
-                                        text = "Undo: ${undo.original}",
-                                        modifier =
-                                            Modifier
-                                                .semantics {
-                                                    contentDescription =
-                                                        "Undo autocorrect, restore ${undo.original}"
-                                                    liveRegion = LiveRegionMode.Polite
-                                                }.clickable(role = Role.Button) {
-                                                    // Corrected -> original, one round-trip.
-                                                    // +1 covers the trailing space.
-                                                    val span = undo.corrected.length + 1
-                                                    keyboardController.replaceTextBeforeCursor(
-                                                        span,
-                                                        undo.original + " ",
-                                                    )
-                                                    typingViewModel.onUndoApplied()
-                                                }.padding(8.dp),
+                                    StripChip(
+                                        label = "Undo: ${undo.original}",
+                                        description =
+                                            "Undo autocorrect, restore ${undo.original}",
                                         color = StickyKeysTheme.colors.primary,
-                                        style = StickyKeysTheme.typography.labelLarge,
+                                        announce = true,
+                                        onClick = {
+                                            // Corrected -> original, one round-trip.
+                                            // +1 covers the trailing space.
+                                            val span = undo.corrected.length + 1
+                                            keyboardController.replaceTextBeforeCursor(
+                                                span,
+                                                undo.original + " ",
+                                            )
+                                            typingViewModel.onUndoApplied()
+                                        },
                                     )
                                 } else {
                                     suggestions.forEach { suggestion ->
-                                        Text(
-                                            text = suggestion,
-                                            modifier =
-                                                Modifier
-                                                    .semantics {
-                                                        contentDescription =
-                                                            "Suggestion: $suggestion"
-                                                    }.clickable(role = Role.Button) {
-                                                        onSuggestionTap(suggestion)
-                                                    }.padding(8.dp),
+                                        StripChip(
+                                            label = suggestion,
+                                            description = "Suggestion: $suggestion",
                                             color = StickyKeysTheme.colors.onSurface,
-                                            style = StickyKeysTheme.typography.labelLarge,
+                                            onClick = { onSuggestionTap(suggestion) },
                                         )
                                     }
                                 }
@@ -515,21 +559,32 @@ fun TypingKeyboardView(
                         }
                     }
 
-                    KeyboardRowsView(
-                        keyRows = keyRows,
-                        mode = mode,
-                        palette = StickyKeysTheme.colors,
-                        hasBackgroundImage = bgBitmap != null,
-                        onKeyPress = onKeyPress,
-                        modifier = Modifier.weight(1f),
-                        onScrub = onScrub,
-                        // Null when the feature is off, which is what disables it: the gesture
-                        // branch is skipped entirely rather than running and discarding its
-                        // result, so a user who turns glide off gets the old pointer handling
-                        // back exactly.
-                        glide = if (glideEnabled) glideTracker else null,
-                        onGlide = onGlide,
-                    )
+                    // Grid and trail share one Box so the trail can be drawn in the same
+                    // coordinate space without the grid knowing it exists. KeyboardRowsView
+                    // never reads glideTracker.trailPoints, so a moving finger repaints only
+                    // the overlay -- the grid does not recompose for it.
+                    Box(modifier = Modifier.weight(1f)) {
+                        KeyboardRowsView(
+                            keyRows = keyRows,
+                            mode = mode,
+                            palette = StickyKeysTheme.colors,
+                            hasBackgroundImage = bgBitmap != null,
+                            onKeyPress = onKeyPress,
+                            modifier = Modifier.fillMaxSize(),
+                            onScrub = onScrub,
+                            onDeleteWord = onDeleteWord,
+                            // Null when the feature is off, which is what disables it: the
+                            // gesture branch is skipped entirely rather than running and
+                            // discarding its result, so a user who turns glide off gets the
+                            // old pointer handling back exactly.
+                            glide = if (glideEnabled) glideTracker else null,
+                            onGlide = onGlide,
+                            enterAction = enterAction,
+                        )
+                        if (glideEnabled) {
+                            GlideTrailOverlay(glideTracker = glideTracker)
+                        }
+                    }
                 }
 
                 // Drawn last so it sits over the keys. Tapping it dismisses.
@@ -549,6 +604,58 @@ fun TypingKeyboardView(
         }
     }
 }
+
+/**
+ * The glide trail: a tapered, fading stroke over the key grid tracing the finger's path.
+ *
+ * Reads [GlideTracker.trailPoints] and [GlideTracker.isGliding] only inside the `Canvas` draw
+ * lambda, which runs in the draw phase -- a moving finger invalidates this draw call and
+ * nothing else. Neither the key grid nor this composable's own recomposition scope reads
+ * either value, so [KeyboardRowsView] is untouched by a glide in progress.
+ *
+ * Points arrive in root coordinates, the same space [KeyboardKey] registers its bounds in, so
+ * they are translated by this overlay's own root offset before drawing.
+ */
+@Composable
+private fun GlideTrailOverlay(glideTracker: GlideTracker) {
+    val rootOffset = remember { mutableStateOf(Offset.Zero) }
+    val accent = StickyKeysTheme.colors.primary
+    val density = LocalDensity.current
+    val maxWidthPx = with(density) { GLIDE_TRAIL_MAX_WIDTH.toPx() }
+    val minWidthPx = with(density) { GLIDE_TRAIL_MIN_WIDTH.toPx() }
+
+    Canvas(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { rootOffset.value = it.positionInRoot() },
+    ) {
+        if (!glideTracker.isGliding.value) return@Canvas
+        val origin = rootOffset.value
+        val trail = glideTracker.trailPoints
+        val last = trail.size - 1
+        if (last < 1) return@Canvas
+        for (i in 1..last) {
+            // 0 at the tail (oldest sample), 1 at the head (the finger's current position) --
+            // both the taper and the fade ride the same fraction, so the thickest point of the
+            // stroke is also its most opaque one.
+            val t = i / last.toFloat()
+            drawLine(
+                color = accent.copy(alpha = t),
+                start = trail[i - 1] - origin,
+                end = trail[i] - origin,
+                strokeWidth = minWidthPx + (maxWidthPx - minWidthPx) * t,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+/** Glide trail stroke width at the finger's current position. */
+private val GLIDE_TRAIL_MAX_WIDTH = 7.dp
+
+/** Glide trail stroke width at the oldest visible sample -- the taper's thin end. */
+private val GLIDE_TRAIL_MIN_WIDTH = 1.dp
 
 /**
  * A single key.
@@ -580,6 +687,7 @@ internal fun KeyboardKey(
     border: Color? = null,
     haze: Color? = null,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    onDeleteWord: () -> Unit = {},
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
 ) {
@@ -613,34 +721,56 @@ internal fun KeyboardKey(
     // LocalIndication. Lifting the fill toward the accent is legible on both light and dark
     // palettes and, unlike a ripple, cannot be missed on a key the finger is covering.
     val accent = StickyKeysTheme.colors.primary
-    val pressTarget =
-        if (pressed.value) {
-            // Blended rather than composited: the fill is usually opaque, so compositing the
-            // accent behind it would change nothing. Alpha is carried over from the original
-            // so a deliberately translucent key stays translucent while pressed.
-            lerp(background, accent, PRESS_BLEND).copy(alpha = background.alpha)
-        } else {
-            background
-        }
+    val pressTarget = if (pressed.value) pressedFill(background, accent) else background
     val animatedBackground by
         animateColorAsState(
             pressTarget,
             // Down has to be immediate or the feedback arrives after the character does.
             // Release keeps the tween so the key fades back rather than snapping.
-            animationSpec = tween(if (pressed.value) 0 else KEY_COLOR_ANIM_MS),
+            animationSpec = tween(if (pressed.value) 0 else PRESS_COLOR_ANIM_MS),
             label = "key-background",
         )
     val animatedForeground by
         animateColorAsState(
             foreground,
-            animationSpec = tween(KEY_COLOR_ANIM_MS),
+            animationSpec = tween(PRESS_COLOR_ANIM_MS),
             label = "key-foreground",
+        )
+
+    // Depth, alongside the colour rather than instead of it. Colour alone left the key
+    // visually flat under the one finger that cannot see it: a fingertip covers the middle of
+    // a key, so a fill change is the feedback most likely to be hidden by the thing causing
+    // it. Scale reads at the edges, which stay visible.
+    val pressScale by
+        animateFloatAsState(
+            targetValue = if (pressed.value) PRESS_SCALE else 1f,
+            animationSpec = PressSpring,
+            label = "key-scale",
+        )
+    // Driven off the theme's own haze radius rather than a constant, so this compresses the
+    // shadow a preset asked for instead of imposing one. Gated on `haze` as well as `pressed`
+    // so a flat preset -- the AMOLED one, deliberately -- has a target that never changes and
+    // therefore animates nothing at all.
+    val restingElevation = keyStyle.hazeRadius.value
+    val pressElevation by
+        animateFloatAsState(
+            targetValue =
+                if (haze != null && pressed.value) {
+                    restingElevation * PRESS_ELEVATION_SINK
+                } else {
+                    restingElevation
+                },
+            animationSpec = tween(if (pressed.value) 0 else PRESS_COLOR_ANIM_MS),
+            label = "key-elevation",
         )
 
     // Read at hold time rather than captured, so a relayout between the down event and the
     // long-press threshold cannot anchor the alternates strip to a stale rectangle.
     val bounds = remember { mutableStateOf(Rect.Zero) }
-    val shape = RoundedCornerShape(KEY_CORNER_RADIUS)
+    // The theme's shape scale rather than a private constant. The visual difference is two
+    // device-independent pixels; the point is that corner radius becomes a thing a preset can
+    // say, which is what stops every theme looking identically sharp.
+    val shape = StickyKeysTheme.shapes.medium
 
     // The gap around the key comes from the user's key-size preference rather than a
     // constant: the cell is fixed by the row layout, so the only way to make a key bigger
@@ -650,7 +780,18 @@ internal fun KeyboardKey(
     Box(
         modifier =
             modifier
-                .padding(keyPadding)
+                // First in the chain, so the scale wraps the padding too and the key shrinks
+                // toward the centre of its own cell. Applied after the padding it would pull
+                // the key's edge away from where the finger came down.
+                //
+                // The lambda form is load-bearing: it defers the transform to the draw phase,
+                // so a press does not invalidate layout and cannot re-fire the
+                // onGloballyPositioned below with a transformed rectangle -- which would hand
+                // GlideTracker a key six percent smaller than the one on screen.
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                }.padding(keyPadding)
                 .onGloballyPositioned {
                     bounds.value = it.boundsInRoot()
                     // Re-registered on every layout pass rather than once: the grid changes
@@ -668,7 +809,11 @@ internal fun KeyboardKey(
                 .then(
                     haze?.let {
                         Modifier.shadow(
-                            elevation = keyStyle.hazeRadius,
+                            // Animated rather than static, so the glow the theme draws
+                            // compresses under the finger and settles back on release. A
+                            // shadow that never moves is decoration; one that does is the same
+                            // press event the scale is reporting, seen from underneath.
+                            elevation = pressElevation.dp,
                             shape = shape,
                             ambientColor = it,
                             spotColor = it,
@@ -687,6 +832,7 @@ internal fun KeyboardKey(
                     onCommit = onKeyPress,
                     pressed = pressed,
                     onScrub = onScrub,
+                    onDeleteWord = onDeleteWord,
                     glide = glide,
                     onGlide = onGlide,
                 )
@@ -777,14 +923,71 @@ internal fun KeyboardKey(
     }
 }
 
-/** Key colour transition length. Short enough that 80 concurrent ones stay cheap. */
-private const val KEY_COLOR_ANIM_MS = 110
-
-/** How far a pressed key moves toward the accent. Visible under a fingertip, not garish. */
-private const val PRESS_BLEND = 0.3f
-
-/** Corner radius shared by every key, matching the reference's rounded caps. */
-private val KEY_CORNER_RADIUS = 6.dp
+/**
+ * One tappable word in the suggestion strip, and the undo affordance that replaces them.
+ *
+ * Previously a bare `Text` with a `clickable` and some padding: a word with a hit box, drawn
+ * with no indication that it was a control at all. The strip is where a wrong autocorrect gets
+ * undone and a wrong glide gets fixed in one tap, so being visibly tappable is not decoration
+ * there -- it is the difference between a repair the user finds and one they retype around.
+ *
+ * Deliberately built from the same tokens as a key rather than given a treatment of its own.
+ * The strip sits directly above the grid and is touched by the same thumb; two surfaces that
+ * respond differently to the same gesture read as two different applications.
+ */
+@Composable
+private fun StripChip(
+    label: String,
+    description: String,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    announce: Boolean = false,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by
+        animateFloatAsState(
+            targetValue = if (pressed) PRESS_SCALE else 1f,
+            animationSpec = PressSpring,
+            label = "chip-scale",
+        )
+    val resting = StickyKeysTheme.colors.surfaceVariant
+    val accent = StickyKeysTheme.colors.primary
+    val background by
+        animateColorAsState(
+            if (pressed) pressedFill(resting, accent) else resting,
+            animationSpec = tween(if (pressed) 0 else PRESS_COLOR_ANIM_MS),
+            label = "chip-background",
+        )
+    Text(
+        text = label,
+        modifier =
+            modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }.clip(StickyKeysTheme.shapes.pill)
+                .background(background)
+                // indication = null for the same reason keys carry none: the strip is under
+                // the thumb that pressed it, and a ripple animating outward from beneath a
+                // fingertip is the feedback most easily hidden by the finger causing it. The
+                // scale and fill above replace it rather than merely removing it.
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onClick,
+                ).padding(horizontal = 12.dp, vertical = 5.dp)
+                .semantics {
+                    contentDescription = description
+                    if (announce) liveRegion = LiveRegionMode.Polite
+                },
+        color = color,
+        style = StickyKeysTheme.typography.labelLarge,
+        maxLines = 1,
+    )
+}
 
 /** The gap around a key at 100% key size. Scaled by the user's preference. */
 internal val KEY_BASE_PADDING = 2.dp
@@ -857,8 +1060,12 @@ internal fun handleKeyPress(
         "STICKERS" -> controller.switchMode(AppMode.EMOJI_PICKER)
         "CLIPBOARD" -> controller.switchMode(AppMode.CLIPBOARD)
         "DEL" -> {
-            viewModel.onDelete()
-            controller.sendDelete()
+            // A backspace straight after a glide takes the whole word back, because one
+            // gesture put it there. Anything else goes through sendDelete, which sizes
+            // itself against the real text so a surrogate pair never loses half of
+            // itself -- deleteBefore(1) would.
+            val charCount = viewModel.onDelete()
+            if (charCount > 1) controller.deleteBefore(charCount) else controller.sendDelete()
         }
         "ENTER" -> {
             // Whether Enter may finish a word depends on what Enter *is* in this field, and
@@ -1060,6 +1267,15 @@ private const val WORD_TERMINATORS = ".,!?;:"
  */
 internal fun currentWordText(controller: KeyboardController): String =
     wordUnderCaret(controller.textBeforeCursor(WORD_CONTEXT_CHARS))
+
+/**
+ * How far back a word-wise delete looks for its boundary.
+ *
+ * Generous enough for any single word plus the whitespace before it, and bounded because this
+ * is a blocking read into the host process. A word longer than this is deleted as far as the
+ * window reaches, which is the same thing a longer look would do one step later.
+ */
+private const val MAX_WORD_DELETE_LOOKBEHIND = 64
 
 /** How many characters the word under the caret occupies, read from the editor. */
 internal fun currentWordSpan(controller: KeyboardController): Int =

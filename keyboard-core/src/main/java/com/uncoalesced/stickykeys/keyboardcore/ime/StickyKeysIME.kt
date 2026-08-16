@@ -254,6 +254,8 @@ class StickyKeysIME :
             noPersonalizedLearning = noPersonalizedLearning(info),
             enterIsNewline =
                 info != null && enterInsertsNewline(info.inputType, info.imeOptions),
+            enterAction =
+                (info?.imeOptions ?: 0) and EditorInfo.IME_MASK_ACTION,
         )
         // A field can be focused with the caret already inside a word -- editing an existing
         // draft, or a search box being corrected. onInputStarted clears the word tracker, so
@@ -386,13 +388,48 @@ class StickyKeysIME :
         predictCaret((caret - charCount).coerceAtLeast(0) + replacement.length)
     }
 
+    /**
+     * Backspace, as a structured edit rather than a synthetic key event.
+     *
+     * This used to send a bare `KEYCODE_DEL` down/up pair built with the two-argument
+     * `KeyEvent` constructor, which leaves `downTime`/`eventTime` at zero -- the same shape
+     * `sendRawEnter` was rewritten away from, because several editors treat a zero-timestamp
+     * event as stale and drop it. A dropped delete is invisible from here: `predictCaret`
+     * assumed it landed either way, so the tracked caret drifted by one and the user saw a
+     * dead keypress until `onUpdateSelection` noticed the mismatch and resynced. That is the
+     * "takes a few tries to delete one letter" report. `deleteSurroundingText` is the call
+     * the InputConnection API actually provides for this, the way `moveCursor` uses
+     * `setSelection` instead of a DPAD event.
+     */
     override fun sendDelete() {
-        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
-        currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
-        // Backspace over a selection deletes the selection; otherwise one character back.
-        predictCaret(
-            if (selStart != selEnd) minOf(selStart, selEnd) else (selEnd - 1).coerceAtLeast(0),
-        )
+        val ic = currentInputConnection ?: return
+        if (selStart != selEnd) {
+            // A selection deletes as a unit, same as a physical Delete key over a highlighted
+            // range. commitText("", 1) replaces the selection with nothing --
+            // deleteSurroundingText explicitly ignores any active selection, so it is the
+            // wrong call here.
+            ic.commitText("", 1)
+            predictCaret(minOf(selStart, selEnd))
+            return
+        }
+        val before = ic.getTextBeforeCursor(2, 0)?.toString() ?: ""
+        val charCount = backspaceLengthFor(before)
+        if (charCount == 0) return
+        ic.deleteSurroundingText(charCount, 0)
+        predictCaret((selEnd - charCount).coerceAtLeast(0))
+    }
+
+    override fun deleteBefore(charCount: Int) {
+        if (charCount <= 0) return
+        val ic = currentInputConnection ?: return
+        if (selStart != selEnd) {
+            // A selection deletes as a unit and its size is its own, not the caller's.
+            ic.commitText("", 1)
+            predictCaret(minOf(selStart, selEnd))
+            return
+        }
+        ic.deleteSurroundingText(charCount, 0)
+        predictCaret((selEnd - charCount).coerceAtLeast(0))
     }
 
     override fun textBeforeCursor(maxChars: Int): String =

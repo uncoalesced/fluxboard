@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -73,7 +74,46 @@ class EmojiPickerViewModel
             }
         }
 
+        private val _searchQuery = MutableStateFlow("")
+        val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+        /**
+         * Search results as a single synthetic group, or the real groups when the query is
+         * blank.
+         *
+         * One group rather than a filtered copy of each: while a search is running there is
+         * nothing to switch between, so the tab strip is hidden and the grid simply swaps
+         * its contents. Filtering in place would leave a row of category tabs most of which
+         * are empty, and a tab strip that changes length as the user types.
+         *
+         * Matching is on [com.uncoalesced.stickykeys.keyboardcore.emoji.Emoji.name], which
+         * that class's own doc comment already described as doubling as the search text --
+         * nothing until now read it that way.
+         */
+        val filteredEmojiGroups: StateFlow<List<EmojiGroup>> =
+            combine(_emojiGroups, _searchQuery) { groups, query ->
+                val trimmed = query.trim().lowercase()
+                if (trimmed.isEmpty()) {
+                    groups
+                } else {
+                    val matches =
+                        groups
+                            .asSequence()
+                            .flatMap { it.emoji.asSequence() }
+                            .filter { it.name.lowercase().contains(trimmed) }
+                            .toList()
+                    listOf(EmojiGroup(SEARCH_RESULTS_GROUP, matches))
+                }
+            }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+        fun onSearchQueryChanged(query: String) {
+            _searchQuery.value = query
+        }
+
         fun selectTab(index: Int) {
+            // Picking a category is how a user leaves a search; leaving the query set would
+            // show that category's tab as selected while the grid still showed results.
+            _searchQuery.value = ""
             _selectedTab.value = index
         }
 
@@ -98,5 +138,8 @@ class EmojiPickerViewModel
             const val RECENT_TAB = 0
             const val STICKERS_TAB_INDEX = 1
             const val FIRST_EMOJI_TAB = 2
+
+            /** Label for the one synthetic group shown while a search is running. */
+            const val SEARCH_RESULTS_GROUP = "Search results"
         }
     }

@@ -72,6 +72,42 @@ internal const val SCRUB_ACTIVATION_DP = 18f
  */
 internal const val ALTERNATE_DRAG_SLOP_DP = 6f
 
+/**
+ * How far left the finger must drag, during a backspace hold, before deletes become word-wise.
+ *
+ * Deliberately larger than [SCRUB_ACTIVATION_DP], and that gap is the whole safety argument.
+ * The repeat path has never had an activation distance because it never needed one: holding
+ * backspace is the most-used gesture on this board and a thumb resting on it drifts. Reusing
+ * the scrub's 18dp would turn that ordinary drift into a word delete, which regresses every
+ * plain backspace hold rather than only adding a new gesture.
+ */
+internal const val WORD_DELETE_ACTIVATION_DP = 24f
+
+/**
+ * Further leftward travel per word deleted, once word mode is active.
+ *
+ * Roughly one word's visual width at the default size. Positional like the scrub rather than
+ * timed: the words disappear as the finger passes over where they were, and stop the instant
+ * it stops, which is what makes a run of them feel controllable instead of runaway.
+ */
+internal const val WORD_DELETE_STEP_DP = 40f
+
+/**
+ * Whether accumulated travel during a backspace hold means "delete by words".
+ *
+ * Leftward only: backspace deletes backwards, so a rightward drag has no matching meaning and
+ * is left doing nothing rather than invented. The sideways-intent test is the scrub's, for the
+ * same reason -- a swipe down off the keyboard travels a long way and must not take a sentence
+ * with it on the way out.
+ *
+ * Pure, so the threshold is assertable without a pointer harness.
+ */
+internal fun wordDeleteActivated(
+    travelX: Float,
+    travelY: Float,
+    activationPx: Float,
+): Boolean = -travelX >= activationPx && abs(travelX) > abs(travelY)
+
 /** Finger travel per caret step at the start of a scrub. */
 private const val SCRUB_STEP_START_DP = 14f
 
@@ -423,6 +459,7 @@ internal fun Modifier.keyGestures(
     onCommit: (String) -> Unit,
     pressed: MutableState<Boolean>,
     onScrub: (Int, Boolean) -> Unit = { _, _ -> },
+    onDeleteWord: () -> Unit = {},
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
 ): Modifier =
@@ -548,12 +585,61 @@ internal fun Modifier.keyGestures(
                         if (waitForUpOrCancellation() != null) onCommit(keyOutput)
                     }
                     longPress is LongPress.Repeat -> {
+                        // Character repeat, which a leftward drag promotes to word repeat.
+                        //
+                        // The repeat clock is left exactly as it was and the drag is read
+                        // inside the same wait, rather than the two being separate loops. That
+                        // ordering matters: the wait is what already ends the gesture on
+                        // lift-off, and a second detector reading the same pointer stream would
+                        // have to agree with it about when the press is over.
                         var step = 0
+                        var travelX = 0f
+                        var travelY = 0f
+                        var accumulator = 0f
+                        var wordMode = false
+                        val activationPx = WORD_DELETE_ACTIVATION_DP.dp.toPx()
+                        val wordStepPx = WORD_DELETE_STEP_DP.dp.toPx()
                         while (true) {
-                            onCommit(keyOutput)
+                            // In word mode the timer stops producing deletes entirely: they are
+                            // driven by travel below, so the caret follows the finger instead of
+                            // running away from it while it is still moving.
+                            if (!wordMode) onCommit(keyOutput)
                             val ended =
                                 withTimeoutOrNull(repeatIntervalAt(step)) {
-                                    waitForUpOrCancellation()
+                                    // Replaces waitForUpOrCancellation, which threw the
+                                    // finger's position away -- the reason the repeat path had
+                                    // no drag to read in the first place.
+                                    while (true) {
+                                        val change =
+                                            awaitPointerEvent().changes.firstOrNull()
+                                                ?: return@withTimeoutOrNull Unit
+                                        val delta = change.positionChange()
+                                        travelX += delta.x
+                                        travelY += delta.y
+                                        if (!wordMode) {
+                                            if (wordDeleteActivated(
+                                                    travelX,
+                                                    travelY,
+                                                    activationPx,
+                                                )
+                                            ) {
+                                                wordMode = true
+                                                accumulator = 0f
+                                                onDeleteWord()
+                                                change.consume()
+                                            }
+                                        } else {
+                                            accumulator += delta.x
+                                            while (-accumulator >= wordStepPx) {
+                                                accumulator += wordStepPx
+                                                onDeleteWord()
+                                            }
+                                            change.consume()
+                                        }
+                                        if (!change.pressed) return@withTimeoutOrNull Unit
+                                    }
+                                    @Suppress("UNREACHABLE_CODE")
+                                    Unit
                                 }
                             if (ended != null) break
                             step++

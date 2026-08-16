@@ -17,5 +17,9 @@
     "onSurface": "#FF394053",
     "onSurfaceVariant": "#FF394053",
     "onError": "#FFFFFFFF"
+  },
+  "keyStyle": {
+    "hazeOpacity": 0.18,
+    "hazeRadius": 3.0
   }
 }

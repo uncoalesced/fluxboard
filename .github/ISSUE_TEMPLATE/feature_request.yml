@@ -1,0 +1,58 @@
+# Engineered by uncoalesced
+name: Idea or feature request
+description: Something you want the app to do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth reading first: a few things are deliberately out of scope, and
+        CONTRIBUTING.md lists them with reasons. The short version is that nothing
+        gets added if it needs telemetry, Google Play Services, `READ_SMS`,
+        notification-listener access, or a check on which app you are typing into.
+
+        Multi-language support and automatic subject cutout are both wanted and
+        both blocked on specific things rather than on interest.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >
+        Describe the situation rather than the solution. It is genuinely more
+        useful, because there is often a cheaper way to fix the actual annoyance.
+      placeholder: >
+        I type in two languages and switching keyboards mid-message loses my place.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What did you have in mind?
+      description: If you have a specific design, say so. If not, that is fine.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app
+      options:
+        - Keyboard typing and prediction
+        - Keyboard appearance or layout
+        - Emoji or stickers
+        - Clipboard
+        - Sticker creation and editing
+        - Device transfer or sharing
+        - Settings and app UI
+        - Accessibility
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How do you handle it now?
+      description: >
+        Including "another keyboard does X" is useful and not an insult. Knowing
+        what already works well elsewhere saves a lot of guessing.

@@ -87,6 +87,28 @@ data class KeyDefinition(
 }
 
 /**
+ * Outputs the keyboard reads as commands rather than as text to type.
+ *
+ * One list, because two would disagree. The layout editor needs it to refuse a remap that
+ * would produce a key whose output is literally the word "SPACE" -- a key that looks ordinary,
+ * types nothing, and gives the user no way to tell why. `keyGlyph` branches on exactly these
+ * strings, and `LayoutValidator` requires a subset of them to be present.
+ */
+val CONTROL_OUTPUTS =
+    setOf(
+        "SPACE",
+        "DEL",
+        "ENTER",
+        "SHIFT",
+        "SYMBOLS",
+        "SYMBOLS_SHIFT",
+        "ABC",
+        "STICKERS",
+        "CLIPBOARD",
+        "MIC",
+    )
+
+/**
  * A full keyboard layout configuration: an ordered list of rows,
  * each containing an ordered list of key definitions.
  */

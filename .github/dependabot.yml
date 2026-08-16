@@ -4,7 +4,7 @@
 # than as something nobody noticed.
 #
 # Grouped and weekly on purpose. This project's rules require a human to vet every
-# dependency (`.agent/rules/privacy-and-scope.md`: no analytics or phone-home SDK, a
+# dependency (CONTRIBUTING.md: no analytics or phone-home SDK, a
 # compatible licence, a known size impact), so a stream of one-line PRs nobody reads
 # would be worse than none -- it would train the reviewer to merge them unread, which
 # is precisely how a telemetry SDK would arrive.

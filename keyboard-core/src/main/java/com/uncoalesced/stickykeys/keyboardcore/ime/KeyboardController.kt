@@ -37,6 +37,16 @@ interface KeyboardController {
 
     fun sendDelete()
 
+    /**
+     * Removes [charCount] characters before the caret in a single edit.
+     *
+     * For deletes whose size is already known -- the word a glide committed, the word a
+     * backspace-swipe just consumed. [sendDelete] stays the right call for an ordinary
+     * backspace, because it measures the text itself and so never splits a surrogate pair;
+     * this one is told the count and trusts it.
+     */
+    fun deleteBefore(charCount: Int)
+
     fun sendEnter()
 
     fun handleEditorAction()

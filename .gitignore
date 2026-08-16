@@ -45,19 +45,28 @@ Thumbs.db
 # Kotlin Gradle plugin data
 .kotlin/
 
-# Agents & Repository Documentation
+# Working notes, kept off a public repository
 #
-# These stay untracked deliberately. This repository is public, and the agent files
-# accumulate working notes that are not written for an audience -- local paths, device
-# details, and running commentary on the project. CLAUDE.md was briefly tracked and was
-# removed from history again; do not re-add it without reading it end to end first.
+# These are notes to ourselves, not documentation. They carry local paths, device
+# serials, phase plans, and running commentary that would only mislead someone
+# reading the repo to understand the app. Listing a path here does nothing on its
+# own if the file is already tracked -- that is why these sat in the repo for
+# several releases despite being listed. They were untracked with
+# `git rm --cached` and removed from history.
 .agent/
 .agents/
 .agents/skills/
 AGENTS.md
 docs/
 CLAUDE.md
-ARCHITECTURE.md
+collaboration-workflow.md
+
+# Everything that is a plan rather than documentation lives here: finished release
+# plans, the phase files, device checklists, research and agent prompts. One
+# directory so there is a single answer to "is this written for a reader, or for
+# us?" -- if it is under .notes/ it is for us and never ships.
+.notes/
+
 
 # Python (dictionary-tools/ build pipeline)
 __pycache__/
@@ -67,4 +76,4 @@ __pycache__/
 keystore.properties
 *.jks
 *.keystore
-*.p12collaboration-workflow.md
+*.p12

@@ -1,8 +1,13 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,14 +23,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_COLOR_ANIM_MS
+import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_SCALE
+import com.uncoalesced.stickykeys.keyboardcore.theme.PressSpring
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysColors
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.pressedFill
 
 /**
  * Cursor movement, selection and clipboard actions, without leaving the keyboard.
@@ -135,16 +144,37 @@ private fun EditChip(
     stateLabel: String? = null,
     onClick: () -> Unit,
 ) {
+    // These are keys in every way that matters to a thumb, so they answer a press the way
+    // keys do: the shared scale and fill from theme/MotionTokens.kt, never a second
+    // definition of the same constants. Without this the editing panel was the one
+    // interactive surface on the board that did not visibly respond to touch.
+    val interactions = remember { MutableInteractionSource() }
+    val pressed by interactions.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) PRESS_SCALE else 1f,
+        animationSpec = PressSpring,
+        label = "edit-chip-scale",
+    )
+    val restingFill = if (active) palette.primary else palette.surfaceVariant
+    val fill by animateColorAsState(
+        targetValue = if (pressed) pressedFill(restingFill, palette.primary) else restingFill,
+        animationSpec = tween(PRESS_COLOR_ANIM_MS),
+        label = "edit-chip-fill",
+    )
     Box(
         modifier =
             modifier
-                .padding(2.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }.padding(2.dp)
                 .fillMaxHeight()
-                .background(
-                    if (active) palette.primary else palette.surfaceVariant,
-                    RoundedCornerShape(6.dp),
-                ).clickable(onClick = onClick)
-                .semantics {
+                .background(fill, StickyKeysTheme.shapes.small)
+                .clickable(
+                    interactionSource = interactions,
+                    indication = null,
+                    onClick = onClick,
+                ).semantics {
                     role = Role.Button
                     contentDescription = label
                     stateLabel?.let { stateDescription = it }

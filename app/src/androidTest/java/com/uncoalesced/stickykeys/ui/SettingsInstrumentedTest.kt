@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
  *
  * Live IME typing is intentionally out of scope here: instrumented tests cannot
  * drive the system IME-switch dialog or the InputConnection IPC boundary. That
- * path is covered by docs/testing/manual/ime-typing-flow.md instead.
+ * path is covered by the manual device checklist instead.
  */
 @RunWith(AndroidJUnit4::class)
 class SettingsInstrumentedTest {

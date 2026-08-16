@@ -6,33 +6,431 @@ All notable changes to FluxBoard. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 alpha-track and not yet semantic.
 
-## A note on how this file was rebuilt
+## How to read this
 
-Entries below are derived from `git log`, the two release tags, and the source
-tree as it actually stands, not from a summary of what any phase was supposed
-to produce.
+Dates are release dates. Anything marked as fixed but not yet confirmed on real
+hardware says so, because this project has twice marked work complete on the
+strength of code that read correctly and did not run.
 
-The previous version of this file was a restatement of the 37-phase plan
-presented as release history, and it disagreed with the code in at least two
-places that matter: it listed "On-Device Segmentation Integration using ML Kit
-Subject Segmentation" as shipped when ML Kit was deliberately removed from the
-project (see v0.1.1 below, and `AGENTS.md` on Play Services), and it listed
-ephemeral link sharing as delivered when `RelayClient` still points at
-`ws://10.0.2.2:8080` and `relay/server.js` is deployed nowhere. Both are now
-recorded where they belong: the removal as a removal, the relay as an open item
-in [`docs/roadmap.md`](docs/roadmap.md).
+Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
+so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
+`v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
-**Version boundaries are only partly reliable, and this is stated rather than
-smoothed over.** Two tags exist -- `v0.1.0-alpha` (2026-07-24) and
-`v0.1.1-ALPHA` (2026-07-30). **`v0.1.2-ALPHA` was never tagged**, and a
-retroactive tag was considered and declined. Its boundary below is inferred from
-`versionName` in `app/build.gradle.kts` and from the commit that names it in its
-own subject line; read the v0.1.2 section as "everything on `development` after
-the v0.1.1 tag".
+## [v0.1.6-BETA] - 2026-08-16
+
+versionCode 8. Signed release APK is 8,112,436 bytes (7.74 MB). Device-verified on
+the LineageOS test phone (Redmi Note 11, Android 15) against the signed artifact,
+installed in place so no app data was lost. Items a phone could not settle are
+listed as such at the end rather than claimed.
+
+### Fixed -- contractions were missing from the dictionary entirely
+
+Reported as "punctuation in a word is not detected". The word-boundary code was
+never the problem: `wordUnderCaret` has always kept an apostrophe inside a word.
+**Not one contraction was in the shipped dictionary.** `you're`, `don't`, `it's`,
+`can't`, `i'm` were all absent, and so were their apostrophe-less spellings.
+
+Both halves of the pipeline behaved exactly as designed and their intersection was
+empty: the corpus that builds `base_dict.bin` carries no punctuation at all, so
+"you're" was never in it, and the form the corpus *did* count -- "youre" -- was then
+dropped by the SCOWL spelling filter because "youre" is not a word either. That is
+roughly one word in twenty of running English typed with no suggestion behind it,
+and an open invitation for autocorrect to reach for something else.
+
+- `dictionary-tools/build_flictionary.py` now emits every English contraction,
+  weighted by the corpus frequency of its stripped form. 63 of 71 landed;
+  `base_dict.bin` grew 1,260 bytes. The list is written out rather than sourced
+  because contractions are a closed grammatical class, not an open-ended set.
+- `build_bigrams.py` rewrites a stripped contraction the corpus counted into the
+  spelling users type, so `don't know`, `i'm not` and `that's what` are real
+  context now. Deliberately not applied where the stripped form is a word in its
+  own right -- "its", "cant", "were" -- because there the count belongs to the
+  plain word too; `boostFor` retries an apostrophe-stripped lookup for those.
+- New `PredictionEngine.restoreApostrophe`: "youre" to "you're", "dont" to "don't".
+  A targeted repair, tried ahead of the general search for the same reason
+  `splitOnMispressedSpace` is. Edit distance cannot get this right at any cost
+  setting -- inserting an apostrophe and deleting a letter are both one gap, so
+  "youre" reaches "you're" and "your" for the same price and frequency decides,
+  which "your" wins by three orders of magnitude. Cheapening the apostrophe until
+  "you're" won would have let "were" reach "we're" for nothing, which is real-word
+  correction. Fires only for a word not already in the dictionary, which is what
+  leaves every contraction homograph alone.
+- **Device-verified:** `dont` commits `Don't `, `youre` commits `You're `, and
+  `its` stays `Its `.
+
+### Fixed -- a bundled asset was never refreshed after an app update
+
+Found on the phone, and findable nowhere else. Both engines extracted their data
+file to private storage under `if (!file.exists())`, which is right on a first
+launch and wrong on every update after one: the previous version's copy survives
+and the new asset shipped in the APK is never read. The first v0.1.6 build
+installed over v0.1.5.1 still typed `Font ` for "dont", because the rebuilt
+dictionary was sitting unread inside the APK.
+
+New `assetBackedFile` stamps each extracted copy with the app's version code and
+re-extracts when it changes, so an asset update happens once per install and never
+on an ordinary launch. `AssetCacheTest` pins it. A unit test could not have caught
+this: it gets a clean app directory every run, so the stale branch cannot occur.
+
+### Fixed -- the suggestion pool was chosen by word length, not frequency
+
+Recorded as a known limitation during the v0.1.5.1 device pass and fixed here.
+`getBaseSuggestions` bounded its walk by *terminals found*, and because the walk is
+breadth-first that means it stopped near the top of the subtree, where the short
+words are. Prefix `ma` offered `map` and `mar` while `many` -- more frequent than
+both -- never entered the pool at all.
+
+The budget now counts nodes visited (20,000), sized against the real dictionary:
+the widest single-letter subtree is `s` at 15,716 nodes, so every prefix a user
+actually types is walked in full. The queue was also a list popped with
+`removeAt(0)`, harmless at the old budget and quadratic at this one; it is an
+`ArrayDeque` now. This is what limited sentence context, which re-ranks the pool
+and never adds to it.
+
+### Added
+
+- **Word-wise backspace, two ways.** A backspace straight after a glide takes the
+  whole word back, because one gesture put it there; the state this needs already
+  existed in `consumeGlideCommit`. Holding backspace and dragging left switches
+  from character repeat to word repeat, on its own 24dp activation distance --
+  deliberately further than the space-bar scrub's 18dp, because the repeat path has
+  never had an activation distance and a resting thumb drifts. **Device-verified:**
+  a drag turned `alpha bravo charlie delta echo` into `alpha bravo `, while a plain
+  450ms hold removed exactly three characters.
+- **Glide typing obeys shift.** A glide at a sentence start capitalizes and one with
+  caps lock engaged uppercases. A rendering fix, not a decoder one: `GlideTracker`
+  lowercases every key it records and has to, so case is applied at commit the same
+  way `matchCase` applies it to an autocorrection.
+- **The Enter key shows what it will do** -- send, search, go, next or done, read
+  from the field's own `EditorInfo`. Behaviour is unchanged; only the artwork was
+  ever static. **Device-verified** in an SMS compose field. UNSPECIFIED (0) and NONE
+  (1) both fall back to the return arrow, which is the trap this pairing always sets.
+- **Emoji search.** Filters the grid on the catalogue's own names. Typed on a pad the
+  picker owns rather than a text field: this *is* the keyboard, so a focusable field
+  has nothing to type into it. That also keeps the whole feature off the typing path
+  -- no autocorrect, no glide, no learning, and nothing that can reach the host
+  editor. **Device-verified:** `cat` filters the grid and the message field stays
+  untouched.
+- **The Recents grid holds still during a burst of emoji taps** for three seconds.
+  The write is *not* delayed, only the displayed order: an IME is killed freely and
+  the usual flow is tap-emoji-then-send, so a deferred write would have dropped most
+  emoji out of Recents.
+- **The layout editor reaches the symbol pages**, which have been part of the saved
+  layout since v0.1.4 with nothing able to edit them. The remap dialog is a preset
+  picker with free text kept as an escape hatch, and it now refuses a control token:
+  mapping a key to the literal string "SPACE" produced a key that drew blank and
+  typed nothing. The number row is deliberately not offered -- it is generated at
+  render time, not stored, so a tab for it would discard what the user did.
+- **An expanding pill dock** replaces the app's bottom navigation bar: icon-only at
+  rest, the active one growing to show its name. Four destinations, not the
+  reference image's five. Its spring lives in `theme/MotionTokens.kt` with the rest
+  of the motion language.
+- **Media metadata, opt-in and off by default.** Reopens a permission this project
+  refused on its merits -- `BIND_NOTIFICATION_LISTENER_SERVICE` grants the text of
+  every notification on the device -- so the trade is visible at every layer. The
+  consent screen states what the *permission* grants, not what the feature does.
+  The listener service overrides no notification-content callback, and
+  `check-source-rules.sh` now fails the build if one is ever added; that rule was
+  proven to bite by crossing the boundary on purpose. `MediaTransport`'s
+  permission-free path is untouched, so declining costs nothing that exists today.
+- **The editing panel's chips answer a press** with the same scale and fill as a key,
+  read from `MotionTokens` rather than redefined.
+
+### Not settled by this pass
+
+- **Media metadata against a real session** is unverified: granting notification
+  access is a system permission change on the owner's phone and was not taken during
+  a test pass. `NEEDS DEVICE`.
+- **Glide gestures** were not driven on device. `adb` cannot produce one faithfully
+  -- each `input motionevent` costs about 100ms, so a simulated finger is correctly
+  read as a hold. Covered by unit tests.
+- **Grid-level hit testing** (`n`/`b` near the space bar) ships as a design document
+  in the project's internal planning notes, not a diff. A materially smaller path
+  than the last investigation found is recorded there, gated on a device measurement.
+- **Profanity filtering of the dictionary** is not implemented, by decision rather
+  than deferral: no words are removed.
+
+## [Unreleased]
+
+Build-verified only: `clean :app:packageReleaseArtifact` succeeds and
+`KeyboardRecompositionTest`/`GlideGateTest` both pass under `--rerun`. Not yet
+confirmed on a device, so nothing below is claimed as more than that -- except
+the v0.1.6 block immediately following, which records what a device pass did and
+did not cover.
+
+### Added -- v0.1.6 work: sentence context, beam-search glide, visual pass
+
+Implemented from `V0.1.6-AUTOCORRECT-GLIDE-UPGRADE.md` (a Cowork-written spec).
+Device-verified on the LineageOS test phone against the signed release artifact,
+installed in place so no app data was lost.
+
+- **Autocorrect and suggestions now see the previous word.** New asset
+  `keyboard-core/src/main/assets/bigram_lm.bin` -- **485,367 bytes (474 KB) raw,
+  223,284 bytes in the APK** -- built offline by the new
+  `dictionary-tools/build_bigrams.py` from Norvig's `count_2w.txt` (5.31 MB,
+  286,358 lines, **tab**-separated unlike `count_1w.txt`), filtered through the
+  same SCOWL intersection that keeps `base_dict.bin` typo-free. Caps chosen:
+  `N_PREV_WORDS = 60_000` (59,637 filled), `MAX_FOLLOWERS = 8`; 266,455 pairs
+  survive, giving 15,471 previous-words with a record. Signed release APK is
+  8,106,996 bytes (7.73 MB) with it included.
+  - Weights are normalized **per previous-word**, not globally. The spec called
+    for `build_trie`'s global log normalization; against a global maximum of
+    2.77e9 that compresses every surviving pair into roughly 100-214, so the
+    stored weight would have degenerated into a flag meaning "this pair exists".
+  - **Device-verified:** typing `we` alone offers `we, web, were`; typing
+    `Very we` offers `well, we, web` -- `well` promoted from fourth to first.
+- **Glide decoding is a bounded beam search** rather than unbounded recursion,
+  `MAX_GLIDE_BEAM = 40`. Partial readings are ranked by `cost - pivotCredit`,
+  an estimate of the final score, **not** by cost alone: a glide crosses its keys
+  exactly, so nearly every branch sits at cost 0 and a stable sort by cost keeps
+  whichever subtries the trie lists first. Measured with cost-only ranking, the
+  h-e-l-o path decoded to `[ho, go, hi]` -- "hello" was gone.
+  - **Device-verified:** a synthetic h-e-l-o path commits `hello`, leaving
+    `ho, hero, no` in the strip as losing readings.
+- **Corners are graded rather than counted.** `GlideStroke` carries `dwell` and
+  `pivotStrength`; the 60-degree boolean cutoff becomes a continuous confidence
+  combining turn sharpness with how long the finger lingered, and an unexplained
+  corner now costs in proportion to how sure it was. Both new fields default to
+  empty, and an empty stroke reproduces the old arithmetic exactly -- which is
+  what let every existing `GlideStrokeTest` assertion pass unmodified.
+- **`LanguageModel` seam.** `PredictionEngine` depends on the interface;
+  `LanguageModelModule` binds it to `BigramLanguageModel`. No model is bundled
+  and no TFLite dependency was added.
+- **Press physicality, theme shapes, rounded system font.** Keys gained a spring
+  scale and an elevation that compresses under the finger, driven off the theme's
+  own `hazeRadius` rather than a constant. `KEY_CORNER_RADIUS` is gone in favour
+  of `StickyKeysTheme.shapes.medium`; typography moved to the platform's
+  `sans-serif-rounded` alias (no bundled font, falls back to the system sans);
+  `default_dark`/`default_light` now ship a subtle `keyStyle` haze while
+  `amoled_dark` deliberately stays flat. New `theme/MotionTokens.kt` is the one
+  definition of the press constants, shared by the key grid and the strip.
+- **Suggestion-strip chips.** Previously a bare `Text` with a hit box; now pill
+  shaped with the same press scale and fill as a key, no ripple.
+
+### Known limitation found during the v0.1.6 device pass
+
+- **`getBaseSuggestions` truncates its candidate search by terminal count during
+  a breadth-first walk**, so the 30-terminal budget is spent on short words and
+  common longer ones never enter the pool at all. Verified against the shipped
+  dictionary: prefix `ma` offers `may, make, map, made, mail, main, man, mar,
+  male, ma` and **not** `many`, whose frequency (209) is higher than both `map`
+  and `mar`. Pre-existing, unrelated to the bigram work, and not fixed here --
+  but it is what limits how often sentence context can visibly change the strip,
+  because context re-ranks the pool and never adds to it. This is why `How m`
+  produces the same suggestions as a bare `m` on device.
+
+### Fixed
+
+- **Stock Material components fell back to M3's default purple the moment they
+  touched a slot `StickyKeysTheme` didn't forward.** `Theme.kt` mapped only 8 of
+  `StickyKeysColors`' 13 fields into Material3's `colorScheme` -- `secondary`,
+  any container role, `surfaceVariant` and `outline` were never set, so a
+  dialog, a ripple, or the theme/layout dropdown menus were the one place on
+  screen where sticky6 was invisible.
+
+  No new colors needed: `secondary`, `onSecondary`, `primaryContainer`,
+  `onPrimaryContainer`, `secondaryContainer`, `onSecondaryContainer`,
+  `surfaceVariant`, `onSurfaceVariant` and `surfaceContainer` all now forward
+  existing `StickyKeysColors` fields (`primaryContainer` reuses `primaryVariant`
+  -- Sage, the existing "latched" tone -- rather than inventing a new one).
+  `outline` has no `StickyKeysColors` equivalent, so it reads `Taupe` directly;
+  outline and secondary are never adjacent on screen, so sharing the hex is
+  safe.
+
+### Added
+
+- **A glide trail.** A tapered, fading stroke now traces the finger's path
+  while swipe-typing, drawn in `TypingKeyboardView`'s own `Canvas` pass over
+  the key grid. Colour follows the active theme's accent, so a custom theme
+  stays on-brand rather than showing a hardcoded colour; the stroke clears on
+  lift or commit instead of decaying on its own.
+
+  It reads `GlideTracker`'s new `trailPoints` -- a list separate from the one
+  the decoder uses, so the two can never be confused -- only inside the
+  `Canvas` draw lambda, which runs in the draw phase rather than composition.
+  The key grid never reads `trailPoints`, so a moving finger repaints the
+  overlay and nothing else; `KeyboardRecompositionTest`'s zero-rebuild
+  assertion still holds with the trail in place.
+
+### Changed
+
+- **Keyboard Settings regrouped into five labelled cards** (Typing, Size &
+  Feel, Appearance, Privacy, If Something Breaks) instead of one flat list of
+  roughly fifteen rows, plus a search field that filters rows by label text and
+  hides a group entirely once nothing in it matches. Same preferences, same
+  `KeyboardSettingsViewModel` calls -- this changes where a control is, not
+  what it does.
 
 ---
 
-## [Unreleased]
+## [v0.1.5.1-BETA] - 2026-08-13
+
+Point release on top of v0.1.5-BETA. Two tester-reported defects, both of them
+data loss rather than cosmetic, plus the ktlint break that was keeping
+`gradlew build` red. `versionCode` 7.
+
+### Fixed
+
+- **Two Key Styling sliders reset each other to 100%.** Setting Fill opacity to
+  5% and then dragging Text opacity down snapped *both* back to full, wiping a
+  value the user had set in an earlier, separately-accepted edit and had not
+  touched since.
+
+  `KeyboardTheme.sanitized()` captured the resolved fill and text once, then ran
+  two checks against those same captured values: one repairing an invisible
+  glyph, and a second resetting the fill when fill *and* text were both below
+  12%. The second still saw the pre-repair text, so any later edit that pushed
+  the text under the threshold also destroyed an unrelated low fill. Every
+  slider tick round-trips through save, reload and `sanitized()` before the
+  control redraws, so it looked like the sliders were fighting the user.
+
+  The second reset is gone rather than corrected. Repairing the glyph is the
+  whole job: an invisible *fill* alone was always allowed -- the panel shows
+  through and translucent keys are a deliberate look -- and `resolveText` sets
+  alpha from `textOpacity`, so a repaired glyph is opaque by construction and
+  the second condition could never have fired again anyway. The contrast check
+  still catches a glyph indistinguishable from its key.
+
+  The Text opacity slider now also stops at 12% instead of running to zero. A
+  control that reaches a value the save path immediately rewrites is
+  indistinguishable from a broken one; the fill slider keeps its full range,
+  because a transparent key is legitimate. `ThemeFallbackTest` gains the
+  reported sequence (fill 5%, then text dragged below the threshold, fill must
+  survive) and was verified to fail when the old reset is put back.
+
+  Device-verified: with fill at 1%, dragging Text opacity to the far left leaves
+  fill at 1% and stops text at its floor, and adjusting Haze afterwards moves
+  nothing else -- which is the same mechanism behind the earlier "messing with
+  the key haze deleted my theme" report.
+
+- **Backspace took several presses to delete a single letter.** Reported by a
+  tester: correcting one mistyped character was "really stubborn, takes a few
+  tries."
+
+  `sendDelete()` was the last edit primitive in `StickyKeysIME` still sending a
+  raw synthetic `KeyEvent` -- a `KEYCODE_DEL` down/up pair built with the
+  two-argument constructor, which leaves `downTime`/`eventTime` at zero. Some
+  host editors treat a zero-timestamp event as stale and drop it, which is
+  exactly why `sendRawEnter` was rewritten to build real timestamps and why
+  `moveCursor` stopped sending `KEYCODE_DPAD_*` entirely: a raw key event's
+  effect belongs to the host, not to this keyboard.
+
+  Nothing here could see the drop. The caret prediction assumed the delete
+  landed regardless, so the keyboard's tracked position drifted by one and the
+  press looked dead; `onUpdateSelection` noticed the mismatch and resynced a
+  moment later, which is why it recovered after a few tries instead of staying
+  broken.
+
+  Backspace is now `deleteSurroundingText`, with `commitText("", 1)` for a
+  selection (`deleteSurroundingText` ignores an active selection by contract, so
+  it is the wrong call there). The character count comes from the new pure
+  `backspaceLengthFor`, which returns 2 for a UTF-16 surrogate pair so pressing
+  backspace on an emoji removes the whole emoji rather than stranding half of
+  it. `BackspaceTest` pins that arithmetic. Both backspace paths -- the typing
+  keyboard's DEL key and the emoji picker's own backspace button -- route
+  through this one method, so both are fixed together.
+
+  Verified on a device (LineageOS, 1080x2400) against the signed release
+  artifact, in two hosts -- the Settings search field and the AOSP Messaging
+  compose box: 32 single presses each removed exactly one character on the first
+  press, at the end of the text and in the middle of it; five-press bursts
+  removed exactly five; an emoji disappeared whole from both the DEL key and the
+  picker's own button, never half; and a selection (both select-all and a
+  double-tap word) went as a unit rather than one character outside it.
+
+  **What that pass does not show:** a control build carrying the old
+  `KeyEvent` body passed the same trials in the same two hosts, so neither of
+  them was dropping the zero-timestamp event. The tester's report came from
+  Discord, which is not installed on this phone, and the drop is host-specific by
+  nature. Treat this as "the new primitive is correct and nothing regressed",
+  not as a reproduction of the original symptom.
+
+- **Every preference silently stopped propagating in release builds.** Settings
+  appeared to do nothing: a toggle wrote to disk and nothing in the app or the
+  keyboard changed until the process was restarted. The privacy switch in the
+  quick-access row was the worst of it -- it could be turned on and never off,
+  and because it suppresses suggestions, autocorrect and glide, that left the
+  keyboard's headline feature dead with the only control for it inert.
+
+  `KeyboardPreferences` and `AppPreferences` published changes through a
+  `SharedPreferences.OnSharedPreferenceChangeListener`. SharedPreferences holds
+  its listeners in a `WeakHashMap`, so the `private val listener` field was the
+  only strong reference to ours -- and R8, seeing a field written once and read
+  once, removed the field. The listener was collected at the first GC and no
+  preference change reached any `StateFlow` again for the life of the process.
+
+  Debug builds are not minified, so it worked perfectly everywhere except the
+  artifact that ships. Confirmed against `outputs/mapping/release/mapping.txt`,
+  which lists `prefs` and all sixteen flow fields for the class and no `listener`
+  field at all.
+
+  Both classes are `@Singleton` and every write already goes through their own
+  setters, so the listener was never doing anything a setter could not. Each
+  setter now publishes to its own flow directly, which R8 cannot remove because
+  the flow is read elsewhere. Clamped setters compute the clamped value once and
+  use it for both the write and the flow, so the stored number and the published
+  one cannot drift.
+
+  `PreferencePublishTest` pins the setter contract (verified to fail when a
+  publish is removed), and `scripts/check-source-rules.sh` now refuses to let a
+  SharedPreferences listener back into the codebase.
+
+- **Stock Material components fell back to M3's default purple the moment they
+  touched a slot `StickyKeysTheme` didn't forward.** `Theme.kt` mapped only 8 of
+  `StickyKeysColors`' 13 fields into Material3's `colorScheme` -- `secondary`,
+  any container role, `surfaceVariant` and `outline` were never set, so a
+  dialog, a ripple, or the theme/layout dropdown menus were the one place on
+  screen where sticky6 was invisible.
+
+  No new colors needed: `secondary`, `onSecondary`, `primaryContainer`,
+  `onPrimaryContainer`, `secondaryContainer`, `onSecondaryContainer`,
+  `surfaceVariant`, `onSurfaceVariant` and `surfaceContainer` all now forward
+  existing `StickyKeysColors` fields (`primaryContainer` reuses `primaryVariant`
+  -- Sage, the existing "latched" tone -- rather than inventing a new one).
+  `outline` has no `StickyKeysColors` equivalent, so it reads `Taupe` directly;
+  outline and secondary are never adjacent on screen, so sharing the hex is
+  safe.
+
+  Build-verified only (clean release build, `KeyboardRecompositionTest` and
+  `GlideGateTest` pass under `--rerun`); not yet confirmed on a device.
+
+### Added
+
+- **A glide trail.** A tapered, fading stroke now traces the finger's path
+  while swipe-typing, drawn in `TypingKeyboardView`'s own `Canvas` pass over
+  the key grid. Colour follows the active theme's accent, so a custom theme
+  stays on-brand rather than showing a hardcoded colour; the stroke clears on
+  lift or commit instead of decaying on its own.
+
+  It reads `GlideTracker`'s new `trailPoints` -- a list separate from the one
+  the decoder uses, so the two can never be confused -- only inside the
+  `Canvas` draw lambda, which runs in the draw phase rather than composition.
+  The key grid never reads `trailPoints`, so a moving finger repaints the
+  overlay and nothing else; `KeyboardRecompositionTest`'s zero-rebuild
+  assertion still holds with the trail in place. Build-verified only, not yet
+  confirmed on a device.
+
+### Changed
+
+- `KeyboardLayouts.symbolsPrimaryRows` KDoc said `$` was not on symbols page 1.
+  It has been since B4 put the currency key there, twelve lines below the
+  sentence saying otherwise.
+
+- **Keyboard Settings regrouped into five labelled cards** (Typing, Size &
+  Feel, Appearance, Privacy, If Something Breaks) instead of one flat list of
+  roughly fifteen rows, plus a search field that filters rows by label text and
+  hides a group entirely once nothing in it matches. Same preferences, same
+  `KeyboardSettingsViewModel` calls -- this changes where a control is, not
+  what it does. Build-verified only, not yet confirmed on a device.
+
+---
+
+## [v0.1.5-BETA] - 2026-08-10
+
+Re-released the same day the beta was cut, because a full device pass found a
+defect serious enough that the first build should not be the one people install.
+Same versionName and versionCode; if you have an earlier `v0.1.5-BETA` build,
+reinstall rather than update.
 
 ### Fixed
 
@@ -74,7 +472,7 @@ the v0.1.1 tag".
 
 ---
 
-## [v0.1.5-BETA] - 2026-08-09
+## [v0.1.5-BETA] - 2026-08-09, first cut
 
 **The first beta.** versionCode 6, versionName `v0.1.5-BETA`. The app says so
 itself: a BETA badge sits beside the name in Settings and a short notice under
@@ -198,12 +596,12 @@ letter. Each is described below.
 ## [v0.1.4-ALPHA] - 2026-08-06
 
 Tagged `v0.1.4-ALPHA`, versionCode 4. Planning for this release is in
-[`docs/planning/v0.1.4-alpha-plan.md`](docs/planning/v0.1.4-alpha-plan.md).
+the release plan for that version.
 
 **Device status:** everything below marked with a dagger was exercised on a
 Redmi Note 11 (Android 15) on 2026-08-06 -- real key taps and real gestures, not
 `adb shell input text`, which bypasses the IME entirely and measures nothing.
-The rest is unit-tested only. `docs/roadmap.md` section 4A carries the pass
+The rest is unit-tested only. The device pass notes carry
 itself, including what it found.
 
 ### Added
