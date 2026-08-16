@@ -145,7 +145,7 @@ and never adds to it.
   -- each `input motionevent` costs about 100ms, so a simulated finger is correctly
   read as a hold. Covered by unit tests.
 - **Grid-level hit testing** (`n`/`b` near the space bar) ships as a design document
-  at `docs/planning/grid-hit-testing-plan.md`, not a diff. A materially smaller path
+  in the project's internal planning notes, not a diff. A materially smaller path
   than the last investigation found is recorded there, gated on a device measurement.
 - **Profanity filtering of the dictionary** is not implemented, by decision rather
   than deferral: no words are removed.

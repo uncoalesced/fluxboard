@@ -61,23 +61,12 @@ docs/
 CLAUDE.md
 collaboration-workflow.md
 
-# Agent-written implementation specs, kept at the repo root while they are being
-# worked and never part of a release. Same class as docs/planning: notes to
-# ourselves, not documentation written for anyone reading the repo.
-FLUXBOARD-FEEDBACK-BACKLOG.md
-V0.1.6-AUTOCORRECT-GLIDE-UPGRADE.md
+# Everything that is a plan rather than documentation lives here: finished release
+# plans, the phase files, device checklists, research and agent prompts. One
+# directory so there is a single answer to "is this written for a reader, or for
+# us?" -- if it is under .notes/ it is for us and never ships.
+.notes/
 
-# Internal docs. Everything still tracked under docs/ is written to be read by
-# someone who does not work on this project; these are not.
-docs/agent-prompts.md
-docs/roadmap.md
-docs/repo-reference.md
-docs/segmentation-research.md
-docs/v0.1.4-commit-sequence.md
-docs/auto_backup.md
-docs/planning/
-docs/release/
-docs/testing/
 
 # Python (dictionary-tools/ build pipeline)
 __pycache__/
