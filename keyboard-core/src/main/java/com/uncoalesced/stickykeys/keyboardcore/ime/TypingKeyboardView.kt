@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
@@ -64,6 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
@@ -993,6 +995,14 @@ private const val HINT_ALPHA = 0.45f
 /** The hold-available marker on keys whose alternates have no printable hint. */
 private val LONG_PRESS_DOT = 3.dp
 
+/**
+ * Floor for a shrunk key label.
+ *
+ * Below this the character is smaller than the corner hint beside it, at which point a legible
+ * clipped label would have been the better of two bad outcomes.
+ */
+private val MIN_KEY_LABEL_SIZE = 10.sp
+
 /** Draws either case of [KeyGlyph] so no call site has to branch on it. */
 @Composable
 internal fun KeyGlyphContent(
@@ -1009,6 +1019,21 @@ internal fun KeyGlyphContent(
                 color = tint,
                 style = style,
                 maxLines = 1,
+                // Shrink rather than clip. `maxLines = 1` defaults to TextOverflow.Clip, so a
+                // label wider than its key silently lost characters off the end -- and the
+                // multi-character labels are exactly the ones with no room to spare: "123" and
+                // "ABC" sit on a 1.5-weight key, the type scale is a user preference, and `sp`
+                // is multiplied again by the system font-size setting on top of that. Three
+                // independent multipliers, none of which the key width knows about.
+                //
+                // Capped at the style's own size, so a label that already fits is drawn at
+                // exactly the size it was before this existed and nothing else on the board
+                // moves. Only the case that used to be cut short behaves differently.
+                autoSize =
+                    TextAutoSize.StepBased(
+                        minFontSize = MIN_KEY_LABEL_SIZE,
+                        maxFontSize = style.fontSize,
+                    ),
                 modifier = modifier,
             )
         is KeyGlyph.Icon ->
