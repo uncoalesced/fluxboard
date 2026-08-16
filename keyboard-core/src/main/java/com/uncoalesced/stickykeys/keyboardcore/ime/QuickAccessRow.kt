@@ -5,10 +5,8 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +41,8 @@ import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.PANEL_FADE_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysColors
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Height of the revealed row. Matches the suggestion strip so the panel grows predictably. */
 internal val QUICK_ROW_HEIGHT = 44.dp
@@ -143,12 +143,25 @@ internal fun QuickAccessRow(
 ) {
     AnimatedVisibility(
         visible = expanded,
-        // The height animation was already here; the fade was not. Expanding alone drew the
-        // icons at full strength from the first frame, so they appeared to slide out from
-        // behind the strip fully formed while the window was still growing to fit them.
-        // Fading over the same gesture lets the row arrive with the space it needs.
-        enter = expandVertically() + fadeIn(tween(PANEL_FADE_MS)),
-        exit = shrinkVertically() + fadeOut(tween(PANEL_FADE_MS)),
+        // Fade only. The height deliberately does **not** animate, and that is the opposite of
+        // what it looks like it should be.
+        //
+        // This row lives outside the fixed-height panel and grows the window upward, which is
+        // the whole reason it never steals height from the keys. But an IME window is
+        // WRAP_CONTENT: its height *is* this content's height, measured by the framework and
+        // pushed across to WindowManager and into the host app's own layout pass. So
+        // `expandVertically` did not animate a view inside a stable window -- it resized the
+        // IME window, and with it relaid out the app being typed into, once per frame for the
+        // length of the animation. That is a cross-process relayout roughly fifteen times for
+        // one chevron tap, and it is why the expand visibly stepped through its frames instead
+        // of sliding. Measured elsewhere in this file's own history: a height change here moves
+        // the window by exactly the row height, 830px to 956px.
+        //
+        // One resize, then a fade over it. The window reaches its final size in a single layout
+        // pass and the icons arrive over the space that is already there, so the motion the eye
+        // follows costs nothing to draw.
+        enter = fadeIn(tween(PANEL_FADE_MS)),
+        exit = fadeOut(tween(PANEL_FADE_MS)),
         modifier = modifier,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -233,7 +246,11 @@ private fun MediaRow(
     // never open.
     var playing by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        playing = isMediaPlaying()
+        // Off the main thread. `isMusicActive` is a binder call into AudioService, and this
+        // effect fires on the frame the toolbar opens -- the one frame in the interaction that
+        // has no time to spare. The answer only picks a glyph, so arriving a frame late costs
+        // nothing and blocking for it would be felt.
+        playing = withContext(Dispatchers.IO) { isMediaPlaying() }
     }
 
     Row(
