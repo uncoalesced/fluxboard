@@ -108,12 +108,44 @@ class ThemeFallbackTest {
     fun `key text the same colour as the key is restored`() {
         // Two colour pickers defaulting to the same swatch reaches this in two taps, and the
         // result is a panel of blank keys rather than an obviously broken screen.
+        //
+        // The glyph is what gets dropped, and the fill the user picked is kept: the palette's
+        // own onSurface is legible over it, so one reset is enough to make the board readable
+        // and taking the fill as well would destroy an edit the user did not just make.
         val cleaned =
             themeWith(
                 KeyStyle(fillColor = Color(0xFF101010), textColor = Color(0xFF101010)),
             ).sanitized()
-        assertNull(cleaned.keyStyle.fillColor)
         assertNull(cleaned.keyStyle.textColor)
+        assertEquals(Color(0xFF101010), cleaned.keyStyle.fillColor)
+    }
+
+    @Test
+    fun `a chosen fill survives a later edit that picks a clashing text colour`() {
+        // zap's v0.1.6 report: "I tap on 1 colour for text opacity and then it resets the
+        // field above it." Key fill is set and accepted in one edit; a later tap on a text
+        // swatch that happens to match it used to reset *both* sections, so the fill chosen
+        // earlier vanished. Only the override being edited may move.
+        val fill = Color(0xFF101010)
+        val afterFillEdit = themeWith(KeyStyle(fillColor = fill)).sanitized()
+        assertEquals("the fill edit alone is legitimate", fill, afterFillEdit.keyStyle.fillColor)
+
+        val afterTextEdit =
+            themeWith(afterFillEdit.keyStyle.copy(textColor = fill)).sanitized()
+        assertEquals(fill, afterTextEdit.keyStyle.fillColor)
+        assertNull(afterTextEdit.keyStyle.textColor)
+    }
+
+    @Test
+    fun `a fill the palette glyph cannot be seen against drops both overrides`() {
+        // The case one reset does not fix: the fill is set to the palette's own glyph colour,
+        // so restoring the glyph leaves it invisible all over again. The second drop is what
+        // makes the repair converge instead of leaving a blank board behind.
+        val glyph = darkStickyKeysColors().onSurface
+        val cleaned =
+            themeWith(KeyStyle(fillColor = glyph, textColor = glyph)).sanitized()
+        assertNull(cleaned.keyStyle.textColor)
+        assertNull(cleaned.keyStyle.fillColor)
     }
 
     @Test
