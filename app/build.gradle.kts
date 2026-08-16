@@ -29,8 +29,8 @@ android {
         applicationId = "com.uncoalesced.stickykeys"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "v0.1.6.1-BETA"
+        versionCode = 10
+        versionName = "v0.1.7-BETA"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

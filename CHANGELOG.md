@@ -16,7 +16,7 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
-## [Unreleased] - v0.1.7 work in progress
+## [v0.1.7-BETA] - 2026-08-17
 
 `.\gradlew.bat build` is green (compile, ktlint, lint, 389 unit tests) and
 `scripts/check-source-rules.sh` passes.
