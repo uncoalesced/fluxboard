@@ -522,6 +522,15 @@ class TypingViewModel
         fun onWordAccepted(word: String) {
             if (word.isNotBlank()) {
                 learn(word)
+                // The word just became the context, so ask what usually follows it. This is the
+                // exact moment issue #17 describes: a word finished, space pressed, and a strip
+                // that had nothing to say because the completion path short-circuits on an empty
+                // prefix before it ever consults the context.
+                //
+                // Here rather than inside `learn` on purpose. A glide also learns, and it fills
+                // the strip with its own losing readings straight afterwards -- a refresh hidden
+                // in `learn` would dispatch under the same generation token and overwrite them.
+                updateSuggestions()
             }
         }
 
@@ -631,6 +640,11 @@ class TypingViewModel
             currentWord = ""
             _suggestions.value = emptyList()
             learn(suggestion)
+            // The tap wrote the word and its trailing space, so the caret is where it would be
+            // after a space bar press and the strip should say the same thing it would there.
+            // Without this, taking a suggestion left the strip permanently blank until the next
+            // keystroke -- which reads as the tap having broken something.
+            updateSuggestions()
         }
 
         /**
@@ -648,12 +662,36 @@ class TypingViewModel
             // not to learn from and wrong for a password. Drawing dictionary matches for a
             // password prefix in a strip above the keyboard is a shoulder-surfing hazard on
             // its own, before any of it reaches storage.
-            if (currentWord.isBlank() || _fieldKind.value.isSensitive) {
+            if (_fieldKind.value.isSensitive) {
                 _suggestions.value = emptyList()
                 return
             }
+            // Captured before the lookup is dispatched and re-checked before the result is
+            // published. Two of these can be in flight at once -- a next-word lookup fired when
+            // the space committed, and a completion lookup for the letter typed a moment later
+            // -- and without this the slower one wins whichever it is, so the strip can fill
+            // with predictions for a word the user has already started typing past.
+            val token = generation
+            val prefix = currentWord
             viewModelScope.launch {
-                _suggestions.value = predictionEngine.getSuggestions(currentWord, previousWord)
+                val results =
+                    if (prefix.isBlank()) {
+                        // Nothing typed: predict rather than complete. Suppressed at a sentence
+                        // boundary, where the previous word is on the far side of a full stop --
+                        // the corpus counts that pair because they were adjacent, not because
+                        // one follows the other, and it is the same reason `onSentenceStarted`
+                        // drops the context outright.
+                        if (atSentenceStart) {
+                            emptyList()
+                        } else {
+                            predictionEngine.getNextWordSuggestions(previousWord)
+                        }
+                    } else {
+                        predictionEngine.getSuggestions(prefix, previousWord)
+                    }
+                if (token == generation) {
+                    _suggestions.value = results
+                }
             }
         }
     }
