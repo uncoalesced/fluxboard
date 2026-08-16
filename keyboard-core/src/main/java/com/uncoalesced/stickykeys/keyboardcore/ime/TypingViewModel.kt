@@ -72,10 +72,6 @@ class TypingViewModel
         /** Whether swiping across the letters decodes into a word. */
         val glideTypingEnabled: StateFlow<Boolean> = keyboardPreferences.glideTypingEnabled
 
-        /** Whether the media row may show what is playing. Off unless the user asked. */
-        val mediaMetadataEnabled: StateFlow<Boolean> =
-            keyboardPreferences.mediaMetadataEnabled
-
         /** Panel sizing, chosen by the user rather than fixed. See `ImePanelHeight`. */
         val keyboardHeightPercent: StateFlow<Int> = keyboardPreferences.keyboardHeightPercent
         val keyboardBottomPaddingDp: StateFlow<Int> = keyboardPreferences.keyboardBottomPaddingDp

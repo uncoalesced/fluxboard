@@ -38,7 +38,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.PANEL_FADE_MS
@@ -140,7 +139,6 @@ internal fun QuickAccessRow(
     onAction: (QuickAction) -> Unit,
     onMedia: (MediaTransport.Action) -> Unit,
     isMediaPlaying: () -> Boolean,
-    nowPlaying: () -> NowPlaying? = { null },
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -158,7 +156,6 @@ internal fun QuickAccessRow(
                 palette = palette,
                 onMedia = onMedia,
                 isMediaPlaying = isMediaPlaying,
-                nowPlaying = nowPlaying,
             )
             Row(
                 modifier =
@@ -228,18 +225,15 @@ private fun MediaRow(
     palette: StickyKeysColors,
     onMedia: (MediaTransport.Action) -> Unit,
     isMediaPlaying: () -> Boolean,
-    nowPlaying: () -> NowPlaying? = { null },
 ) {
-    // Re-read on each press rather than polled. There is no callback to subscribe to without
-    // the notification-listener permission, and a timer ticking inside an IME to keep a glyph
-    // fresh would cost battery in every session for a row most of them never open.
+    // Re-read on each open rather than polled. There is no callback to subscribe to without
+    // the notification-listener permission -- which this app does not declare, because Play
+    // Protect blocks the install of any sideloaded app that does -- and a timer ticking inside
+    // an IME to keep a glyph fresh would cost battery in every session for a row most of them
+    // never open.
     var playing by remember { mutableStateOf(false) }
-    // Read once per open, exactly like `playing`, and held nowhere else. Nothing about the
-    // track is persisted: no history, no recently-played, no writes at all.
-    var track by remember { mutableStateOf<NowPlaying?>(null) }
     LaunchedEffect(Unit) {
         playing = isMediaPlaying()
-        track = nowPlaying()
     }
 
     Row(
@@ -251,26 +245,6 @@ private fun MediaRow(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Additive, never a replacement. With the opt-in off, or the grant absent, or nothing
-        // playing, this is simply not drawn and the row looks exactly as it always has --
-        // declining the permission is not a degraded state.
-        track?.let { current ->
-            val caption = listOfNotNull(current.title, current.artist).joinToString(" - ")
-            if (caption.isNotEmpty()) {
-                Text(
-                    text = caption,
-                    color = palette.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = StickyKeysTheme.typography.labelMedium,
-                    modifier =
-                        Modifier
-                            .weight(1f, fill = false)
-                            .padding(end = 10.dp)
-                            .semantics { contentDescription = "Now playing: $caption" },
-                )
-            }
-        }
         mediaButtons.forEach { (action, label) ->
             val isPlayPause = action == MediaTransport.Action.PLAY_PAUSE
             val icon =

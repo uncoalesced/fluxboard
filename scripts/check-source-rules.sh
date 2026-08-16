@@ -91,37 +91,36 @@ if [ -n "$listener_hits" ]; then
   fail=1
 fi
 
-# --- 4. Notification-listener scope boundary ---------------------------------
-# MediaMetadataListenerService exists for one reason: the platform will not answer
-# MediaSessionManager.getActiveSessions() unless a NotificationListenerService is
-# bound. The permission that buys is BIND_NOTIFICATION_LISTENER_SERVICE, which
-# hands the app the text of every notification on the device.
+# --- 4. Notification listener ------------------------------------------------
+# Banned outright, at the manifest level, because declaring it makes the app
+# uninstallable for this project's entire audience.
 #
-# The feature reads track title and artist and nothing else, and the way that stays
-# true is that the service never overrides a notification-content callback. The base
-# class delivers every notification on the device to onNotificationPosted and
-# onNotificationRemoved whether or not they are overridden, so not overriding them
-# is the boundary -- and a later edit adding one would cross it silently.
+# v0.1.6-BETA shipped a NotificationListenerService so the media row could show a
+# track name -- MediaSessionManager.getActiveSessions() will not answer without one.
+# It was scoped as tightly as the platform allows: off by default, granted only from
+# system Settings, overriding no notification callback at all. Google Play Protect
+# blocks the install anyway, with "App blocked to protect your device", because it
+# reads the manifest and not the class. FluxBoard is distributed only by sideloading,
+# so the app simply could not be installed.
 #
-# Only the two connection lifecycle hooks are allowed. If a content callback is ever
-# genuinely needed, this check must be given a documented exemption and the consent
-# screen's wording revisited, rather than the check being deleted.
-listener_service="keyboard-core/src/main/java/com/uncoalesced/stickykeys/keyboardcore/ime/MediaMetadataListenerService.kt"
-if [ -f "$listener_service" ]; then
-  notif_hits=$(grep -n "override fun onNotification" "$listener_service" 2>/dev/null || true)
-  if [ -n "$notif_hits" ]; then
-    echo "NOTIFICATION SCOPE VIOLATION -- MediaMetadataListenerService must never read"
-    echo "notification content. It exists only to satisfy the binding requirement for"
-    echo "MediaSessionManager.getActiveSessions():"
-    echo "$notif_hits"
-    echo
-    fail=1
-  fi
+# Matched on declaration syntax -- the quoted, fully-qualified permission and the
+# base class itself -- rather than on the bare constant name, so the manifest and
+# MediaTransport can keep explaining in prose why this is banned without tripping the
+# check that enforces it.
+notif_hits=$(grep -RInE '"android\.permission\.BIND_NOTIFICATION_LISTENER_SERVICE"|:[[:space:]]*NotificationListenerService\('   --include='*.xml' --include='*.kt' --include='*.java'   "${SRC_GLOBS[@]}" 2>/dev/null || true)
+
+if [ -n "$notif_hits" ]; then
+  echo "NOTIFICATION LISTENER RULE VIOLATION -- Play Protect blocks the install of any"
+  echo "sideloaded app that declares BIND_NOTIFICATION_LISTENER_SERVICE, whatever the"
+  echo "service actually does. See keyboard-core's manifest for the full reasoning:"
+  echo "$notif_hits"
+  echo
+  fail=1
 fi
 
 if [ "$fail" -eq 0 ]; then
   echo "Source rule check passed: no emoji, all source files watermarked, no prefs listeners,"
-  echo "no notification-content reads."
+  echo "no notification listener."
 fi
 
 exit "$fail"

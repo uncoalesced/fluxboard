@@ -16,6 +16,45 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [v0.1.6.1-BETA] - 2026-08-16
+
+versionCode 9. A point release with one job: **v0.1.6-BETA could not be installed.**
+
+### Fixed -- Play Protect blocked the install of v0.1.6-BETA
+
+Sideloading the v0.1.6 APK produced "App blocked to protect your device -- this app
+can request access to sensitive data", and the install did not proceed. Nothing was
+wrong with the build; Play Protect's sideloading protection blocks any app that
+**declares** `BIND_NOTIFICATION_LISTENER_SERVICE`, and it reads the manifest rather
+than the class.
+
+v0.1.6 declared one for a single feature: the media row showing the current track
+name. `MediaSessionManager.getActiveSessions()` will not answer without a bound
+`NotificationListenerService`, and Android offers no narrower permission for it.
+That service was scoped as tightly as the platform allows -- off by default, granted
+only from system Settings behind a consent screen that named what the grant really
+covers, and overriding no notification callback at all, with a source-rule check
+enforcing it. None of that was visible to Play Protect.
+
+FluxBoard is distributed only by sideloading, so this was not a close call: a
+permission that makes the app uninstallable for the entire audience cannot buy one
+line of track metadata. The service, its reader, the preference, the consent screen
+and its strings are all removed.
+
+- **Media transport controls are unaffected.** Previous, play/pause and next never
+  needed the permission and go on working exactly as before -- `MediaTransport` was
+  always the permission-free path and is now the only one.
+- **What is lost:** the track and artist caption beside those buttons. Nothing else
+  from v0.1.6 changes.
+- `scripts/check-source-rules.sh` now fails the build if the declaration ever comes
+  back, matched on the quoted permission and on the base class rather than on a
+  class name, so a differently-named service cannot slip past. Verified to fail by
+  reintroducing the declaration on purpose, per this project's rule about guards
+  that pass either way.
+
+Also bumped versionCode, which is what `assetBackedFile` keys asset re-extraction
+on, so the v0.1.6 dictionary and bigram table refresh on update.
+
 ## [v0.1.6-BETA] - 2026-08-16
 
 versionCode 8. Signed release APK is 8,112,436 bytes (7.74 MB). Device-verified on

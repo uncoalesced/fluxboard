@@ -254,7 +254,6 @@ fun TypingKeyboardView(
     val glideTracker = remember { GlideTracker() }
     val glideEnabled by typingViewModel.glideTypingEnabled.collectAsState()
     val enterAction by typingViewModel.enterAction.collectAsState()
-    val mediaMetadataEnabled by typingViewModel.mediaMetadataEnabled.collectAsState()
 
     // Hoisted for the same reason every other handler here is: an unmemoized lambda handed to
     // every key is a fresh instance per recomposition, which takes the grid out of skipping.
@@ -380,12 +379,6 @@ fun TypingKeyboardView(
                 },
                 onMedia = { action -> MediaTransport.dispatch(context, action) },
                 isMediaPlaying = { MediaTransport.isPlaying(context) },
-                // Gated twice on purpose. The preference is the user's intent; the reader
-                // then asks the OS whether the grant actually exists, because it can be
-                // withdrawn from system Settings without the app being told.
-                nowPlaying = {
-                    if (mediaMetadataEnabled) MediaMetadataReader.currentTrack(context) else null
-                },
             )
 
             // Everything below here is the unchanging part: one fixed height, shared with the
