@@ -71,6 +71,25 @@ interface LanguageModel {
         previousWord: String?,
         candidate: String,
     ): Float
+
+    /**
+     * The words most likely to follow [previousWord], best first, at most [limit] of them.
+     *
+     * The one place context is allowed to *be* a candidate source rather than only re-rank one,
+     * and it is deliberately a separate method rather than a mode of [boostFor]. Completion and
+     * prediction are different questions: a completion has to match what the user is visibly
+     * typing, and letting the corpus contribute there is how a strip starts proposing words the
+     * user is plainly not writing. With nothing typed there is no prefix to contradict, and the
+     * corpus is the only thing that knows anything at all.
+     *
+     * Empty when there is no signal -- no previous word, an unknown one, or an implementation
+     * with no table behind it. Defaulted so an implementation that cannot answer this does not
+     * have to say so, the same way [initialize] is.
+     */
+    fun followersOf(
+        previousWord: String?,
+        limit: Int,
+    ): List<String> = emptyList()
 }
 
 @Singleton
@@ -118,23 +137,43 @@ class BigramLanguageModel
                 emptyMap()
             }
 
+        /**
+         * The stored followers of [previousWord], or null when the table has never seen it.
+         *
+         * A contraction whose stripped form is also a real word -- "it's"/"its",
+         * "can't"/"cant", "we're"/"were" -- keeps its record under the plain spelling,
+         * because in the corpus that count belongs to both senses and rewriting it
+         * would have cost the plain word its context entirely. Retrying without the
+         * apostrophe is what reaches it. Contractions whose stripped form is not a word
+         * ("don't", "i'm", "that's") are stored under the real spelling and hit first.
+         */
+        private fun followerRecords(previousWord: String?): List<Pair<String, Int>>? {
+            if (previousWord == null) return null
+            return table[previousWord] ?: table[previousWord.replace("'", "")]
+        }
+
         override fun boostFor(
             previousWord: String?,
             candidate: String,
         ): Float {
-            if (previousWord == null) return 0f
-            // A contraction whose stripped form is also a real word -- "it's"/"its",
-            // "can't"/"cant", "we're"/"were" -- keeps its record under the plain spelling,
-            // because in the corpus that count belongs to both senses and rewriting it
-            // would have cost the plain word its context entirely. Retrying without the
-            // apostrophe is what reaches it. Contractions whose stripped form is not a word
-            // ("don't", "i'm", "that's") are stored under the real spelling and hit first.
-            val followers =
-                table[previousWord]
-                    ?: table[previousWord.replace("'", "")]
-                    ?: return 0f
+            val followers = followerRecords(previousWord) ?: return 0f
             val weight = followers.firstOrNull { it.first == candidate }?.second ?: return 0f
             return weight * BIGRAM_WEIGHT_SCALE
+        }
+
+        override fun followersOf(
+            previousWord: String?,
+            limit: Int,
+        ): List<String> {
+            if (limit <= 0) return emptyList()
+            val followers = followerRecords(previousWord) ?: return emptyList()
+            // Sorted here rather than trusted from the file. The weights are what rank these,
+            // and nothing in the FLBG format promises an order -- a writer that changed its
+            // grouping would silently reorder every prediction with no test able to see it.
+            return followers
+                .sortedByDescending { it.second }
+                .take(limit)
+                .map { it.first }
         }
     }
 

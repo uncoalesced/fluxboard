@@ -25,4 +25,19 @@ internal class FakeLanguageModel(
         val followers = table[previousWord] ?: return 0f
         return followers.firstOrNull { it.first == candidate }?.second?.toFloat() ?: 0f
     }
+
+    /**
+     * Overridden rather than left on the interface default, which returns nothing.
+     *
+     * A fake that silently answered "no followers" would let a next-word test pass against a
+     * production implementation that had never been wired up at all.
+     */
+    override fun followersOf(
+        previousWord: String?,
+        limit: Int,
+    ): List<String> {
+        if (previousWord == null || limit <= 0) return emptyList()
+        val followers = table[previousWord] ?: return emptyList()
+        return followers.sortedByDescending { it.second }.take(limit).map { it.first }
+    }
 }

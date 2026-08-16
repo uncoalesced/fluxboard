@@ -16,6 +16,141 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [Unreleased] - v0.1.7 work in progress
+
+`.\gradlew.bat build` is green (compile, ktlint, lint, 389 unit tests) and
+`scripts/check-source-rules.sh` passes.
+
+**Device-verified on 2026-08-16**, against the signed release installed in place on
+the LineageOS phone, typing into an SMS compose field by tapping real key
+coordinates. Five of the six fixes below were confirmed on the phone and say so
+individually. The sixth is a race, where a correct outcome on the day proves
+nothing, so it stays on the unit test. The one item that is *not* fixed -- glide
+suggestions -- was narrowed by the pass rather than closed.
+
+### Added -- next-word prediction after a space (GitHub issue #17)
+
+"I type hello and then hit space, the next word isn't predicted, its just blank."
+
+That was not a broken lookup, it was a scope boundary that had never been crossed.
+`PredictionEngine.getSuggestions` returns early on an empty prefix, and
+`TypingViewModel.updateSuggestions` short-circuited on a blank `currentWord` before
+that -- so at the one moment the sentence context had the most to say, it was never
+asked. The v0.1.6 bigram work was deliberately built to *re-rank* candidates that
+already match what is being typed, and deliberately not to generate any.
+
+That rule is unchanged, and is now asserted: the moment a letter is typed the strip
+goes back to completing it. What is new is a separate question for the separate
+case where there is no prefix to contradict.
+
+- `LanguageModel.followersOf(previousWord, limit)` -- the one place context may
+  *be* a candidate source. Defaulted to empty on the interface, implemented by
+  `BigramLanguageModel` off the table it already holds.
+- `PredictionEngine.getNextWordSuggestions(previousWord)`, called from
+  `updateSuggestions` when the word is blank.
+- Suppressed at a sentence boundary. The corpus counts "hello"/"there" because they
+  were adjacent, and across a full stop that is two unrelated words -- the same
+  judgement `onSentenceStarted` already makes by dropping the context outright.
+- Suppressed in a sensitive field, like every other dictionary *read*. A strip of
+  predicted words above a password field is a shoulder-surfing hazard before any of
+  it reaches storage, and this is a new way of putting words there.
+- Tapping a suggestion now refreshes the strip too. It previously went blank until
+  the next keystroke, which reads as the tap having broken something.
+
+`NextWordSuggestionTest` covers all of the above.
+
+### Fixed -- a suggestion lookup could land on top of a word already being typed
+
+Pre-existing and made reachable by the above: `updateSuggestions` dispatched a
+coroutine and published whatever came back, with no check that the text had not
+moved meanwhile. Two lookups are now routinely in flight at once -- a next-word
+lookup fired when the space committed, and a completion lookup for the letter typed
+straight after -- and the slower one won whichever it was. The lookup now carries
+the generation token and publishes only if it is still current.
+
+### Fixed -- picking a key text colour wiped the key fill (zap, v0.1.6)
+
+"I tap on 1 color for text opacity and then it resets the field above it."
+
+`KeyboardTheme.sanitized()` guards against a glyph that cannot be told apart from
+the key under it, which two colour pickers defaulting to the same swatch reach in
+two taps. The guard reset **both** overrides in one step, so a fill chosen and
+accepted in an earlier edit vanished the moment a later edit picked a text colour
+near it -- and because the editor reads the sanitized theme and saves it back, the
+loss persisted.
+
+Now dropped one at a time, glyph first, re-checked in between. The fill is still
+dropped when it has to be: a fill set to the palette's own glyph colour cannot be
+repaired by restoring the glyph, and one reset would not converge. This is the same
+class of defect as the v0.1.6 "two sliders reset each other to 100%" fix, one layer
+along.
+
+**This reopens and answers `docs/roadmap.md` 4E.15.** The roadmap asked zap to
+retry key haze on v0.1.6 and said that if it still reproduced it was a new defect.
+It did reproduce -- but haze was never the mechanism. `sanitized()` does not inspect
+haze at all, and the sequence zap described is the fill/text contrast reset above.
+
+### Fixed -- the quick-access toolbar resized the IME window once per frame (zap, v0.1.6)
+
+The expand animation stuttered badly enough that individual frames were visible.
+Not a recomposition regression -- `KeyboardRecompositionTest` still passes.
+
+The toolbar lives outside the fixed-height panel and grows the window upward, which
+is what keeps it from stealing height from the keys. But an IME window is
+WRAP_CONTENT: its height *is* that content's height, measured by the framework and
+pushed to WindowManager and into the host app's own layout pass. `expandVertically`
+was therefore not animating a view inside a stable window, it was resizing the IME
+window and relaying out the app being typed into, roughly fifteen times per chevron
+tap. Replaced with a fade over a single resize.
+
+`MediaRow`'s `isMusicActive` binder call also moved off the main thread; it fired on
+the exact frame the toolbar opened.
+
+### Fixed -- multi-character key labels clipped instead of shrinking
+
+`123`, `ABC` and `{&=` sit on 1.5-weight keys, and `maxLines = 1` defaults to
+clipping. Three independent multipliers decide the label's width -- the theme's type
+scale, the system font-size setting, and the key's share of the row -- and none of
+them is aware of the others, so on a large font scale the label was silently cut
+short. Labels now shrink to fit, capped at the size they were, so anything that
+already fitted is drawn identically.
+
+Reported by zap as "the number button got fucked some how its not scaling" and
+confirmed as this rather than a row-height problem.
+
+### Added -- currencies on the number row (roadmap 3.7)
+
+Holding digit 4 offers `€ ¥ $ ¢ ₹` and commits `$` on a straight release, which is
+what the key's corner hint already promises. Its superscript and fraction were
+dropped to make room -- a decision, and the only digit where the shifted symbol
+stays in the hold strip. Both currency keys read one list, so the set cannot drift
+between the number row and the symbols page.
+
+The digit fraction strips for `0` and `3`-`9`, which shipped in v0.1.6 as an
+unconfirmed proposal, are confirmed as they are.
+
+### Unresolved -- glide typing produced no suggestion strip (zap, v0.1.6)
+
+Not fixed, but the device pass moved it a long way.
+
+**The strip works.** Two glides driven along straight key runs both committed a word
+and both populated the strip with the readings that lost -- `w`-to-`t` gave `At `
+with `Wet`/`Set`/`Art` offered, `a`-to-`l` gave `All ` with `Asp`/`Ail`/`Awl`. Tapping
+an alternate replaced the committed word rather than appending to it. So the
+commit-to-strip path is not where zap's report lives, and `GlideSuggestionsTest` now
+pins the ordering it depends on.
+
+**What did reproduce the exact symptom** was resting on the first key before
+dragging: a 700ms hold then a drag committed `@`, the corner-hint alternate, and left
+the strip empty -- no glide, and nothing on screen to say why. That is the trap this
+project already documented and had never actually watched happen.
+
+So the leading account is that the glide is never recognised, rather than that the
+strip fails to fill, which points at the activation threshold instead of
+`onGlideCommitted`. It is an account, not a diagnosis: nobody has watched zap do it,
+and `adb` cannot draw a cornered path, so whether he pauses before swiping and
+whether accuracy collapses on real multi-corner strokes both still need a hand.
+
 ## [v0.1.6.1-BETA] - 2026-08-16
 
 versionCode 9. A point release with one job: **v0.1.6-BETA could not be installed.**
@@ -189,7 +324,11 @@ and never adds to it.
 - **Profanity filtering of the dictionary** is not implemented, by decision rather
   than deferral: no words are removed.
 
-## [Unreleased]
+## [v0.1.6-BETA] - 2026-08-16, detail
+
+Left titled "Unreleased" through the release and renamed here, because a second
+section by that name above it now describes work that genuinely is unreleased.
+Everything below shipped in v0.1.6-BETA; the text is otherwise untouched.
 
 Build-verified only: `clean :app:packageReleaseArtifact` succeeds and
 `KeyboardRecompositionTest`/`GlideGateTest` both pass under `--rerun`. Not yet

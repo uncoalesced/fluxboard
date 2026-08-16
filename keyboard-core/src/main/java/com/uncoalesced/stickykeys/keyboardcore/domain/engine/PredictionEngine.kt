@@ -323,6 +323,30 @@ class PredictionEngine
             }
 
         /**
+         * What is likely to come *next*, with nothing typed yet.
+         *
+         * The deliberate counterpart to [getSuggestions] rather than a case inside it, and the
+         * split is the point. [getSuggestions] refuses to let context contribute candidates
+         * because a word that does not match the prefix is not a completion of it -- that rule
+         * is unchanged and this does not weaken it. Here there is no prefix at all: the user
+         * has finished a word and pressed space, so nothing on screen can be contradicted, and
+         * the corpus is the only thing with an opinion to offer.
+         *
+         * Empty for an unknown or absent previous word, which is the previous behaviour and
+         * still the common case -- so a strip that has nothing to say stays blank rather than
+         * filling with whatever is frequent in English.
+         *
+         * The privacy gates live at the caller, in `TypingViewModel`, alongside the ones the
+         * completion path already answers to. Nothing about this read is safe that was not
+         * already safe: [previousWord] is only ever set by `learn`, which incognito stops.
+         */
+        suspend fun getNextWordSuggestions(previousWord: String?): List<String> =
+            withContext(Dispatchers.IO) {
+                if (previousWord.isNullOrBlank()) return@withContext emptyList()
+                languageModel.followersOf(previousWord.lowercase(), MAX_SUGGESTIONS)
+            }
+
+        /**
          * Decodes a finished glide into ranked word candidates.
          *
          * Walks the same trie the spelling search uses, but with a different question. Spelling

@@ -84,10 +84,23 @@ data class KeyboardTheme(
         }
         // Glyph and key the same colour is the other way to get a blank board, and it is easy
         // to reach by accident with two colour pickers that default to the same swatch.
-        if (contrastRatio(safe.resolveText(colors.onSurface), safe.resolveFill(colors.surface)) <
-            MIN_KEY_CONTRAST
-        ) {
-            safe = safe.copy(textColor = null, textOpacity = 1f, fillColor = null, fillOpacity = 1f)
+        //
+        // Dropped one override at a time, glyph first, and re-checked in between. Resetting
+        // both in one step is the same class of mistake the opacity check above was fixed for:
+        // fill and text come from two separate controls, so wiping the fill because the *text*
+        // clashed with it destroys a choice the user made in an earlier, separately-accepted
+        // edit and has not touched since. Reported as "I tap one colour for text and it resets
+        // the field above it", which is exactly what it did.
+        //
+        // The fill is still dropped when it has to be -- a user can pick a fill that the
+        // palette's own glyph colour cannot be seen against, and one reset would not converge.
+        // Both dropped, glyph and key are onSurface over surface, which the palette check
+        // below guarantees is legible.
+        if (clashes(safe)) {
+            safe = safe.copy(textColor = null, textOpacity = 1f)
+            if (clashes(safe)) {
+                safe = safe.copy(fillColor = null, fillOpacity = 1f)
+            }
         }
 
         // The palette itself can express the same mistake without any key override at all.
@@ -108,6 +121,11 @@ data class KeyboardTheme(
             copy(keyStyle = safe, colors = safeColors, backgroundImagePath = safeImage)
         }
     }
+
+    /** Whether [style] paints a glyph that cannot be told apart from the key under it. */
+    private fun clashes(style: KeyStyle): Boolean =
+        contrastRatio(style.resolveText(colors.onSurface), style.resolveFill(colors.surface)) <
+            MIN_KEY_CONTRAST
 
     companion object {
         /**

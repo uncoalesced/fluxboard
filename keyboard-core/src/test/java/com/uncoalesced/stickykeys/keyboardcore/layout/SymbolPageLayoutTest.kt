@@ -5,6 +5,7 @@ import com.uncoalesced.stickykeys.keyboardcore.ime.KeyboardLayouts
 import com.uncoalesced.stickykeys.keyboardcore.ime.KeyboardMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -191,15 +192,35 @@ class SymbolPageLayoutTest {
     }
 
     @Test
-    fun `the currency key and digit four never share a strip`() {
-        // Both type "$". Under a table keyed on output, one would have inherited the other's
-        // alternates -- the currency key would have offered fractions, or digit 4 would have
-        // offered currencies. They are attached per key, so neither can happen.
-        val digitFour = KeyboardLayouts.numberRow.first { it.output == "4" }
-        val currency = KeyboardLayouts.symbolsPrimaryRows.flatten().first { it.output == "$" }
+    fun `strips are attached per key, never inherited from a matching output`() {
+        // The number row's digit 4 and the symbols page's `$` now deliberately carry the same
+        // currency list, so this can no longer be shown by their strips differing. The property
+        // was never about those two lists disagreeing anyway -- it is that a strip belongs to a
+        // *key*, and the symbols page's own digit row is where an output-keyed table showed
+        // itself: those keys type the same characters as the number row and must stay bare.
+        // That is the F1 finding, and it is the reason alternates live on KeyDefinition.
+        val symbolsPageDigits =
+            KeyboardLayouts.symbolsPrimaryRows
+                .flatten()
+                .filter { it.output.singleOrNull()?.isDigit() == true }
 
-        assertEquals(listOf("⁴", "⅘"), digitFour.alternates)
-        assertEquals(listOf("€", "¥", "$", "¢", "₹"), currency.alternates)
+        assertEquals(
+            "the symbols page should still carry a full digit row",
+            10,
+            symbolsPageDigits.size,
+        )
+        symbolsPageDigits.forEach { key ->
+            assertNull(
+                "symbols-page digit ${key.output} must not inherit the number row's strip",
+                key.alternates,
+            )
+        }
+
+        // And the number row's own 4 does carry one, so the assertion above is not vacuous.
+        assertEquals(
+            listOf("€", "¥", "$", "¢", "₹"),
+            KeyboardLayouts.numberRow.first { it.output == "4" }.alternates,
+        )
     }
 
     @Test
