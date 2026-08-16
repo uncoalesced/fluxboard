@@ -142,15 +142,30 @@ class NextWordSuggestionTest {
      * The corpus counts "hello"/"there" because they were adjacent, and after a sentence ends
      * the next word is not following the previous one in any sense the table measured. This is
      * the same judgement `onSentenceStarted` already makes by dropping the context outright.
+     *
+     * The call order is the whole test and is taken from `handleKeyPress`, not from what reads
+     * naturally. Typing "." runs `onSymbolCommitted` first -- which is what raises
+     * `atSentenceStart` -- and only then dispatches the correction lookup that ends in
+     * `onWordAccepted`, so the word is accepted *after* the boundary is already set. Written the
+     * intuitive way round, with `onWordAccepted("hello")` before the full stop, this passed
+     * without exercising anything: the trailing `onWordAccepted("")` is blank, so
+     * `updateSuggestions` was never reached at all and the strip was empty only because
+     * `onSpacePressed` had cleared it. Deleting the guard under test left it green.
      */
     @Test
     fun `a sentence boundary suppresses the prediction`() =
         runTest(dispatcher) {
             viewModel.onInputStarted(initialCapsMode = 0)
+            viewModel.onSymbolCommitted(".")
             viewModel.onWordAccepted("hello")
             advanceUntilIdle()
-            viewModel.onSymbolCommitted(".")
-            finishWordWithSpace("")
+
+            assertEquals(emptyList<String>(), viewModel.suggestions.value)
+
+            // And the space that follows the full stop must not bring it back either: it carries
+            // the boundary rather than ending it, which is why `onSpacePressed` deliberately
+            // leaves `atSentenceStart` alone.
+            finishWordWithSpace("hello")
             advanceUntilIdle()
 
             assertEquals(emptyList<String>(), viewModel.suggestions.value)
