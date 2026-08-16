@@ -19,23 +19,23 @@
                 android:resource="@xml/method" />
         </service>
 
-        <!-- Declared, never auto enabled. The permission below is granted only from the
-             system Settings screen, and only after the user has turned on FluxBoard's own
-             opt in and read what the grant actually covers. Everything the media row does
-             without it keeps working exactly as before; see MediaTransport.
+        <!-- There is deliberately no NotificationListenerService here.
 
-             The service itself reads no notification content, and
-             scripts/check-source-rules.sh fails the build if an onNotification override is
-             ever added to it. -->
-        <service
-            android:name=".ime.MediaMetadataListenerService"
-            android:label="FluxBoard media info"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
+             v0.1.6-BETA briefly declared one, purely so the platform would answer
+             MediaSessionManager.getActiveSessions() and the media row could show a track
+             name. It was scoped as tightly as the platform allows: off by default, granted
+             only from system Settings, and the service overrode no notification callback at
+             all. None of that mattered. Google Play Protect blocks the install of any
+             sideloaded app that merely *declares* BIND_NOTIFICATION_LISTENER_SERVICE, with
+             "App blocked to protect your device", and it reads the manifest, not the class.
+
+             FluxBoard is distributed only by sideloading, so that trade is not close: a
+             permission that makes the app uninstallable for the entire audience cannot buy
+             one line of track metadata. Transport controls never needed it and are
+             unaffected; see MediaTransport, which is the permission-free path and is now
+             the only one. Do not reintroduce this service, the feature it enabled is not
+             worth what declaring it costs. scripts/check-source-rules.sh now fails the
+             build if the declaration comes back. -->
 
         <!-- Not the stock FileProvider: stickers are stored as ".sticker", an extension
              MimeTypeMap cannot resolve, so getType() answered null for every sticker and

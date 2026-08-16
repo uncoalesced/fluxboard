@@ -176,28 +176,11 @@ class KeyboardPreferences
             MutableStateFlow(prefs.getBoolean("glide_typing", true))
         val glideTypingEnabled: StateFlow<Boolean> = _glideTypingEnabled.asStateFlow()
 
-        /**
-         * Whether the quick-access media row may show what is playing. Off by default.
-         *
-         * Its own flag, not folded into any existing setting and never enabled by installing an
-         * update. The feature needs `BIND_NOTIFICATION_LISTENER_SERVICE`, which grants the app
-         * the text of every notification on the device -- a trade this project refused outright
-         * for two releases and reopened only as something the user asks for explicitly, having
-         * been told what it actually costs.
-         *
-         * This records the user's intent, and is deliberately not the source of truth for
-         * whether the feature works: `MediaMetadataReader.listenerGranted` asks the OS, because
-         * the grant can be withdrawn in system Settings without the app being told.
-         */
-        private val _mediaMetadataEnabled =
-            MutableStateFlow(prefs.getBoolean("media_metadata", false))
-        val mediaMetadataEnabled: StateFlow<Boolean> = _mediaMetadataEnabled.asStateFlow()
-
-        /** See [mediaMetadataEnabled]. Turning this on does not itself grant anything. */
-        fun setMediaMetadataEnabled(enabled: Boolean) {
-            prefs.edit().putBoolean("media_metadata", enabled).apply()
-            _mediaMetadataEnabled.value = enabled
-        }
+        // The "media_metadata" key is deliberately not read or written any more. It backed a
+        // v0.1.6-BETA opt-in for showing the playing track, which needed a
+        // NotificationListenerService -- and Play Protect blocks the install of any sideloaded
+        // app that declares one. The service is gone (see keyboard-core's manifest), so the
+        // preference has nothing left to enable. Any stored value is simply ignored.
 
         /** Turns glide typing on or off. */
         fun setGlideTyping(enabled: Boolean) {
