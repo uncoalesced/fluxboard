@@ -18,10 +18,15 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 
 ## [Unreleased] - v0.1.7 work in progress
 
-Build-verified only. `.\gradlew.bat build` is green (compile, ktlint, lint, 388
-unit tests) and `scripts/check-source-rules.sh` passes. **Nothing below has run on
-a phone**, and three of the five items are answers to reports that can only be
-closed on one.
+`.\gradlew.bat build` is green (compile, ktlint, lint, 389 unit tests) and
+`scripts/check-source-rules.sh` passes.
+
+**Device-verified on 2026-08-16**, against the signed release installed in place on
+the LineageOS phone, typing into an SMS compose field by tapping real key
+coordinates. Five of the six fixes below were confirmed on the phone and say so
+individually. The sixth is a race, where a correct outcome on the day proves
+nothing, so it stays on the unit test. The one item that is *not* fixed -- glide
+suggestions -- was narrowed by the pass rather than closed.
 
 ### Added -- next-word prediction after a space (GitHub issue #17)
 
@@ -126,19 +131,25 @@ unconfirmed proposal, are confirmed as they are.
 
 ### Unresolved -- glide typing produced no suggestion strip (zap, v0.1.6)
 
-Not reproduced and not fixed. The wiring is intact at every level a unit test can
-reach: `GlideBeamTest` already asserts a real stroke decodes to at least two
-readings, and the new `GlideSuggestionsTest` pins the commit ordering the view
-performs, including the part that is fragile -- the partial word is abandoned
-*before* the glide commits, and `onWordAbandoned` clears the strip, so the two calls
-only produce a populated strip in one order.
+Not fixed, but the device pass moved it a long way.
 
-That leaves three possibilities, none separable without a finger on a phone: the
-glide is not being recognised at all (the tracked v0.1.5.1 accuracy problem wearing
-a different face), the decoder returns a single reading in practice for the paths
-zap drew, or the report is about the *next* word rather than the losing readings --
-which would make it issue #17 above rather than a defect. `adb` cannot drive a glide
-faithfully, so this needs a real device pass.
+**The strip works.** Two glides driven along straight key runs both committed a word
+and both populated the strip with the readings that lost -- `w`-to-`t` gave `At `
+with `Wet`/`Set`/`Art` offered, `a`-to-`l` gave `All ` with `Asp`/`Ail`/`Awl`. Tapping
+an alternate replaced the committed word rather than appending to it. So the
+commit-to-strip path is not where zap's report lives, and `GlideSuggestionsTest` now
+pins the ordering it depends on.
+
+**What did reproduce the exact symptom** was resting on the first key before
+dragging: a 700ms hold then a drag committed `@`, the corner-hint alternate, and left
+the strip empty -- no glide, and nothing on screen to say why. That is the trap this
+project already documented and had never actually watched happen.
+
+So the leading account is that the glide is never recognised, rather than that the
+strip fails to fill, which points at the activation threshold instead of
+`onGlideCommitted`. It is an account, not a diagnosis: nobody has watched zap do it,
+and `adb` cannot draw a cornered path, so whether he pauses before swiping and
+whether accuracy collapses on real multi-corner strokes both still need a hand.
 
 ## [v0.1.6.1-BETA] - 2026-08-16
 
