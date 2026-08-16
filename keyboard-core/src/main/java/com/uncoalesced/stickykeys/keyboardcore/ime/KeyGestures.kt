@@ -173,25 +173,48 @@ private val PUNCTUATION_ALTERNATES =
     )
 
 /**
+ * Every currency the board offers, and the cell selected when the strip opens.
+ *
+ * One list, reached from two keys -- the symbols page's `$` and digit 4 on the number row --
+ * because a user who found `€` under one of them and not the other would reasonably conclude
+ * the keyboard had lost it. Still attached to each [KeyDefinition] individually rather than
+ * looked up by output: both keys type `$`, and an output-keyed table is exactly the shape that
+ * gave the symbols page digit 4's fraction strip.
+ *
+ * `$` sits at index 2 because the list reads in a conventional order rather than starting with
+ * the key's own face -- so the default cell has to be named rather than assumed to be first.
+ */
+internal val CURRENCY_ALTERNATES = listOf("€", "¥", "$", "¢", "₹")
+internal const val CURRENCY_DEFAULT_INDEX = 2
+
+/**
  * What holding a digit on the number row offers.
  *
- * **The shifted symbol is deliberately not here.** It used to lead every strip, on the
- * reasoning that the corner hint promised it. But the same character is already directly
- * reachable by arming shift, which swaps the whole row to real shifted-symbol keys, so the
- * cell was a second route to something one tap away and it pushed the content the strip
- * exists for down the row. The corner hint stays as information -- it still tells the user
- * what shift will produce -- it simply is no longer what the hold commits.
+ * **The shifted symbol is deliberately not here**, with one named exception below. It used to
+ * lead every strip, on the reasoning that the corner hint promised it. But the same character
+ * is already directly reachable by arming shift, which swaps the whole row to real
+ * shifted-symbol keys, so the cell was a second route to something one tap away and it pushed
+ * the content the strip exists for down the row. The corner hint stays as information -- it
+ * still tells the user what shift will produce -- it simply is no longer what the hold commits.
  *
- * A release without any sideways drag therefore now commits the superscript, which is index 0.
+ * A release without any sideways drag therefore commits the superscript, which is index 0.
  *
  * Ordering is superscript, then the vulgar fractions with that digit as numerator ascending by
  * value, then any superscript letter that belongs with it. There is no length ceiling: the
  * strip sizes its own cells to fit (see [alternateCellWidthPx]).
  *
+ * **Digit 4 is the exception, by decision rather than oversight.** It carries the currencies
+ * instead of `⁴ ⅘`, and keeps `$` among them even though `$` is its own shifted symbol. The
+ * general rule exists because a duplicated cell crowds out content the strip is *for*; here
+ * the currencies are the content, `$` belongs beside them to read as a set rather than as four
+ * strays, and it is the cell a straight hold should commit. So the trade the rule was written
+ * to prevent does not arise: the superscript and fraction were dropped for the currencies, not
+ * squeezed alongside them. Six cells is the practical ceiling on a narrow phone and this is
+ * five. See [DIGIT_ALTERNATES_DEFAULT_INDEX] for the cell it opens on.
+ *
  * `1` and `5` are Joel's confirmed spec, quoted rather than derived -- note that `1` is a
- * *curated* subset of the nine numerator-1 fractions, so it cannot be generated. The rest are
- * complete numerator-N sets and are a proposal pending confirmation; changing them is an edit
- * to this table and nothing else.
+ * *curated* subset of the nine numerator-1 fractions, so it cannot be generated. The remaining
+ * digits were proposed rather than inferred from it, and are confirmed as shipped.
  *
  * Attached to the keys themselves rather than consulted here -- see [KeyDefinition.alternates]
  * for why an output-keyed table was the wrong shape.
@@ -202,7 +225,7 @@ internal val DIGIT_ALTERNATES =
         "1" to listOf("¹", "⅛", "¼", "⅓", "½", "ⁱ"),
         "2" to listOf("²", "⅔", "⅖"),
         "3" to listOf("³", "¾", "⅗", "⅜"),
-        "4" to listOf("⁴", "⅘"),
+        "4" to CURRENCY_ALTERNATES,
         "5" to listOf("⁵", "⅝", "⅚", "ⁿ"),
         "6" to listOf("⁶"),
         "7" to listOf("⁷", "⅞"),
@@ -211,17 +234,14 @@ internal val DIGIT_ALTERNATES =
     )
 
 /**
- * The currency key's alternates, and the cell selected when the strip opens.
+ * Which cell of a digit's strip opens selected, for the digits where it is not the first.
  *
- * Held separately from [DIGIT_ALTERNATES] on purpose. `$` is also digit 4's shifted symbol, so
- * anything keyed on the character alone would have applied one of these tables to the other's
- * key. They are attached to their own [KeyDefinition]s instead and never meet.
- *
- * `$` sits at index 2 because the list reads in a conventional order rather than starting with
- * the key's own face -- so the default cell has to be named rather than assumed to be first.
+ * A map with one entry rather than a field on every digit: index 0 is right for a strip that
+ * leads with its superscript, and naming the exception is what keeps the rule readable. This
+ * is also what a TalkBack long-press commits, so it is behaviour rather than presentation --
+ * getting it wrong gives screen-reader users a different character from everyone else.
  */
-internal val CURRENCY_ALTERNATES = listOf("€", "¥", "$", "¢", "₹")
-internal const val CURRENCY_DEFAULT_INDEX = 2
+internal val DIGIT_ALTERNATES_DEFAULT_INDEX = mapOf("4" to CURRENCY_DEFAULT_INDEX)
 
 /**
  * Whether a key can take part in a glide.

@@ -63,32 +63,83 @@ class NumberRowTest {
     fun `the shifted symbol is no longer in any hold strip`() {
         // The removal, stated directly. Leaving one behind would put the strip back to leading
         // with a character that is already one tap away.
-        KeyboardLayouts.numberRow.forEach { key ->
-            assertFalse(
-                "${key.output} still offers its shifted symbol ${key.hint} on hold",
-                key.hint in stripFor(key),
-            )
-        }
+        //
+        // Digit 4 is excluded by decision, not by accident, and the exception is narrow enough
+        // to name here rather than weaken the assertion into uselessness: its strip is the
+        // currency set, and `$` sits in it as one of the currencies rather than as a duplicate
+        // of the shift route. The rule exists to stop a redundant cell crowding out the strip's
+        // real content; on 4 the currencies *are* the content and nothing was displaced by it.
+        KeyboardLayouts.numberRow
+            .filterNot { it.output == "4" }
+            .forEach { key ->
+                assertFalse(
+                    "${key.output} still offers its shifted symbol ${key.hint} on hold",
+                    key.hint in stripFor(key),
+                )
+            }
+    }
+
+    // --- digit 4 carries the currencies ---------------------------------------------------
+
+    @Test
+    fun `digit 4 offers the currencies and opens on the dollar`() {
+        // The number row is where a currency is actually reached from mid-sentence: the symbols
+        // page has the same set on its own `$` key, but getting there is a page switch. A
+        // straight hold commits `$`, which is both the corner hint's promise and what a
+        // TalkBack long-press produces -- those two must not disagree.
+        val four = keyFor("4")
+        val held =
+            longPressFor(four.output, four.hint, four.alternates, four.alternatesDefaultIndex)
+                as LongPress.Alternates
+
+        assertEquals(listOf("€", "¥", "$", "¢", "₹"), held.options)
+        assertEquals("$", held.options[held.defaultIndex])
+    }
+
+    @Test
+    fun `both currency keys offer the same set`() {
+        // Two keys, one list. A user who found a currency under one and not the other would
+        // reasonably conclude the keyboard had lost it.
+        val symbolsPageDollar =
+            KeyboardLayouts.symbolsPrimaryRows
+                .flatten()
+                .first { it.output == "$" }
+
+        assertEquals(symbolsPageDollar.alternates, keyFor("4").alternates)
+        assertEquals(
+            symbolsPageDollar.alternates!![symbolsPageDollar.alternatesDefaultIndex],
+            keyFor("4").alternates!![keyFor("4").alternatesDefaultIndex],
+        )
+    }
+
+    @Test
+    fun `digit 4 no longer carries a superscript or a fraction`() {
+        // The trade that made room for the currencies, pinned so it is not quietly undone by
+        // someone restoring the table to look like its neighbours.
+        val strip = stripFor(keyFor("4"))
+        assertFalse("4 should no longer offer its superscript", "⁴" in strip)
+        assertFalse("4 should no longer offer its fraction", "⅘" in strip)
     }
 
     // --- what a hold now commits ----------------------------------------------------------
 
     @Test
     fun `holding a digit and releasing without moving commits its superscript`() {
+        // 4 is absent: it gave up its superscript for the currency set and commits `$` instead.
+        // Asserted in its own test above rather than folded in here with a special case.
         val superscripts =
             mapOf(
                 "0" to "⁰",
                 "1" to "¹",
                 "2" to "²",
                 "3" to "³",
-                "4" to "⁴",
                 "5" to "⁵",
                 "6" to "⁶",
                 "7" to "⁷",
                 "8" to "⁸",
                 "9" to "⁹",
             )
-        digits.forEach { digit ->
+        superscripts.keys.forEach { digit ->
             val key = keyFor(digit)
             val held =
                 longPressFor(key.output, key.hint, key.alternates, key.alternatesDefaultIndex)

@@ -77,7 +77,14 @@ object KeyboardLayouts {
      */
     val numberRow: List<KeyDefinition> =
         digitShiftPairs.map { (digit, shifted) ->
-            key(digit, hint = shifted, alternates = DIGIT_ALTERNATES[digit])
+            key(
+                digit,
+                hint = shifted,
+                alternates = DIGIT_ALTERNATES[digit],
+                // Zero for every digit but 4, whose strip is the currencies and opens on `$`
+                // rather than on its first cell. See DIGIT_ALTERNATES_DEFAULT_INDEX.
+                alternatesDefaultIndex = DIGIT_ALTERNATES_DEFAULT_INDEX[digit] ?: 0,
+            )
         }
 
     /**
