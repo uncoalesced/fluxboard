@@ -61,43 +61,62 @@ class EmojiRepository
         private suspend fun load(): List<EmojiGroup> =
             withContext(Dispatchers.IO) {
                 val paint = Paint()
-                val groups = mutableListOf<EmojiGroup>()
-                var currentName: String? = null
-                var current = mutableListOf<Emoji>()
-
-                fun flush() {
-                    val name = currentName ?: return
-                    if (current.isNotEmpty()) groups += EmojiGroup(name, current)
-                }
-
                 context.assets.open(ASSET).bufferedReader().useLines { lines ->
-                    lines.forEach { line ->
-                        if (line.isEmpty()) return@forEach
-                        if (line[0] == '#') {
-                            flush()
-                            currentName = line.substring(1)
-                            current = mutableListOf()
-                            return@forEach
-                        }
-                        val parts = line.split('\t')
-                        if (parts.size < 3) return@forEach
-                        val glyph = parts[0]
-                        // Ask the font, do not guess from the API level.
-                        //
-                        // Emoji support tracks the system font, which OEMs update on their own
-                        // schedule -- an SDK-to-Unicode-version table is an approximation that
-                        // is wrong on exactly the devices that matter. hasGlyph answers for a
-                        // whole sequence, so a ZWJ emoji the font lacks is rejected rather than
-                        // rendering as its separate parts. The alternative is a grid of tofu.
-                        if (!paint.hasGlyph(glyph)) return@forEach
-                        current += Emoji(glyph = glyph, version = parts[1], name = parts[2])
-                    }
+                    // Ask the font, do not guess from the API level.
+                    //
+                    // Emoji support tracks the system font, which OEMs update on their own
+                    // schedule -- an SDK-to-Unicode-version table is an approximation that is
+                    // wrong on exactly the devices that matter. hasGlyph answers for a whole
+                    // sequence, so a ZWJ emoji the font lacks is rejected rather than rendering
+                    // as its separate parts. The alternative is a grid of tofu.
+                    parseEmojiData(lines) { paint.hasGlyph(it) }
                 }
-                flush()
-                groups
             }
 
         private companion object {
             const val ASSET = "emoji_data.txt"
         }
     }
+
+/**
+ * The generated asset, as groups.
+ *
+ * Pure, and separated from [EmojiRepository] for the reason every other pure helper in this
+ * codebase is: the parse decides what the picker contains, and until now the only way to
+ * exercise it was to look at a phone. It takes the font probe as a parameter rather than
+ * calling `Paint` itself, which is also the only part of the old version that needed Android.
+ *
+ * Format is one record per line, `<glyph>TAB<version>TAB<name>`, with group headers as
+ * `#<name>`. A group whose every emoji the font rejects is dropped rather than shown empty --
+ * a tab that opens on nothing reads as the picker being broken.
+ */
+internal fun parseEmojiData(
+    lines: Sequence<String>,
+    isSupported: (String) -> Boolean,
+): List<EmojiGroup> {
+    val groups = mutableListOf<EmojiGroup>()
+    var currentName: String? = null
+    var current = mutableListOf<Emoji>()
+
+    fun flush() {
+        val name = currentName ?: return
+        if (current.isNotEmpty()) groups += EmojiGroup(name, current)
+    }
+
+    lines.forEach { line ->
+        if (line.isEmpty()) return@forEach
+        if (line[0] == '#') {
+            flush()
+            currentName = line.substring(1)
+            current = mutableListOf()
+            return@forEach
+        }
+        val parts = line.split('\t')
+        if (parts.size < 3) return@forEach
+        val glyph = parts[0]
+        if (!isSupported(glyph)) return@forEach
+        current += Emoji(glyph = glyph, version = parts[1], name = parts[2])
+    }
+    flush()
+    return groups
+}
