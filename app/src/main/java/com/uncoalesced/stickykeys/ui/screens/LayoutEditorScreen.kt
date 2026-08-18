@@ -29,6 +29,7 @@ import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyboardLayoutConfig
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutValidationResult
+import com.uncoalesced.stickykeys.keyboardcore.layout.REMAPPABLE_ACTIONS
 import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -173,6 +174,14 @@ class LayoutEditorViewModel
          * drew as a blank and typed nothing, with no way to tell from the editor that anything
          * was wrong. Rejecting the control vocabulary is the whole of the fix; free text is
          * still allowed, because remapping a key to a personal shorthand is a real use.
+         *
+         * [REMAPPABLE_ACTIONS] are the exception, and they are the reason key remapping could
+         * not reach emoji at all: blanket-rejecting the control vocabulary also rejected the
+         * three tokens that are destinations rather than structure. They are normalized to the
+         * canonical upper-case token, so a user who types "emoji" into the free-text field gets
+         * the emoji key rather than a key that types the five letters -- the keyboard matches
+         * these exactly, and a lower-case near-miss is precisely the silent failure this
+         * function exists to prevent.
          */
         fun remapKey(
             keyId: String,
@@ -180,11 +189,17 @@ class LayoutEditorViewModel
         ): RemapResult {
             val trimmed = newOutput.trim()
             if (trimmed.isEmpty()) return RemapResult.Blank
-            if (trimmed.uppercase() in CONTROL_OUTPUTS) return RemapResult.Reserved(trimmed)
+            val upper = trimmed.uppercase()
+            val output =
+                when {
+                    upper in REMAPPABLE_ACTIONS -> upper
+                    upper in CONTROL_OUTPUTS -> return RemapResult.Reserved(trimmed)
+                    else -> trimmed
+                }
             updateCurrentPage { rows ->
                 rows.map { row ->
                     row.map { key ->
-                        if (key.id == keyId) key.copy(output = trimmed) else key
+                        if (key.id == keyId) key.copy(output = output) else key
                     }
                 }
             }
@@ -568,6 +583,25 @@ fun LayoutEditorScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // Destinations, listed apart from the characters because they are a
+                    // different kind of thing: these keys open a panel rather than type. Until
+                    // now the dialog rejected every control token without distinguishing the
+                    // structural ones from these, which is why no key could be pointed at emoji.
+                    Text("...or jump straight to:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(REMAPPABLE_ACTIONS.size) { index ->
+                            val action = REMAPPABLE_ACTIONS[index]
+                            FilterChip(
+                                selected = false,
+                                onClick = { apply(action) },
+                                label = {
+                                    Text(ACTION_LABELS[action] ?: action, fontSize = 14.sp)
+                                },
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     // Kept, because remapping a key to a personal shorthand string is a real
                     // and already-supported use that must not regress.
@@ -613,6 +647,19 @@ fun LayoutEditorScreen(
 
 /** Editable planes, in the order KeyboardLayoutConfig.pages() returns them. */
 private val PAGE_LABELS = listOf("Letters", "Symbols 1", "Symbols 2")
+
+/**
+ * Human names for the action tokens.
+ *
+ * The tokens themselves are what the keyboard reads, and showing "EMOJI" in a chip would make
+ * the dialog look like it wanted the user to know the vocabulary.
+ */
+private val ACTION_LABELS =
+    mapOf(
+        "EMOJI" to "Emoji",
+        "STICKERS" to "Stickers",
+        "CLIPBOARD" to "Clipboard",
+    )
 
 /**
  * The curated remap vocabulary.

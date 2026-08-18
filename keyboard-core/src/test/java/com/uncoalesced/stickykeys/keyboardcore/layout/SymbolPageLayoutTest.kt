@@ -167,9 +167,11 @@ class SymbolPageLayoutTest {
             listOf("SYMBOLS_SHIFT", "\"", "*", "'", ":", "/", "!", "?", "+", "DEL"),
             rows[2],
         )
-        // STICKERS is a deliberate deviation from the reference, which draws no emoji key
-        // here. Keeping it preserves one-tap emoji access from the symbols page.
-        assertEquals(listOf("ABC", "STICKERS", ",", "SPACE", ".", "ENTER"), rows[3])
+        // EMOJI is a deliberate deviation from the reference, which draws no emoji key here.
+        // Keeping it preserves one-tap emoji access from the symbols page. The token was
+        // "STICKERS" until the two picker doors were separated; the key and its behaviour are
+        // unchanged, only the name now says which tab it lands on.
+        assertEquals(listOf("ABC", "EMOJI", ",", "SPACE", ".", "ENTER"), rows[3])
     }
 
     @Test

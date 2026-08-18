@@ -38,7 +38,7 @@
     ],
     [
       {"id": "key_symbols", "output": "SYMBOLS", "displayLabel": "?123", "weight": 1.5},
-      {"id": "key_stickers", "output": "STICKERS", "displayLabel": "\u263a", "weight": 1.5},
+      {"id": "key_emoji", "output": "EMOJI", "displayLabel": "\u263a", "weight": 1.5},
       {"id": "key_space", "output": "SPACE", "displayLabel": " ", "weight": 4.0},
       {"id": "key_period", "output": ".", "weight": 1.0},
       {"id": "key_enter", "output": "ENTER", "displayLabel": "\u23ce", "weight": 1.5}

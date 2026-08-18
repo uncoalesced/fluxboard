@@ -103,10 +103,23 @@ val CONTROL_OUTPUTS =
         "SYMBOLS",
         "SYMBOLS_SHIFT",
         "ABC",
+        "EMOJI",
         "STICKERS",
         "CLIPBOARD",
         "MIC",
     )
+
+/**
+ * The control outputs a key may be remapped *to*.
+ *
+ * Destinations only. Every one of these opens a panel and can sit anywhere on any page without
+ * making a class of input unreachable, which is what separates them from the rest of
+ * [CONTROL_OUTPUTS] -- `SPACE`, `SHIFT`, `ABC` and the like are structural, and `LayoutValidator`
+ * has rules about where they must appear. `MIC` is absent because voice input is still a stub and
+ * a remap target for a feature that does nothing is the same broken promise the comma key's mic
+ * hint was.
+ */
+val REMAPPABLE_ACTIONS = listOf("EMOJI", "STICKERS", "CLIPBOARD")
 
 /**
  * A full keyboard layout configuration: an ordered list of rows,
@@ -202,7 +215,7 @@ data class KeyboardLayoutConfig(
                             when (label) {
                                 "SPACE" -> 4f
                                 "ENTER", "SHIFT", "DEL", "SYMBOLS", "ABC",
-                                "STICKERS", "SYMBOLS_SHIFT",
+                                "EMOJI", "STICKERS", "SYMBOLS_SHIFT",
                                 -> 1.5f
                                 else -> 1f
                             }

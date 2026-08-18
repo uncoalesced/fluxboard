@@ -22,6 +22,7 @@ internal fun accessibleKeyLabel(keyOutput: String): String =
         "SYMBOLS" -> "Symbols"
         "SYMBOLS_SHIFT" -> "More symbols"
         "ABC" -> "Letters"
+        "EMOJI" -> "Emoji"
         "STICKERS" -> "Stickers"
         "CLIPBOARD" -> "Clipboard"
         "\t" -> "Tab"
