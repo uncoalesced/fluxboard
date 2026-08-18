@@ -16,6 +16,7 @@ import com.uncoalesced.stickykeys.data.local.AppPreferences
 import com.uncoalesced.stickykeys.data.local.ThemeMode
 import com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
 import com.uncoalesced.stickykeys.keyboardcore.haptics.ProvideHapticIndication
+import com.uncoalesced.stickykeys.keyboardcore.ime.EXTRA_INITIAL_ROUTE
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.navigation.AppNavGraph
 import com.uncoalesced.stickykeys.stickercore.capture.ScreenshotObserver
@@ -31,6 +32,14 @@ class MainActivity : ComponentActivity() {
     lateinit var hapticsManager: HapticsManager
 
     private var sharedImageUri by mutableStateOf<String?>(null)
+
+    /**
+     * A route the keyboard asked us to open on, consumed once.
+     *
+     * Nulled by the nav graph after it navigates, so a configuration change does not send the
+     * user back to the Keyboard tab every time they rotate the phone.
+     */
+    private var initialRoute by mutableStateOf<String?>(null)
     private var screenshotObserver: ScreenshotObserver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +72,11 @@ class MainActivity : ComponentActivity() {
                 // same enable switch and strength slider. Installed once here rather than at
                 // ninety call sites, so screens added later inherit it.
                 ProvideHapticIndication(hapticsManager) {
-                    AppNavGraph(initialImageUri = sharedImageUri)
+                    AppNavGraph(
+                        initialImageUri = sharedImageUri,
+                        initialRoute = initialRoute,
+                        onInitialRouteHandled = { initialRoute = null },
+                    )
                 }
             }
         }
@@ -87,5 +100,9 @@ class MainActivity : ComponentActivity() {
                 sharedImageUri = it.toString()
             }
         }
+        // Also read on onNewIntent, not only on first launch: the app is usually already in the
+        // back stack by the time someone reaches for the keyboard's settings shortcut, so the
+        // launcher intent is delivered here rather than to a fresh onCreate.
+        intent?.getStringExtra(EXTRA_INITIAL_ROUTE)?.let { initialRoute = it }
     }
 }

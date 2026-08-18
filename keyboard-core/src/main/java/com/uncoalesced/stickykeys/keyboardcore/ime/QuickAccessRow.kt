@@ -77,7 +77,13 @@ internal data class QuickAction(
 internal val quickActions =
     listOf(
         QuickAction("grid", R.drawable.ic_quick_grid, "Stickers and emoji"),
-        QuickAction("translate", R.drawable.ic_quick_translate, "Translate", comingSoon = true),
+        // Took the slot the Translate stub held. Seven is the hard ceiling (see above), so a
+        // real destination and a placeholder were competing for the same 48dp -- and Translate
+        // is the one placeholder here that cannot ship as designed: offline translation needs
+        // a model, and a model does not fit the project's 100MB budget or its no-network rule.
+        // Grammar check stays, being plausibly local. Move this back in one line if the
+        // placeholder is wanted more than the shortcut.
+        QuickAction("settings", R.drawable.ic_quick_settings, "Keyboard settings"),
         QuickAction("grammar", R.drawable.ic_quick_grammar, "Grammar check", comingSoon = true),
         QuickAction("clipboard", R.drawable.ic_key_clipboard, "Clipboard history"),
         QuickAction("textedit", R.drawable.ic_quick_text_edit, "Text editing"),
