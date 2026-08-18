@@ -2,6 +2,7 @@
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -114,5 +115,37 @@ class ShiftCycleTest {
         mode = nextShiftMode(mode, Long.MAX_VALUE)
         mode = nextShiftMode(mode, window * 3)
         assertEquals(KeyboardMode.LETTERS_LOWER, mode)
+    }
+
+    @Test
+    fun `a letter releases one-shot shift`() {
+        assertEquals(
+            KeyboardMode.LETTERS_LOWER,
+            modeAfterPrintableKey(KeyboardMode.LETTERS_UPPER, autoCapitalize = false),
+        )
+    }
+
+    @Test
+    fun `a key that re-arms auto-capitalize keeps the board in upper case`() {
+        // Roadmap 4F.10. Typing the full stop of "Hello." consumes one-shot shift and re-arms
+        // it in the same keystroke. Releasing unconditionally here is what left the board
+        // lowercase at a sentence start: shouldAutoCapitalize was already true, so the effect
+        // that would have re-armed it never re-ran.
+        assertNull(modeAfterPrintableKey(KeyboardMode.LETTERS_UPPER, autoCapitalize = true))
+    }
+
+    @Test
+    fun `caps lock is not consumed by typing`() {
+        listOf(true, false).forEach { autoCapitalize ->
+            assertNull(modeAfterPrintableKey(KeyboardMode.LETTERS_CAPS_LOCK, autoCapitalize))
+        }
+    }
+
+    @Test
+    fun `a board already in lower case is left alone`() {
+        // Returning LETTERS_LOWER here instead of null would be a setMode on every keystroke,
+        // which is a state write per letter for no change.
+        assertNull(modeAfterPrintableKey(KeyboardMode.LETTERS_LOWER, autoCapitalize = false))
+        assertNull(modeAfterPrintableKey(KeyboardMode.SYMBOLS, autoCapitalize = false))
     }
 }

@@ -57,3 +57,27 @@ fun nextShiftMode(
         // only sensible reading of it there.
         else -> KeyboardMode.LETTERS_LOWER
     }
+
+/**
+ * The mode a printable key leaves behind once it has consumed one-shot shift.
+ *
+ * Null means "leave the mode alone" -- caps lock is not consumed by typing, and a board already
+ * in lower case has nothing to release.
+ *
+ * The [autoCapitalize] half is why this is a function rather than an `if`. A key that ends a
+ * sentence *re-arms* shift at the same moment it consumes it, and the auto-capitalize effect
+ * that would otherwise put the board back into upper case only re-runs when the flag *changes*.
+ * Type "Hello.", backspace the stop and retype it and the flag is already true both times, so
+ * nothing fires: the unconditional downgrade dropped the board to lower case at a sentence start
+ * with nothing to correct it until the next word. Enter and the space bar had always read the
+ * flag at this point; the printable-key path had not.
+ */
+fun modeAfterPrintableKey(
+    current: KeyboardMode,
+    autoCapitalize: Boolean,
+): KeyboardMode? =
+    when {
+        current != KeyboardMode.LETTERS_UPPER -> null
+        autoCapitalize -> null
+        else -> KeyboardMode.LETTERS_LOWER
+    }
