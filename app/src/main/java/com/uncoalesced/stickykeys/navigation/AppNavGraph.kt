@@ -63,7 +63,11 @@ private data class NavEntry(
 )
 
 @Composable
-fun AppNavGraph(initialImageUri: String? = null) {
+fun AppNavGraph(
+    initialImageUri: String? = null,
+    initialRoute: String? = null,
+    onInitialRouteHandled: () -> Unit = {},
+) {
     val navController = rememberNavController()
 
     LaunchedEffect(initialImageUri) {
@@ -71,6 +75,20 @@ fun AppNavGraph(initialImageUri: String? = null) {
             val encodedUri = java.net.URLEncoder.encode(initialImageUri, "UTF-8")
             navController.navigate("crop/$encodedUri")
         }
+    }
+
+    // The keyboard's settings shortcut lands here. Navigated like a dock tap rather than pushed
+    // on top of the stack, so pressing back from it leaves the app instead of returning to the
+    // Styles screen the user never asked for -- and so a second use of the shortcut while the
+    // tab is already open is a no-op rather than a second copy of it.
+    LaunchedEffect(initialRoute) {
+        val route = initialRoute ?: return@LaunchedEffect
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+        onInitialRouteHandled()
     }
 
     // The icons used to be Text(title.first()), so "Styles" and "Settings" both rendered a

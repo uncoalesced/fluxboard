@@ -31,6 +31,16 @@ enum class AppMode {
      * that could only be reached by editing code.
      */
     EMOJI_PICKER,
+
+    /**
+     * The same picker, opened on the stickers tab instead of on emoji.
+     *
+     * A mode rather than an argument to [EMOJI_PICKER] because the landing tab has to survive
+     * the trip through `KeyboardController.switchMode`, and widening that signature would mean
+     * editing all five implementors for a value only one of them reads. It renders the same
+     * view -- this is not the retired Phase 16 sticker panel coming back.
+     */
+    STICKER_PICKER,
     CLIPBOARD,
     TEXT_EDIT,
 }

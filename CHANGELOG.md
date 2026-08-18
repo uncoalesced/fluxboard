@@ -16,6 +16,81 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [v0.1.7.1-BETA] - 2026-08-18
+
+Worked from the consolidated v0.1.7 open backlog. `.\gradlew.bat build` is green
+(compile, ktlint, lint, unit tests), `scripts/check-source-rules.sh` passes, and
+`python emoji-tools/test_build_emoji_data.py` passes.
+
+**Device-verified on 2026-08-17**, against the signed release
+(`FluxBoard-v0.1.7-BETA-release.apk`) installed **in place** on the LineageOS phone
+so the IME binding and the on-device dictionary, clipboard and themes all survived.
+Typing was done by tapping real key coordinates in an SMS compose field.
+
+Two backlog items marked open turned out to be already built and merely
+un-updated -- the action-aware Enter glyph, and the comma key's stale "MIC" hint.
+Both were confirmed against source rather than assumed.
+
+### Added
+
+- **A Keyboard Settings shortcut in the quick-access row.** One tap from inside the
+  keyboard opens the app on its Keyboard tab. It took the Translate placeholder's
+  slot: seven entries is a hard ceiling in that row, and Translate is the one stub
+  there that cannot ship as designed, since offline translation needs a model that
+  fits neither the size budget nor the no-network rule.
+- **Key remapping can reach the panels.** The remap dialog rejected every control
+  token without distinguishing structural keys from destinations, so no key could be
+  pointed at emoji, stickers or the clipboard at all. Those three are now offered as
+  their own row of chips, and free text naming one is normalized to the real token
+  rather than becoming a key that types the word.
+- **Emoji and stickers are separate doors.** The picker key has always opened on
+  Recent emoji; it is now named for that, and a second token opens the same picker on
+  the stickers tab. They draw different glyphs so a board carrying both is readable.
+  The shipped keyboard behaves exactly as before.
+- **Clipboard rows show how old they are**, and the panel is drawn on the keyboard's
+  own theme tokens instead of Material defaults -- it was the last surface in the IME
+  that ignored a custom theme's palette and shapes.
+- **Unit tests for the emoji layer**, which had been verified on a phone and nowhere
+  else: the catalogue parse on the Kotlin side, and the four filtering rules of the
+  offline generator on the Python side. The regenerated dataset is byte-identical to
+  the committed one, which is what makes the refactor safe.
+
+### Fixed
+
+- **Auto-capitalize went stale after backspacing into a full stop.** Type "Hello.",
+  backspace the stop, retype it, and the board dropped to lower case at a sentence
+  start and stayed there. A sentence-ending mark consumes one-shot shift and re-arms
+  it in the same keystroke, and the effect that would have re-armed it only runs when
+  the flag changes -- so with the flag already true, nothing put the capital back.
+  Enter and the space bar had always re-read the flag at that point; ordinary keys
+  had not.
+- **A caret scrubbed to the end of the text now says so.** The bounds always worked,
+  but a gesture that silently stops producing anything is indistinguishable from one
+  that has died. A distinct haptic fires once on arriving at either end, not on every
+  refused step.
+- **Backspacing punctuation left the board capitalized mid-word.** The sibling of the
+  fix above, found while verifying it. Delete the stop in "Hello." and the board
+  stayed in upper case over "Hello", so the next letter came out `HelloE`. Every
+  branch of the backspace path was deciding whether the caret had landed at a
+  sentence start by looking at the keyboard's own copy of the word in progress -- and
+  that copy is always empty straight after punctuation, which is not the same fact.
+  It now asks the text, the way every other part of the keyboard that needs this
+  answer already did.
+
+  Verified on two phones deliberately far apart: Android 15 on LineageOS, and stock
+  Samsung Android 9 at a display size where the keyboard is at its narrowest.
+
+### Known, and deliberately not changed
+
+- **Grid-level hit testing for `n`/`b` mispresses near the space bar** is still open.
+  Its plan gates the smaller version on measuring where those presses actually land,
+  and that measurement needs a real thumb typing over time -- synthetic taps only
+  reproduce coordinates someone chose.
+- **Undoing a glide is fixed by the same change but was not reproduced on a phone.**
+  Backspacing a whole glided word back mid-sentence takes the corrected path, but
+  driving a glide over adb is unreliable enough that both attempts fell through to
+  the ordinary single-character delete. Covered by unit test only.
+
 ## [v0.1.7-BETA] - 2026-08-17
 
 `.\gradlew.bat build` is green (compile, ktlint, lint, 389 unit tests) and

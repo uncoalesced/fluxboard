@@ -19,7 +19,7 @@ It is free, MIT-licensed, and has no accounts, no ads, and no analytics.
 
 ## Current state: beta
 
-`v0.1.5-BETA`, versionCode 6. It works and it is being used daily, but it is a
+`v0.1.7.1-BETA`, versionCode 11. It works and it is being used daily, but it is a
 beta and it will have rough edges. If something looks wrong, please
 [open an issue](https://github.com/uncoalesced/fluxboard/issues/new/choose) —
 small reports are welcome and often the useful ones.

@@ -197,11 +197,19 @@ fun MainIMEView(
                                 typingViewModel = typingViewModel,
                             )
                         }
-                        AppMode.EMOJI_PICKER -> {
-                            // The emoji key lands on Recent, not on whatever tab was left
-                            // selected last time. Keyed on entering the mode rather than on
-                            // composition, so scrolling within the picker does not reset it.
-                            LaunchedEffect(Unit) { emojiPickerViewModel.openAtDefaultTab() }
+                        AppMode.EMOJI_PICKER, AppMode.STICKER_PICKER -> {
+                            // One view, two doors. The emoji key lands on Recent and the
+                            // stickers key on the stickers tab, in both cases overriding
+                            // whatever tab was left selected last time. Keyed on entering the
+                            // mode rather than on composition, so scrolling within the picker
+                            // does not reset it.
+                            LaunchedEffect(Unit) {
+                                if (targetMode == AppMode.STICKER_PICKER) {
+                                    emojiPickerViewModel.openAtStickersTab()
+                                } else {
+                                    emojiPickerViewModel.openAtDefaultTab()
+                                }
+                            }
                             EmojiPickerView(
                                 viewModel = emojiPickerViewModel,
                                 fileManager = fileManager,

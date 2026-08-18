@@ -90,6 +90,14 @@ class StickyKeysIME :
     private var selStart = 0
     private var selEnd = 0
 
+    /**
+     * Whether the last caret move was refused because there was nowhere to go.
+     *
+     * Held so the limit haptic fires once per arrival at an end rather than once per refused
+     * step. Cleared by any move that succeeds, so leaving the end and coming back buzzes again.
+     */
+    private var caretMoveRefused = false
+
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -611,7 +619,19 @@ class StickyKeysIME :
         val before = ic.getTextBeforeCursor(scan, 0)?.toString() ?: return
         val after = ic.getTextAfterCursor(scan, 0)?.toString() ?: return
 
-        val target = cursorTargetFor(before, after, caret, move)?.coerceAtLeast(0) ?: return
+        val target = cursorTargetFor(before, after, caret, move)?.coerceAtLeast(0)
+        if (target == null) {
+            // Fired on the transition into "stuck", not on every refused step. A held scrub at
+            // the end of the text asks for a move every few milliseconds, and an unthrottled
+            // buzz there stops being a signal and becomes one continuous vibration -- the same
+            // reason the scrub's own step haptic is throttled.
+            if (!caretMoveRefused) {
+                caretMoveRefused = true
+                hapticsManager.performCaretLimitHaptic()
+            }
+            return
+        }
+        caretMoveRefused = false
 
         if (extend) {
             ic.setSelection(anchor, target)

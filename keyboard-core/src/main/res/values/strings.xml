@@ -1,7 +1,9 @@
-<?xml version="1.0" ?>
-<resources>
-    <string name="text_back">Back</string>
-    <string name="text_clear_all">Clear All</string>
-    <string name="text_del">Del</string>
-    <string name="text_favourites">Favourites</string>
+<?xml version="1.0" ?>
+<resources>
+    <string name="text_back">Back</string>
+    <string name="text_clear_all">Clear all</string>
+    <string name="clipboard_title">Clipboard</string>
+    <string name="clipboard_empty">Anything you copy while FluxBoard is installed shows up here.</string>
+    <string name="text_del">Del</string>
+    <string name="text_favourites">Favourites</string>
 </resources>

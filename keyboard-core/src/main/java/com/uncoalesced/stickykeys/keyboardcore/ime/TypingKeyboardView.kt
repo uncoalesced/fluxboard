@@ -371,6 +371,8 @@ fun TypingKeyboardView(
                             keyboardController.switchMode(AppMode.TEXT_EDIT)
                         action.id == "private" ->
                             typingViewModel.setPrivateMode(!privateMode)
+                        action.id == "settings" ->
+                            openAppAt(context, ROUTE_KEYBOARD_SETTINGS)
                         action.id == "switchime" -> keyboardController.showInputMethodPicker()
                     }
                     // The privacy toggle stays put. Collapsing the row on it would hide the
@@ -1073,16 +1075,29 @@ internal fun handleKeyPress(
         }
         "SYMBOLS" -> setMode(KeyboardMode.SYMBOLS)
         "ABC" -> setMode(KeyboardMode.LETTERS_LOWER)
-        // One tap from the emoji key straight into the unified picker: no menu,
-        // no intermediate panel.
-        "STICKERS" -> controller.switchMode(AppMode.EMOJI_PICKER)
+        // One tap from either key straight into the unified picker: no menu, no intermediate
+        // panel. They differ only in which tab the picker opens on.
+        "EMOJI" -> controller.switchMode(AppMode.EMOJI_PICKER)
+        "STICKERS" -> controller.switchMode(AppMode.STICKER_PICKER)
         "CLIPBOARD" -> controller.switchMode(AppMode.CLIPBOARD)
         "DEL" -> {
+            // Read before the delete lands, the same shape and for the same reason the SPACE
+            // branch below reads for doubleSpaceReplacement: onDelete has to know whether the
+            // caret is landing on a sentence boundary, and the local currentWord mirror cannot
+            // answer that -- it is always empty straight after punctuation, which is not the
+            // same fact (roadmap 4G.7).
+            //
+            // One bounded read per backspace. The repeat loop in `keyGestures` calls this as
+            // fast as every 22ms at full speed, so it is worth naming that `sendDelete` below
+            // already performs its own `getTextBeforeCursor` on every one of those same steps
+            // to size a surrogate pair -- this is a second bounded read on a path that already
+            // pays one, not a new class of blocking call on the keystroke path.
+            //
             // A backspace straight after a glide takes the whole word back, because one
             // gesture put it there. Anything else goes through sendDelete, which sizes
             // itself against the real text so a surrogate pair never loses half of
             // itself -- deleteBefore(1) would.
-            val charCount = viewModel.onDelete()
+            val charCount = viewModel.onDelete(controller.textBeforeCursor(WORD_CONTEXT_CHARS))
             if (charCount > 1) controller.deleteBefore(charCount) else controller.sendDelete()
         }
         "ENTER" -> {
@@ -1248,9 +1263,10 @@ internal fun handleKeyPress(
                 }
             }
 
-            if (currentMode == KeyboardMode.LETTERS_UPPER) {
-                setMode(KeyboardMode.LETTERS_LOWER)
-            }
+            // One-shot shift is consumed by any key -- unless the key that consumed it also
+            // re-armed it, which a sentence-ending mark does. See modeAfterPrintableKey.
+            modeAfterPrintableKey(currentMode, viewModel.shouldAutoCapitalize.value)
+                ?.let(setMode)
         }
     }
 }

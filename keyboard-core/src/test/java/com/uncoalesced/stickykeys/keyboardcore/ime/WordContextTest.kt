@@ -220,6 +220,62 @@ class WordContextTest {
         }
 
     @Test
+    fun `backspacing a sentence terminator does not capitalize mid-word`() =
+        runTest(dispatcher) {
+            // Roadmap 4G.7, the reported case. "Hello." then one backspace is "Hello", which
+            // is not a sentence boundary -- but the old version hard-coded true whenever the
+            // local currentWord mirror was empty, and it is always empty right after
+            // punctuation committed and cleared it.
+            "Hello".forEach { viewModel.onKeyPressed(it.toString()) }
+            viewModel.onSymbolCommitted(".")
+            assertTrue(viewModel.shouldAutoCapitalize.value)
+
+            viewModel.onDelete("Hello.")
+
+            assertFalse(viewModel.shouldAutoCapitalize.value)
+        }
+
+    @Test
+    fun `backspacing to the very start of the field still capitalizes`() =
+        runTest(dispatcher) {
+            // The positive control. Reading the text must not become "always false" -- clearing
+            // a message and retyping it has to give a capital first letter, which is the bug
+            // the branch being changed here was originally written to fix.
+            viewModel.onKeyPressed("H")
+            assertFalse(viewModel.shouldAutoCapitalize.value)
+
+            viewModel.onDelete("H")
+
+            assertTrue(viewModel.shouldAutoCapitalize.value)
+        }
+
+    @Test
+    fun `backspacing a mid-sentence word does not falsely re-arm capitalization`() =
+        runTest(dispatcher) {
+            // The second branch shares the defect by inspection rather than by its own report:
+            // an empty mirror after dropping the last letter is not the same fact as an empty
+            // field. Covered here rather than left to be rediscovered.
+            "Hi w".forEach { viewModel.onKeyPressed(it.toString()) }
+
+            viewModel.onDelete("Hi w")
+
+            assertFalse(viewModel.shouldAutoCapitalize.value)
+        }
+
+    @Test
+    fun `undoing a glide mid-sentence does not arm capitalization`() =
+        runTest(dispatcher) {
+            // The third branch, same reasoning. A glide commits its word plus a trailing
+            // space, so the text in front of it is what decides -- dropping both is what makes
+            // this the same question the other two branches ask.
+            viewModel.onGlideCommitted("world", listOf("world"))
+
+            viewModel.onDelete("Hello world ")
+
+            assertFalse(viewModel.shouldAutoCapitalize.value)
+        }
+
+    @Test
     fun `an external change invalidates an autocorrect already in flight`() =
         runTest(dispatcher) {
             val token = viewModel.onSpacePressed()

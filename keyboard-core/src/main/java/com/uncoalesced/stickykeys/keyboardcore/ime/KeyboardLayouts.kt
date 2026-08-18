@@ -150,7 +150,11 @@ object KeyboardLayouts {
     private val actionRow =
         listOf(
             key("SYMBOLS", weight = 1.5f),
-            key("STICKERS"),
+            // `EMOJI`, not `STICKERS`, and the behaviour is unchanged by the rename: this key
+            // has always opened the unified picker on Recent emoji. `STICKERS` now names the
+            // door that lands on the sticker tab, so the two are separable when a user remaps
+            // a key to one of them -- which is the whole point of having two tokens.
+            key("EMOJI"),
             // No mic hint. It advertised voice input that this key never produced --
             // longPressFor consults PUNCTUATION_ALTERNATES before the hint, and "," is in
             // that map, so holding it has always given ". ? !" and never the mic. Removing
@@ -211,7 +215,7 @@ object KeyboardLayouts {
     private val symbolActionRow =
         listOf(
             key("ABC", weight = 1.5f),
-            key("STICKERS"),
+            key("EMOJI"),
             key(","),
             key("SPACE", weight = 4f),
             key("."),

@@ -442,8 +442,22 @@ class TypingViewModel
          * The count is returned rather than issued here because a ViewModel holds no
          * controller. A caller seeing 1 must still go through `sendDelete`, which sizes the
          * delete against the text itself so a surrogate pair does not lose half of itself.
+         *
+         * [textBeforeCursor] is the editor's text as it stands **before** this delete lands,
+         * with the characters about to be removed still present -- the same shape
+         * [onEditorContextChanged] takes, and read by the caller for the same reason.
+         *
+         * Roadmap 4G.7: every branch below used to guess `atSentenceStart` from [currentWord],
+         * a local mirror that is always empty straight after punctuation was committed. So
+         * deleting *any* punctuation mark read as landing on a sentence start, and the next
+         * letter capitalized mid-word. Whether the caret ends up at a boundary is a property
+         * of the text, and only the editor knows it.
+         *
+         * Defaults to `""` for callers with no editor to read. That resolves to
+         * `startsNewSentence("")`, which is `true` -- exactly what all three branches used to
+         * hard-code, so a caller that only wants the returned count is unaffected.
          */
-        fun onDelete(): Int {
+        fun onDelete(textBeforeCursor: String = ""): Int {
             usageLog.onBackspace()
             // Read before the token moves. `consumeGlideCommit` is valid only while the
             // generation still matches the one the glide committed under, so bumping first
@@ -453,8 +467,11 @@ class TypingViewModel
             generation++
             if (glided != null) {
                 // A glide clears currentWord and commits its own trailing space, so there is
-                // no partial word here to fall through to.
-                atSentenceStart = true
+                // no partial word here to fall through to. Whether the word being undone sat
+                // at a sentence start is a property of the text in front of it, not of the
+                // glide -- so drop the word and its trailing space and ask about the rest.
+                atSentenceStart =
+                    startsNewSentence(textBeforeCursor.dropLast(glided.length + 1))
                 publishAutoCapitalize()
                 _suggestions.value = emptyList()
                 return glided.length + 1
@@ -464,13 +481,17 @@ class TypingViewModel
                 // Deleting back to nothing puts the caret where a sentence would start again,
                 // so capitalization has to come back with it. Forcing this false
                 // unconditionally meant clearing a message and retyping it produced a
-                // lower-case first letter every time.
-                atSentenceStart = currentWord.isEmpty()
+                // lower-case first letter every time -- but an empty mirror is not the same
+                // fact as an empty field, which is what asking the text settles.
+                atSentenceStart = startsNewSentence(textBeforeCursor.dropLast(1))
                 publishAutoCapitalize()
                 updateSuggestions()
                 return 1
             }
-            atSentenceStart = true
+            // The mirror was already empty going in; the common case is straight after
+            // punctuation committed and cleared it. Nothing about the character being removed
+            // is decidable from here, which is the whole of 4G.7.
+            atSentenceStart = startsNewSentence(textBeforeCursor.dropLast(1))
             publishAutoCapitalize()
             return 1
         }

@@ -66,6 +66,20 @@ class HapticsManager
         fun performKeyPressHaptic() = vibrate(KEY_PRESS_MS, preferences.hapticsIntensity.value)
 
         /**
+         * The caret had nowhere left to go: a scrub, or an arrow, run to the end of the text.
+         *
+         * The bounds themselves always worked -- `cursorTargetFor` returns null and nothing
+         * moves -- but a gesture that silently stops producing anything is indistinguishable
+         * from one that died, and the user has no way to tell which. Longer and softer than a
+         * keystroke so it reads as a wall rather than as another step.
+         */
+        fun performCaretLimitHaptic() =
+            vibrate(
+                CARET_LIMIT_MS,
+                (preferences.hapticsIntensity.value * CARET_LIMIT_SCALE).toInt(),
+            )
+
+        /**
          * Sending a sticker: longer and softer than a keystroke, so a committed action does
          * not land in the hand as though it were a typo.
          */
@@ -124,5 +138,7 @@ class HapticsManager
             const val KEY_PRESS_MS = 10L
             const val STICKER_SEND_MS = 20L
             const val STICKER_SEND_SCALE = 0.7f
+            const val CARET_LIMIT_MS = 25L
+            const val CARET_LIMIT_SCALE = 0.6f
         }
     }

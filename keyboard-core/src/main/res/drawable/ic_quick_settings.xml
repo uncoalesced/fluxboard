@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- Keyboard settings. Sliders rather than a gear: a gear at 22dp inside an IME reads as a
+     grey smudge, and this row already carries several outline glyphs a toothed circle would
+     not sit beside. Note single dashes only - "- -" is a fatal parse error in an XML comment. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round"
+        android:pathData="M4,7 L20,7 M4,12 L20,12 M4,17 L20,17" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M9,7 A2.4,2.4 0 1 1 8.99,7 Z M16,12 A2.4,2.4 0 1 1 15.99,12 Z M11,17 A2.4,2.4 0 1 1 10.99,17 Z" />
+</vector>

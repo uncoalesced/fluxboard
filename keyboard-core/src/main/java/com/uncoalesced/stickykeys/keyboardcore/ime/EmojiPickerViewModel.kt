@@ -128,6 +128,17 @@ class EmojiPickerViewModel
             _selectedTab.value = if (_recentEmoji.value.isEmpty()) FIRST_EMOJI_TAB else RECENT_TAB
         }
 
+        /**
+         * Opens the picker on the stickers tab.
+         *
+         * The counterpart to [openAtDefaultTab], and the reason the two keys are worth telling
+         * apart: a user who remapped a key to reach their stickers does not want to land on
+         * Recent emoji and press a tab, which is the whole of the saving the remap was for.
+         */
+        fun openAtStickersTab() {
+            _selectedTab.value = STICKERS_TAB_INDEX
+        }
+
         fun onEmojiUsed(glyph: String) {
             keyboardPreferences.recordEmojiUse(glyph)
             _recentEmoji.value = keyboardPreferences.recentEmoji()

@@ -64,30 +64,41 @@ DATA_LINE = re.compile(
 
 
 def parse(path):
-    """Yield (group, glyph, version, name) for every pickable emoji."""
-    group = None
+    """Yield (group, glyph, version, name) for every pickable emoji in a file."""
     with open(path, encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.rstrip("\n")
-            if line.startswith("# group:"):
-                group = line.split(":", 1)[1].strip()
-                continue
-            if not line or line.startswith("#"):
-                continue
+        yield from parse_lines(handle)
 
-            match = DATA_LINE.match(line)
-            if match is None:
-                continue
-            if match.group("status") != "fully-qualified":
-                continue
-            if group in SKIPPED_GROUPS:
-                continue
 
-            codes = [int(c, 16) for c in match.group("codes").split()]
-            if any(c in SKIN_TONES for c in codes):
-                continue
+def parse_lines(lines):
+    """Yield (group, glyph, version, name) for every pickable emoji.
 
-            yield group, match.group("glyph"), match.group("version"), match.group("name")
+    Split out from parse() so the filtering rules above can be asserted without a
+    630KB fixture on disk -- see test_build_emoji_data.py. Every rule in this
+    function's docstring block at the top of the file is a decision that silently
+    changes what ships in the picker if it regresses.
+    """
+    group = None
+    for raw in lines:
+        line = raw.rstrip("\n")
+        if line.startswith("# group:"):
+            group = line.split(":", 1)[1].strip()
+            continue
+        if not line or line.startswith("#"):
+            continue
+
+        match = DATA_LINE.match(line)
+        if match is None:
+            continue
+        if match.group("status") != "fully-qualified":
+            continue
+        if group in SKIPPED_GROUPS:
+            continue
+
+        codes = [int(c, 16) for c in match.group("codes").split()]
+        if any(c in SKIN_TONES for c in codes):
+            continue
+
+        yield group, match.group("glyph"), match.group("version"), match.group("name")
 
 
 def main():

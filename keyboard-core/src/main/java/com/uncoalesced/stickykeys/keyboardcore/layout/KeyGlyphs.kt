@@ -73,7 +73,11 @@ fun keyGlyph(
                 EditorInfo.IME_ACTION_DONE -> KeyGlyph.Icon(R.drawable.ic_key_enter_done, "Done")
                 else -> KeyGlyph.Icon(R.drawable.ic_key_enter, "Enter")
             }
-        "STICKERS" -> KeyGlyph.Icon(R.drawable.ic_key_emoji, "Stickers and emoji")
+        // Two doors into the same picker, and they must not look alike: a user who put both on
+        // one board could otherwise not tell which key was which. The face is emoji, the grid is
+        // the sticker library -- the same two glyphs the quick-access row already uses for them.
+        "EMOJI" -> KeyGlyph.Icon(R.drawable.ic_key_emoji, "Emoji")
+        "STICKERS" -> KeyGlyph.Icon(R.drawable.ic_quick_grid, "Stickers")
         "CLIPBOARD" -> KeyGlyph.Icon(R.drawable.ic_key_clipboard, "Clipboard history")
         "MIC" -> KeyGlyph.Icon(R.drawable.ic_key_mic, "Voice input")
         "SYMBOLS" -> KeyGlyph.Label("123")
