@@ -103,6 +103,14 @@ class StickyKeysIME :
      */
     private var caretMoveRefused = false
 
+    /**
+     * When the last sticker commit was allowed through, on the uptime clock.
+     *
+     * Held so [commitStickerContent] can refuse a tap that arrives on top of the previous one.
+     * See [STICKER_COMMIT_MIN_INTERVAL_MS] for why that path needs a floor at all.
+     */
+    private var lastStickerCommitAt = 0L
+
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -674,6 +682,13 @@ class StickyKeysIME :
     }
 
     private fun commitStickerContent(sticker: Sticker) {
+        // Refused before anything else happens, including the haptic: a tap that is being
+        // dropped should cost nothing at all, and a buzz for a sticker that was never sent
+        // says the opposite of what happened.
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastStickerCommitAt < STICKER_COMMIT_MIN_INTERVAL_MS) return
+        lastStickerCommitAt = now
+
         hapticsManager.performStickerSendHaptic()
         val file = fileManager.getStickerFile(sticker.id)
         if (!file.exists()) return
@@ -751,5 +766,28 @@ class StickyKeysIME :
          * characters covers any realistic line while staying far inside that limit.
          */
         const val MAX_SCAN = 2000
+
+        /**
+         * Floor between two sticker commits.
+         *
+         * Every commit is synchronous main-thread work with two blocking parts: disk I/O (the
+         * file check, and the header sniff the resolver runs behind `getType`) and binder IPC
+         * into the host app, which has to accept or refuse the content before the call
+         * returns. One of those is cheap. A dozen queued behind an app that is slow to answer
+         * is a stalled main thread, and a stalled IME main thread is an ANR -- which is what
+         * "spamming the stickers crashed the keyboard" looks like from the outside
+         * (roadmap 4J.3).
+         *
+         * A floor between events rather than a queue, which is the same shape the scrub's
+         * haptic throttle uses in `KeyGestures.kt` for the same reason: the tap that arrives
+         * too soon is dropped, not deferred, because deferring it would still run the work.
+         *
+         * ponytail: 300ms is a guess, and it is the *only* thing standing between a fast tap
+         * run and the main thread. Set the number from a device: if a reproduction still
+         * stalls, the real fix is moving the file read off the main thread rather than raising
+         * this further -- a debounce large enough to hide a slow host is one a user notices as
+         * "the sticker didn't send".
+         */
+        const val STICKER_COMMIT_MIN_INTERVAL_MS = 300L
     }
 }

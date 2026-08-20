@@ -94,14 +94,24 @@ class StickerFileProvider : FileProvider() {
      * Magic numbers rather than the stored `Sticker.mimeType`: this runs in a
      * ContentProvider, which the system may instantiate without the rest of the app, and a
      * file's own header is the one source that is always available and always correct.
+     *
+     * **Opened with [FileProvider.openFile], never `ContentProvider.openFileHelper`.** That is
+     * not a preference. `openFileHelper` resolves a URI to a file by *querying its own
+     * provider* -- and [query] is overridden here to call [getType], which calls this. Every
+     * sticker commit therefore recursed until the stack was gone: a native SIGSEGV, ~512
+     * frames of `query -> getType -> sniff -> openFileHelper -> query`, taking the whole IME
+     * process with it on the first tap (roadmap 4J.3, device-confirmed 2026-08-20). It
+     * presented as "spamming stickers crashed the keyboard" only because nobody had tapped
+     * one twice slowly. The `catch` below cannot save it either: a blown stack is an Error.
+     * `FileProvider.openFile` maps the path from its own `<files-path>` config and asks the
+     * provider nothing, so it cannot re-enter.
      */
     private fun sniff(uri: Uri): String? {
         val header = ByteArray(HEADER_BYTES)
         val read =
             try {
-                context
-                    ?.contentResolver
-                    ?.let { openFileHelper(uri, "r") }
+                super
+                    .openFile(uri, "r")
                     ?.use { descriptor ->
                         java.io.FileInputStream(descriptor.fileDescriptor).use { it.read(header) }
                     } ?: return null

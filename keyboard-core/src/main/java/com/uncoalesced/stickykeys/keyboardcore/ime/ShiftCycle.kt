@@ -9,8 +9,13 @@ package com.uncoalesced.stickykeys.keyboardcore.ime
  * seeing the first one take effect, so it arrives later than a double click on a link would.
  * Long enough to be reachable without hurrying, short enough that a tap the user thinks of as
  * "turn shift back off" is never mistaken for it.
+ *
+ * It was a full second until v0.1.7.3 and that failed the second half: at typing speed a whole
+ * second is several keystrokes, so a deliberate "shift back off" tap kept landing inside the
+ * window and latching capitals instead (roadmap 4J.2). 500ms still leaves well over the
+ * platform's own double-tap allowance for the gesture it is trying to catch.
  */
-const val CAPS_LOCK_WINDOW_MS = 1_000L
+const val CAPS_LOCK_WINDOW_MS = 500L
 
 /**
  * What the shift key does next.

@@ -16,6 +16,83 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [v0.1.7.3-BETA] - 2026-08-20
+
+zap's report on the v0.1.7.2 build: dropped characters when typing fast, a caps
+lock window that latched when he meant to turn shift off, and the keyboard
+crashing when he spammed stickers into WhatsApp. All three are fixed and
+device-verified; the third turned out to be a different bug from the one it was
+diagnosed as. `.\gradlew.bat clean build` is green (compile, ktlint, lint, 500
+unit tests, 0 failures) and `scripts/check-source-rules.sh` passes.
+
+**Device-verified on 2026-08-20**, against the signed release installed **in
+place** on the LineageOS phone (2201117TI, Android 15, 420dpi), so the IME
+binding and the on-device dictionary, clipboard and themes all survived.
+
+### Fixed
+
+- **Fast typing no longer drops or deletes characters.** Since v0.1.7.2 a letter
+  is committed the moment the finger lands, and the same press opens a 350ms
+  watch for the finger leaving the key -- which is how a glide is told apart from
+  a tap. A fast, slightly off-centre tap crosses its own edge before it lifts, so
+  an ordinary keystroke was being read as a glide: the letter already on screen
+  was taken back, and the decoder either found nothing (a dropped character) or
+  committed a short unrelated reading over the text near the caret. The crossing
+  now has a 10dp dead zone. The edge still decides -- a flat pixel threshold means
+  something different on a narrow key than on a wide one -- and the tolerance is
+  measured from the edge, so a press that lands mid-key still has to travel the
+  whole way out.
+
+  On the phone, a press may now stray 21-22px (about 8dp) past the key it started
+  on and still type; before, it was taken back from roughly the edge onward. 115
+  characters typed at 52ms per tap came back character-identical, and words typed
+  with every press deliberately dragged past its own edge came back intact.
+  Glides are unaffected: straight and cornered paths both still commit, with
+  their losing readings in the suggestion strip.
+
+- **Caps lock now latches on a 500ms double-tap, not a full second.** At typing
+  speed a second is several keystrokes, so a deliberate "shift back off" tap kept
+  landing inside the window and latching capitals instead -- the exact failure the
+  window exists to prevent. Measured on the device: a double-tap 472ms apart
+  latches, 522ms apart does not. A single tap still releases caps lock whatever
+  the timing, so nobody is stranded in capitals.
+
+- **Sending a sticker no longer crashes the keyboard.** The crash was not the
+  main-thread flood it was diagnosed as, and it did not need spamming: **one tap
+  on one sticker killed the IME process every time**, and had done since
+  v0.1.4-ALPHA. `StickerFileProvider.sniff()` read the file header through
+  `ContentProvider.openFileHelper`, which resolves a URI by querying its own
+  provider -- and this provider overrides `query()` to call `getType()`, which
+  calls `sniff()`. Unbounded recursion, roughly 512 frames of it, ending in a
+  SIGSEGV about 410ms after the tap. The `catch` in `sniff()` could not help: a
+  blown stack is an Error, not an Exception. It reads the header through
+  `FileProvider.openFile` now, which maps the path from its own configuration and
+  asks the provider nothing.
+
+  Verified on the phone with the same input that killed it: one tap, then 20 taps
+  in 1.2 seconds, then six real send cycles. The IME held one process id through
+  all of it, with no fatal signal and no ANR. `scripts/check-source-rules.sh`
+  refuses any new call to `openFileHelper`, since a unit test cannot cover this
+  one -- Robolectric on Windows rejects its own temp directory before the
+  recursion can even start, so a test written against it passes whether the bug
+  is present or not.
+
+- **A floor of 300ms between sticker commits.** Written for the crash above and
+  kept on its own merits: each commit is synchronous disk I/O plus two binder
+  round-trips on the main thread. It drops rather than defers, and it is checked
+  ahead of the haptic, because buzzing for a sticker that was never sent says the
+  opposite of what happened. It cannot swallow a real send: the picker closes
+  after each sticker, so the fastest cadence measured on the device is ~567ms per
+  send, and all six of six were accepted.
+
+### Known, unchanged
+
+Sticker delivery still has not been seen landing in a receiving app. The commit
+path now runs to completion, but this project's test phone has no app that
+accepts rich content -- both AOSP Messaging and IronFox report
+`contentMimeTypes=null`, so every commit correctly ends at the "this field does
+not take this content" branch. WhatsApp and Discord remain unconfirmed.
+
 ## [v0.1.7.2-BETA] - 2026-08-20
 
 The intermittent typing-lag report, closed with a measurement rather than another
