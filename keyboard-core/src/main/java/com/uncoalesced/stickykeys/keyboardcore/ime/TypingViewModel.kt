@@ -5,6 +5,7 @@ import android.view.inputmethod.EditorInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.TypingStatsStore
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
 import com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
@@ -35,6 +36,7 @@ class TypingViewModel
         private val hapticsManager: HapticsManager,
         private val incognitoState: IncognitoState,
         private val usageLog: UsageRecorder,
+        private val typingStats: TypingStatsStore,
     ) : ViewModel() {
         private val _suggestions = MutableStateFlow<List<String>>(emptyList())
         val suggestions: StateFlow<List<String>> = _suggestions
@@ -398,6 +400,9 @@ class TypingViewModel
             // Counted here rather than in onKeyPressed: this fires for every key including
             // shift, symbols and enter, which is what "keystrokes" means to a tester.
             usageLog.onKeystroke()
+            // The same event, counted a second time for the user's own stats. Two recorders
+            // rather than one because only one of them exists in a release build.
+            typingStats.recordKeystroke()
         }
 
         fun onKeyPressed(char: String) {
@@ -459,6 +464,7 @@ class TypingViewModel
          */
         fun onDelete(textBeforeCursor: String = ""): Int {
             usageLog.onBackspace()
+            typingStats.recordBackspace()
             // Read before the token moves. `consumeGlideCommit` is valid only while the
             // generation still matches the one the glide committed under, so bumping first
             // would make this return null every time -- and the whole feature silently
@@ -570,6 +576,7 @@ class TypingViewModel
             corrected: String,
         ) {
             usageLog.onAutocorrectAccepted()
+            typingStats.recordAutocorrectAccepted()
             _undoState.value = UndoAction(original, corrected)
             currentWord = ""
             _suggestions.value = emptyList()
@@ -582,6 +589,7 @@ class TypingViewModel
 
         fun onUndoApplied() {
             usageLog.onAutocorrectUndone()
+            typingStats.recordAutocorrectUndone()
             _undoState.value = null
         }
 

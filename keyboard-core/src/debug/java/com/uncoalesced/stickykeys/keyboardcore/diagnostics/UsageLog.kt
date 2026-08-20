@@ -82,7 +82,11 @@ class UsageLog
             if (started == 0L) return
             sessionStartedAt = 0L
             val durationMs = max(0L, System.currentTimeMillis() - started)
-            scope.launch { appendSession(durationMs) }
+            // Read on this thread and reset here, so the window belongs to the session being
+            // written rather than to whatever gets typed while the write is queued.
+            val latency = LatencyTracker.snapshot()
+            LatencyTracker.reset()
+            scope.launch { appendSession(durationMs, latency) }
         }
 
         override fun onKeystroke() {
@@ -109,13 +113,17 @@ class UsageLog
             scrubGestures++
         }
 
-        private suspend fun appendSession(durationMs: Long) {
+        private suspend fun appendSession(
+            durationMs: Long,
+            latency: LatencySnapshot,
+        ) {
             mutex.withLock {
                 val target = file
                 if (!target.exists()) {
                     target.writeText(header())
                 }
-                target.appendText(sessionRow(durationMs))
+                target.appendText(sessionRow(durationMs, latency))
+                target.appendText(outlierNote(latency.outlierMs))
                 // Reset per-session counters only after a successful write, so a failed
                 // append does not silently discard the session it was recording.
                 keystrokes = 0
@@ -141,20 +149,48 @@ class UsageLog
                 // that matters here anyway, since it is what decides the file exists at all.
                 appendLine("Build type: debug (tester build)")
                 appendLine()
+                appendLine("Latency is in milliseconds. `Input` is the gap between the OS")
+                appendLine("timestamping a press and this keyboard acting on it, which is the")
+                appendLine("one that rises when the process stalls. `Commit` starts at the same")
+                appendLine("press and ends when the edit is issued, so it also contains however")
+                appendLine("long the finger stayed on the key.")
+                appendLine()
                 appendLine(
-                    "| Ended | Session (s) | Keys | Backspace | Autocorrect | Undone | Modes | Scrubs |",
+                    "| Ended | Session (s) | Keys | Backspace | Autocorrect | Undone | Modes | " +
+                        "Scrubs | Input avg | Input p95 | Commit avg | Commit p95 |",
                 )
                 appendLine(
-                    "|---|---|---|---|---|---|---|---|",
+                    "|---|---|---|---|---|---|---|---|---|---|---|---|",
                 )
             }
 
-        private fun sessionRow(durationMs: Long): String {
+        private fun sessionRow(
+            durationMs: Long,
+            latency: LatencySnapshot,
+        ): String {
             val stamp =
                 SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
             return "| $stamp | ${durationMs / 1000} | $keystrokes | $backspaces | " +
-                "$autocorrectsAccepted | $autocorrectsUndone | $modeSwitches | $scrubGestures |\n"
+                "$autocorrectsAccepted | $autocorrectsUndone | $modeSwitches | $scrubGestures | " +
+                "${cell(latency.deliveryAverageMs)} | ${cell(latency.deliveryP95Ms)} | " +
+                "${cell(latency.commitAverageMs)} | ${cell(latency.commitP95Ms)} |\n"
         }
+
+        /** A dash rather than a zero: no sample recorded is not the same as no latency. */
+        private fun cell(value: Long?): String = value?.toString() ?: "-"
+
+        /**
+         * The spikes, under the table rather than in it.
+         *
+         * A p95 over 200 samples smooths away three bad keystrokes in a minute of typing, and
+         * three bad keystrokes in a minute of typing is exactly the report this is chasing.
+         */
+        private fun outlierNote(outliers: List<Long>): String =
+            if (outliers.isEmpty()) {
+                ""
+            } else {
+                "\n- Slow keystrokes this session (ms): " + outliers.joinToString(", ") + "\n"
+            }
 
         /**
          * A content URI for the log, for use with `Intent.ACTION_SEND`.

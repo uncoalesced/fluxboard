@@ -125,6 +125,9 @@ class EnterLearningTest {
                 mockk<com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder>(
                     relaxed = true,
                 ),
+                mockk<com.uncoalesced.stickykeys.keyboardcore.diagnostics.TypingStatsStore>(
+                    relaxed = true,
+                ),
             )
     }
 

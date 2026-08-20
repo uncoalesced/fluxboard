@@ -16,6 +16,7 @@ import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.LatencyTracker
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
@@ -486,6 +487,11 @@ internal fun Modifier.keyGestures(
     this.pointerInput(keyOutput, longPress, alternates, cellWidthPx, glide) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            // The only place in this process that sees a press before anything reacts to it,
+            // which is why the latency measurement starts here rather than in handleKeyPress.
+            // The event's own timestamp is passed rather than read here: the gap between the
+            // two IS the number worth having.
+            LatencyTracker.markDown(down.uptimeMillis)
             // Replacing `clickable` also removed the indication it supplied, so keys had no
             // press feedback of any kind while every other control in the app did. A
             // MutableState rather than a callback: an instance is stable and remembered per
