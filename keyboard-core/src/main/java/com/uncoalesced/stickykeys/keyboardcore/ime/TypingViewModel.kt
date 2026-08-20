@@ -119,6 +119,9 @@ class TypingViewModel
         /** True when the next letter should be capitalized, tracked locally (no IPC). */
         private var atSentenceStart = true
 
+        /** What [atSentenceStart] was before the press currently under the finger. */
+        private var atSentenceStartBeforeKey = true
+
         /**
          * Bumped once per input session, so the view can tell "a different field is now
          * focused" from an ordinary recomposition.
@@ -406,11 +409,40 @@ class TypingViewModel
         }
 
         fun onKeyPressed(char: String) {
+            // Saved because the key that was just pressed may turn out not to be a keystroke
+            // at all -- see onKeyRevoked. One level deep is all that is ever needed: only the
+            // press still under the finger can be taken back.
+            atSentenceStartBeforeKey = atSentenceStart
             currentWord += char
             _undoState.value = null // Typing clears undo state
             generation++
             // A letter was typed, so we are no longer at a sentence boundary.
             atSentenceStart = false
+            publishAutoCapitalize()
+            updateSuggestions()
+        }
+
+        /**
+         * The letter [onKeyPressed] just committed was not a keystroke after all.
+         *
+         * Letters now reach the screen when the finger lands rather than when it lifts, which
+         * is what removed the dwell-shaped lag from the press-to-letter path. The cost is that
+         * two gestures only reveal themselves later: a press that leaves the key is the start
+         * of a glide, and one that stays past the long-press window is a hold that commits an
+         * alternate instead. Both take the letter back through here.
+         *
+         * The mirror is un-appended rather than rebuilt, and [atSentenceStart] is restored
+         * rather than recomputed, so the state is exactly what it was before the press. The
+         * generation still moves: any suggestion lookup dispatched for the letter that is now
+         * gone must not be allowed to land.
+         *
+         * The caller deletes the character from the editor. Nothing is learned or unlearned --
+         * a letter that was never a keystroke never reached a word boundary.
+         */
+        fun onKeyRevoked(char: String) {
+            currentWord = currentWord.dropLast(char.length)
+            atSentenceStart = atSentenceStartBeforeKey
+            generation++
             publishAutoCapitalize()
             updateSuggestions()
         }

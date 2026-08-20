@@ -165,11 +165,21 @@ internal class LatencySamples {
         const val MAX_PLAUSIBLE_MS = 1_000L
 
         /**
-         * Five frames at 60Hz. A guess at "obviously felt", not a measurement -- the first
-         * device pass should look at the raw distribution before this number is trusted,
-         * because a lag that sits consistently at 40ms would not trip it even once.
+         * Calibrated against the real distribution, which the 80ms guess this replaces would
+         * never once have tripped.
+         *
+         * Measured on the LineageOS test device (2201117TI, Android 15) over 100 presses of
+         * sustained typing: delivery averaged 2.6ms, p95 4ms, worst single sample 15ms, with
+         * no frame skips and no blocking GC in the same window. A threshold twenty times the
+         * p95 does not report spikes, it reports nothing at all -- which is exactly what the
+         * first device pass found.
+         *
+         * 32ms is two frames at 60Hz and comfortably clear of the 15ms worst case seen when
+         * nothing is wrong, so it fires on a real hitch without turning ordinary jitter into
+         * a list of outliers. Re-measure it on a slower device before treating it as settled;
+         * this is one phone's distribution, not a universal number.
          */
-        const val OUTLIER_THRESHOLD_MS = 80L
+        const val OUTLIER_THRESHOLD_MS = 32L
     }
 }
 

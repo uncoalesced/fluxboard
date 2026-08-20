@@ -82,6 +82,31 @@ internal fun rememberKeyPressHandler(
     }
 
 /**
+ * The counterpart to [rememberKeyPressHandler], for a press that turned out not to be a
+ * keystroke.
+ *
+ * Remembered for exactly the reason that one is: it is captured by every key's gesture
+ * modifier, so a fresh instance per recomposition would hand all of them a changed parameter
+ * and take the whole grid out of skipping -- the invariant `KeyboardRecompositionTest`
+ * measures.
+ */
+@Composable
+internal fun rememberKeyRevokeHandler(
+    keyboardController: KeyboardController,
+    typingViewModel: TypingViewModel,
+): (String) -> Unit =
+    remember(keyboardController, typingViewModel) {
+        { key: String ->
+            // Sized from the key itself rather than from the editor, unlike every other
+            // destructive edit here. This one is not a guess about what is in front of the
+            // caret: this keyboard put that character there microseconds ago and the gesture
+            // that would have let anything else move has not finished yet.
+            keyboardController.deleteBefore(key.length)
+            typingViewModel.onKeyRevoked(key)
+        }
+    }
+
+/**
  * The colours a key is painted with.
  *
  * [border] and [haze] are null when their effect is off, rather than transparent, so the
@@ -166,6 +191,7 @@ internal fun KeyboardRowsView(
     onDeleteWord: () -> Unit = {},
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
+    onKeyRevoke: (String) -> Unit = {},
     enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
 ) {
     // One strip for the whole grid, not one per key. A popup owned by the key that opened it
@@ -242,6 +268,7 @@ internal fun KeyboardRowsView(
                             availableWidthPx = availableWidthPx,
                             modifier = Modifier.weight(keyDef.weight).fillMaxHeight(),
                             onKeyPress = onKeyPress,
+                            onKeyRevoke = onKeyRevoke,
                             onScrub = onScrub,
                         )
                     }

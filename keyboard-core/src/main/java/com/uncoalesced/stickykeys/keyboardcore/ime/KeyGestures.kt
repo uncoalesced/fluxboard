@@ -256,6 +256,38 @@ internal fun isGlideCandidate(keyOutput: String): Boolean =
     keyOutput.length == 1 && keyOutput[0].isLetter()
 
 /**
+ * Whether this key puts its character on screen when the finger lands, rather than when it lifts.
+ *
+ * Every key used to commit on release, because release is the moment a tap is finally
+ * distinguishable from a glide and from a hold. That is correct and it is also the whole of
+ * the intermittent-lag report: measured on device, the press-to-letter time tracked finger
+ * dwell one-for-one (50ms dwell -> 57ms, 300ms -> 306ms) with this keyboard's own share a
+ * flat ~5ms. Nothing was stalling. The letter was waiting for the finger, so the lag was
+ * whatever the user's own dwell happened to be that keystroke -- which is exactly why it came
+ * and went with no pattern anyone could describe.
+ *
+ * So the letter goes on screen at once and is taken back on the two gestures that turn out
+ * not to be a keystroke. That trade is only safe where the take-back is exact:
+ *
+ * - **Letters only.** A letter goes through `onKeyPressed`, which appends one character to
+ *   the word mirror and is therefore reversible. Punctuation and digits go through
+ *   `onSymbolCommitted`, which *clears* the mirror -- the word it discarded cannot be
+ *   restored, so revoking one would leave the mirror describing text that is not there. That
+ *   is the class of desync this codebase sizes destructive edits from the editor to avoid.
+ * - **Not the repeat or scrub keys.** Backspace already fires on press through its repeat
+ *   loop, and the space bar's press may still become a caret scrub, which must not type.
+ *   Both are excluded here as well as by the letter test, because the two facts are
+ *   independent and a future key could satisfy one without the other.
+ */
+internal fun commitsOnPress(
+    keyOutput: String,
+    longPress: LongPress,
+): Boolean =
+    isGlideCandidate(keyOutput) &&
+        longPress !is LongPress.Repeat &&
+        longPress !is LongPress.Scrub
+
+/**
  * Width of one alternates cell, shrunk when the strip would otherwise run off the screen.
  *
  * The strip used to assume every cell could have its full preferred width, and the only thing
@@ -483,6 +515,7 @@ internal fun Modifier.keyGestures(
     onDeleteWord: () -> Unit = {},
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
+    onRevoke: (String) -> Unit = {},
 ): Modifier =
     this.pointerInput(keyOutput, longPress, alternates, cellWidthPx, glide) {
         awaitEachGesture {
@@ -499,6 +532,13 @@ internal fun Modifier.keyGestures(
             // take the whole grid out of skipping.
             pressed.value = true
             try {
+                // The keystroke lands here rather than on release. See commitsOnPress for the
+                // measurement that moved it, and for why only letters are eligible.
+                var committedOnPress = false
+                if (commitsOnPress(keyOutput, longPress)) {
+                    onCommit(keyOutput)
+                    committedOnPress = true
+                }
                 // Scrubbing is decided before the long-press clock, not after it. Gating it on
                 // the hold threshold would mean the cursor sat still for the first 350ms of a
                 // drag, which reads as the gesture being broken rather than deliberate.
@@ -565,6 +605,13 @@ internal fun Modifier.keyGestures(
                     }
 
                     if (glided) {
+                        // The letter this press already put on screen was the first key of a
+                        // stroke, not a keystroke. Taken back before the stroke can finish, so
+                        // the word the decoder commits is not prefixed by its own first letter.
+                        if (committedOnPress) {
+                            committedOnPress = false
+                            onRevoke(keyOutput)
+                        }
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull() ?: break
@@ -579,11 +626,18 @@ internal fun Modifier.keyGestures(
                         return@awaitEachGesture
                     }
                     if (lifted) {
-                        onCommit(keyOutput)
+                        // Already on screen for an eligible key; this is the lift that only
+                        // confirms it.
+                        if (!committedOnPress) onCommit(keyOutput)
                         return@awaitEachGesture
                     }
                     // Still down, still on the key: this is a hold, and the window has already
-                    // been spent waiting it out.
+                    // been spent waiting it out. A hold commits the alternate rather than the
+                    // key's own character, so the letter shown on press comes back off.
+                    if (committedOnPress) {
+                        committedOnPress = false
+                        onRevoke(keyOutput)
+                    }
                     heldPastThreshold = true
                 }
 
@@ -602,13 +656,25 @@ internal fun Modifier.keyGestures(
                     }
 
                 when {
-                    early == true -> onCommit(keyOutput)
-                    early == false -> Unit
+                    early == true -> if (!committedOnPress) onCommit(keyOutput)
+                    // Cancelled out from under us before it resolved into anything.
+                    early == false ->
+                        if (committedOnPress) {
+                            committedOnPress = false
+                            onRevoke(keyOutput)
+                        }
                     longPress is LongPress.None -> {
                         // Held, but this key has no hold behaviour: still a keystroke on
                         // release, otherwise resting a moment on a letter would silently
                         // swallow it.
-                        if (waitForUpOrCancellation() != null) onCommit(keyOutput)
+                        if (waitForUpOrCancellation() != null) {
+                            if (!committedOnPress) onCommit(keyOutput)
+                        } else {
+                            if (committedOnPress) {
+                                committedOnPress = false
+                                onRevoke(keyOutput)
+                            }
+                        }
                     }
                     longPress is LongPress.Repeat -> {
                         // Character repeat, which a leftward drag promotes to word repeat.
@@ -672,6 +738,12 @@ internal fun Modifier.keyGestures(
                         }
                     }
                     longPress is LongPress.Alternates -> {
+                        // Same as the hold path above: the strip is about to commit a
+                        // different character than the one already on screen.
+                        if (committedOnPress) {
+                            committedOnPress = false
+                            onRevoke(keyOutput)
+                        }
                         alternates.show(
                             longPress.options,
                             keyBounds(),
