@@ -118,9 +118,41 @@ if [ -n "$notif_hits" ]; then
   fail=1
 fi
 
+# --- 5. ContentProvider.openFileHelper ---------------------------------------
+# Banned because StickerFileProvider overrides query(), and openFileHelper resolves a
+# URI by querying its own provider.
+#
+# sniff() read the sticker header through openFileHelper. That called query(), which
+# calls getType(), which calls sniff(), which called openFileHelper again -- unbounded
+# recursion, roughly 512 frames of it, ending in a native SIGSEGV that took the whole
+# IME process down on the *first* sticker tap. The catch in sniff() cannot help: a
+# blown stack is an Error, not an Exception. It was filed as "spamming stickers
+# crashed the keyboard" (roadmap 4J.3) purely because nobody had tapped one slowly,
+# and it had shipped in every release since v0.1.4-ALPHA.
+#
+# FileProvider.openFile maps the path from its own <files-path> config and asks the
+# provider nothing, so it is the safe way to read a file this provider serves. This is
+# a text-level ban rather than a unit test on purpose: Robolectric cannot model
+# FileProvider path resolution on Windows (it rejects its own temp data directory as
+# "Resolved path jumped beyond configured root"), so a test written against it passes
+# whether the recursion is present or not, which is worse than no test at all.
+# Matched as a call, so the comment above sniff() can keep explaining why this is
+# banned without tripping the check that enforces it -- the same reason the rule
+# above matches declaration syntax rather than the bare constant name.
+openfilehelper_hits=$(grep -RInE "openFileHelper[[:space:]]*\("   --include='*.kt' --include='*.java'   "${SRC_GLOBS[@]}" 2>/dev/null || true)
+
+if [ -n "$openfilehelper_hits" ]; then
+  echo "OPENFILEHELPER RULE VIOLATION -- ContentProvider.openFileHelper queries its own"
+  echo "provider, and StickerFileProvider.query() calls getType(): that is the recursion"
+  echo "that crashed the IME on every sticker tap. Use FileProvider.openFile instead:"
+  echo "$openfilehelper_hits"
+  echo
+  fail=1
+fi
+
 if [ "$fail" -eq 0 ]; then
   echo "Source rule check passed: no emoji, all source files watermarked, no prefs listeners,"
-  echo "no notification listener."
+  echo "no notification listener, no openFileHelper."
 fi
 
 exit "$fail"
