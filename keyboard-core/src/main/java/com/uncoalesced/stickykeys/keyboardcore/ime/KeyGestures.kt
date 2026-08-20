@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.pointerInput
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.LatencyTracker
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * What a key does when it is held rather than tapped.
@@ -254,6 +256,52 @@ internal val DIGIT_ALTERNATES_DEFAULT_INDEX = mapOf("4" to CURRENCY_DEFAULT_INDE
  */
 internal fun isGlideCandidate(keyOutput: String): Boolean =
     keyOutput.length == 1 && keyOutput[0].isLetter()
+
+/**
+ * Dead zone past a key's own edge, before a press is read as the start of a glide.
+ *
+ * Crossing the edge is still what decides a glide -- see the comment in the watch loop for why
+ * that, and not a travel distance, is the test. This is only the tolerance on it, and it exists
+ * because "crossed the edge" and "is a glide" stopped being the same statement the moment
+ * letters began committing on press (see [commitsOnPress]). Before that, a tap that strayed a
+ * pixel over its own boundary and lifted still typed on release and nothing was lost. Now the
+ * same stray press revokes the letter already on screen and hands the gesture to the decoder,
+ * which either finds nothing -- a dropped character -- or commits some short unrelated reading
+ * over the text near the caret. That is zap's "it sometimes doesnt register a character if I
+ * type too fast" and "its randomly deleting chars" (roadmap 4J.1): fast typing is exactly what
+ * produces the off-centre press that lands near an edge and rolls over it.
+ *
+ * Measured from the *edge*, not from the touch point, so a press that lands mid-key still has
+ * to cross the whole way out. That asymmetry is right: a tap already sitting on the boundary
+ * is the genuinely ambiguous one, and it is the only one this has to be careful about.
+ *
+ * ponytail: 10dp is a guess with no device behind it. It costs a real glide a couple of pointer
+ * samples and nothing else, because the stroke is anchored at the key's centre either way, so
+ * erring high is the cheap direction. If a device pass still drops characters, raise it (16dp
+ * is still under half a key width); if real glides start failing to trigger, lower it toward
+ * the 6dp [ALTERNATE_DRAG_SLOP_DP] already uses to absorb the same jitter.
+ */
+internal const val GLIDE_ESCAPE_DP = 10f
+
+/**
+ * Whether the finger has left this key far enough that a tap is no longer a plausible reading.
+ *
+ * Pure, so the dead zone is assertable without a pointer harness -- which matters here more
+ * than usual, because the thing it prevents is invisible until someone types fast on a phone.
+ *
+ * [bounds] and [point] are both in root coordinates. An [escapePx] of zero collapses this back
+ * to the bare bounds test it replaced.
+ */
+internal fun glideEscaped(
+    bounds: Rect,
+    point: Offset,
+    escapePx: Float,
+): Boolean {
+    if (bounds.contains(point)) return false
+    val dx = maxOf(bounds.left - point.x, point.x - bounds.right, 0f)
+    val dy = maxOf(bounds.top - point.y, point.y - bounds.bottom, 0f)
+    return hypot(dx, dy) >= escapePx
+}
 
 /**
  * Whether this key puts its character on screen when the finger lands, rather than when it lifts.
@@ -566,6 +614,13 @@ internal fun Modifier.keyGestures(
                 // the space bar, whereas crossing into a neighbour means the same thing
                 // everywhere -- and it is precisely the moment a tap stops being a plausible
                 // reading of what the finger is doing.
+                //
+                // With a dead zone on it, and only a dead zone: the edge still decides,
+                // GLIDE_ESCAPE_DP only says how far past it the finger has to be before the
+                // crossing is believed. Without one, a fast off-centre tap that rolls a pixel
+                // over its own boundary is indistinguishable from a glide's first sample, and
+                // since v0.1.7.2 that costs the letter already on screen. See GLIDE_ESCAPE_DP.
+                //
                 // The glide watch runs *inside* the long-press window rather than instead of
                 // it, and that is the whole reason this is shaped the way it is.
                 //
@@ -581,6 +636,7 @@ internal fun Modifier.keyGestures(
                 var heldPastThreshold = false
                 if (glide != null && isGlideCandidate(keyOutput)) {
                     val origin = keyBounds()
+                    val escapePx = GLIDE_ESCAPE_DP.dp.toPx()
                     var glided = false
                     var lifted = false
                     withTimeoutOrNull(LONG_PRESS_MS) {
@@ -592,7 +648,7 @@ internal fun Modifier.keyGestures(
                                 break
                             }
                             val root = origin.topLeft + change.position
-                            if (!origin.contains(root)) {
+                            if (glideEscaped(origin, root, escapePx)) {
                                 glided = true
                                 glide.begin(origin.center)
                                 glide.move(root)
