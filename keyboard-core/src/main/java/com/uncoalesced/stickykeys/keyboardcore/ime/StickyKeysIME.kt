@@ -28,6 +28,7 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.LatencyTracker
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
 import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
@@ -80,6 +81,10 @@ class StickyKeysIME :
     @Inject
     lateinit var usageLog: com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
 
+    @Inject
+    lateinit var typingStats:
+        com.uncoalesced.stickykeys.keyboardcore.diagnostics.TypingStatsStore
+
     /**
      * Where the caret is, mirrored from [onUpdateSelection].
      *
@@ -120,6 +125,7 @@ class StickyKeysIME :
                         hapticsManager,
                         incognitoState,
                         usageLog,
+                        typingStats,
                     ) as T
                 } else if (modelClass.isAssignableFrom(ClipboardIMEViewModel::class.java)) {
                     return ClipboardIMEViewModel(clipboardDao) as T
@@ -353,6 +359,9 @@ class StickyKeysIME :
         // Flushed when the keyboard goes away rather than on a timer: an IME process can be
         // killed at any moment, and a session that only existed in memory would be lost.
         usageLog.onSessionEnd()
+        // Same reason as the line above: an IME process can be killed at any moment, so
+        // counters that only ever existed in memory would be lost with it.
+        typingStats.flush()
         // Keyboard no longer shown -> no field-driven incognito any more. A manual private
         // mode stays on: clipboard capture keeps running while the keyboard is hidden, and
         // that is precisely the window a user who threw the switch wants covered.
@@ -455,6 +464,15 @@ class StickyKeysIME :
     private fun predictCaret(position: Int) {
         selStart = position
         selEnd = position
+        // Every edit this keyboard makes to the host passes through here -- that is the whole
+        // reason it exists -- so it is also the one place that can say "this keyboard's work
+        // for that key press is finished" without a mark in each of commitText, sendDelete,
+        // replaceTextBeforeCursor, deleteBefore and the newline path, and without the next
+        // edit primitive added being quietly left out of the measurement.
+        //
+        // Silent unless a key press is actually outstanding, so a suggestion tap, a paste or
+        // an autocorrect follow-up is not timed against whatever the finger last did.
+        LatencyTracker.markCommitted()
     }
 
     /**

@@ -3,11 +3,14 @@ package com.uncoalesced.stickykeys.ui.screens
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -77,6 +80,8 @@ class KeyboardSettingsViewModel
         private val clipboardDao: ClipboardDao,
         val appPreferences: com.uncoalesced.stickykeys.data.local.AppPreferences,
         private val usageLog: com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder,
+        private val typingStats:
+            com.uncoalesced.stickykeys.keyboardcore.diagnostics.TypingStatsStore,
     ) : ViewModel() {
         /** Opening either editor is what arms the default-keyboard prompt. */
         fun onCustomizerOpened() {
@@ -165,6 +170,17 @@ class KeyboardSettingsViewModel
         fun usageLogUri() = usageLog.shareIntentFile()
 
         fun clearUsageLog() = usageLog.clear()
+
+        /**
+         * Read on demand rather than exposed as a flow.
+         *
+         * These counters change on the typing path, and a flow emitting per keystroke would
+         * mean this screen recomposing behind the keyboard for a number nobody is looking at.
+         * A screen that is open is a screen the user just opened.
+         */
+        fun statsSnapshot() = typingStats.snapshot()
+
+        fun clearStats() = typingStats.clear()
     }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -198,6 +214,8 @@ fun KeyboardSettingsScreen(
 
             val availableThemes by viewModel.themeManager.availableThemes.collectAsState()
             val availableLayouts by viewModel.layoutManager.availableLayouts.collectAsState()
+
+            var stats by remember { mutableStateOf(viewModel.statsSnapshot()) }
 
             var showClearClipboardDialog by remember { mutableStateOf(false) }
             var showResetAppearanceDialog by remember { mutableStateOf(false) }
@@ -667,6 +685,55 @@ fun KeyboardSettingsScreen(
                     )
                 }
 
+                // YOUR TYPING
+                //
+                // Present in every build, unlike the diagnostics group below it. This is the
+                // user's own data rather than a tester artefact, and it never leaves the
+                // device -- there is no share action here on purpose.
+                if (matches("Your typing", "speed", "accuracy", "stats")) {
+                    SettingsGroup(title = "Your typing") {
+                        StatRow("Keys typed", stats.keystrokes.toString())
+                        StatRow(
+                            "Speed",
+                            stats.wordsPerMinute?.let { "$it words a minute" }
+                                ?: "Not enough typing yet",
+                        )
+                        StatRow("Time spent typing", "${stats.activeMs / 60_000} min")
+                        // Two readings of "accuracy", each labelled for what it measures.
+                        // Deleting is not always a mistake and autocorrect being kept is a
+                        // statement about the engine, so averaging them would produce one
+                        // number that answers neither question.
+                        StatRow(
+                            "Typed without deleting",
+                            stats.cleanKeystrokePercent?.let { "$it%" } ?: "-",
+                        )
+                        StatRow(
+                            "Autocorrect kept",
+                            stats.correctionsKeptPercent?.let { "$it%" } ?: "-",
+                        )
+                        StatRow(
+                            "Key response",
+                            stats.latency.deliveryAverageMs?.let { "$it ms" } ?: "-",
+                        )
+                        Text(
+                            "Last 7 days",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                        WeekBars(stats.keystrokesByDay)
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.clearStats()
+                                stats = viewModel.statsSnapshot()
+                            },
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        ) {
+                            Text("Reset stats")
+                        }
+                    }
+                }
+
                 // Absent entirely from a stable or F-Droid build: USAGE_LOGGING is a
                 // compile-time false there, so this whole block folds away rather than
                 // showing a control for a file that is never written.
@@ -756,6 +823,55 @@ private fun SettingsGroup(
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 content = content,
+            )
+        }
+    }
+}
+
+/** One label and one value, the read-only counterpart to [SettingsSwitchRow]. */
+@Composable
+private fun StatRow(
+    title: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/**
+ * Seven days of keystroke counts as bars, oldest first.
+ *
+ * Deliberately not a charting library: seven numbers scaled against their own maximum is a
+ * Row of Boxes, and the alternative is a dependency whose size has to be argued against the
+ * 100MB budget for one figure on one screen.
+ */
+@Composable
+private fun WeekBars(counts: List<Long>) {
+    val peak = (counts.maxOrNull() ?: 0L).coerceAtLeast(1L)
+    Row(
+        modifier = Modifier.fillMaxWidth().height(48.dp).padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        counts.forEach { count ->
+            // A day with any typing at all keeps a visible sliver, so an empty day and a
+            // quiet one do not read as the same thing.
+            val fraction =
+                if (count == 0L) 0.02f else (count.toFloat() / peak).coerceAtLeast(0.08f)
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight(fraction)
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            StickyKeysTheme.shapes.small,
+                        ),
             )
         }
     }
