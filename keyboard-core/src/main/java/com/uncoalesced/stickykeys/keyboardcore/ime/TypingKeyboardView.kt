@@ -188,6 +188,12 @@ fun TypingKeyboardView(
             modeState = modeState,
         )
 
+    val onKeyRevoke =
+        rememberKeyRevokeHandler(
+            keyboardController = keyboardController,
+            typingViewModel = typingViewModel,
+        )
+
     // Remembered for the same reason as the key-press handler: an unmemoized lambda here is
     // a fresh instance every recomposition, which hands the space bar a changed parameter and
     // takes the whole grid out of skipping.
@@ -567,6 +573,7 @@ fun TypingKeyboardView(
                             palette = StickyKeysTheme.colors,
                             hasBackgroundImage = bgBitmap != null,
                             onKeyPress = onKeyPress,
+                            onKeyRevoke = onKeyRevoke,
                             modifier = Modifier.fillMaxSize(),
                             onScrub = onScrub,
                             onDeleteWord = onDeleteWord,
@@ -687,6 +694,7 @@ internal fun KeyboardKey(
     onDeleteWord: () -> Unit = {},
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
+    onKeyRevoke: (String) -> Unit = {},
 ) {
     val spokenLabel = accessibleKeyLabel(keyOutput)
     val spokenState = accessibleKeyState(keyOutput, mode)
@@ -832,6 +840,7 @@ internal fun KeyboardKey(
                     onDeleteWord = onDeleteWord,
                     glide = glide,
                     onGlide = onGlide,
+                    onRevoke = onKeyRevoke,
                 )
                 // pointerInput replaces `clickable`, which also supplied the button role and
                 // the click action. Both are restated here rather than lost: a screen reader
