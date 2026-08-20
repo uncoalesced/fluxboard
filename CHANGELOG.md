@@ -16,6 +16,93 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [v0.1.7.2-BETA] - 2026-08-20
+
+The intermittent typing-lag report, closed with a measurement rather than another
+guess. `.\gradlew.bat clean build` is green (compile, ktlint, lint, unit tests) and
+`scripts/check-source-rules.sh` passes.
+
+**Device-verified on 2026-08-20**, against the signed release installed **in place**
+on the LineageOS phone (2201117TI, Android 15), so the IME binding and the
+on-device dictionary, clipboard and themes all survived.
+
+### The report, and what it actually was
+
+"Key press to letter on screen lags, sometimes not always." The leading suspect
+going in was the haptic buzz -- a synchronous Binder call to `VibratorService`
+sitting in program order ahead of `commitText` on the main thread, on a phone
+running whatever vibrator HAL its OEM wrote.
+
+**That suspect is dead, and measured dead.** Across 280 presses on the device the
+vibrate call never once exceeded 1ms, `commitText` never exceeded 9ms, and the
+delivery span -- the OS timestamping a press to this process observing it, which is
+dwell-free by construction -- averaged 2.6ms with a p95 of 4ms and a worst sample of
+15ms. No frame skips, no blocking GC. Nothing in this process was stalling, which is
+why three rounds of looking for a stall found nothing.
+
+The lag was the design. Every key committed on **release**, because release is the
+first moment a tap is distinguishable from a glide and from a hold. A dwell sweep on
+the device measured press-to-letter tracking finger dwell one-for-one: 50ms dwell
+gave 57ms, 100 gave 105, 200 gave 207, 300 gave 306, with this keyboard's own share a
+flat ~5ms throughout. So the delay was never the keyboard's -- it was the user's own
+dwell handed back to them, which varies keystroke to keystroke and is exactly why it
+"sometimes" happened and no one could describe a pattern.
+
+### Fixed
+
+- **Letters go on screen when the finger lands, not when it lifts.** Same sweep after
+  the change: 2ms, 1.2ms, 2.6ms, 1.8ms, 1.2ms across the same dwells -- flat, and
+  independent of how long the key is held. The variance that made it feel unsettling
+  is gone along with the delay.
+
+  The two gestures that only reveal themselves later take the letter back. A press
+  that leaves its key is the start of a glide; one that outstays the long-press
+  window is a hold that commits an alternate instead. Both revoke through a single
+  path that restores the word mirror and the sentence-start flag exactly as they were,
+  rather than merely deleting a character -- a mirror left one letter long is the
+  desync that makes the *next* destructive edit size itself against text that is not
+  there.
+
+  Letters only, and deliberately. A letter appends one character to the word mirror
+  and is reversible; punctuation and digits route through `onSymbolCommitted`, which
+  clears the mirror, so the word a revoke would have to restore is already gone. The
+  repeat and scrub keys are excluded twice over -- backspace already fires on press,
+  and a space-bar press may still become a caret scrub, which must not type.
+
+  Device-verified: ordinary typing is exact ("hello world", 11 keys, 11 characters);
+  a shifted slow press gives one `A` and not two, despite the mode change tearing the
+  gesture down mid-press; a long press gives the corner alternate alone with no
+  leftover letter; and a glide across `w`-`e`-`r`-`t` commits `wet ` with no stray
+  `w` in front of it.
+
+  The haptic moved with the commit, so it now fires as the finger lands rather than
+  as it lifts, which is where touch feedback belongs.
+
+### Changed
+
+- **`OUTLIER_THRESHOLD_MS` is calibrated instead of guessed**, 80ms to 32ms. The old
+  number was five frames at 60Hz picked before any distribution existed, and against
+  the real one -- p95 4ms, worst 15ms -- it would never have fired once. 32ms is two
+  frames at 60Hz and clear of the worst sample seen when nothing is wrong. It is one
+  phone's distribution; re-measure on a slower device before treating it as settled.
+
+### Added
+
+- **Key-press latency instrumentation, and typing stats for the user.**
+  `LatencyTracker` records two spans -- delivery, and press to this keyboard issuing
+  the edit -- as a rolling 200-sample window with an average, a p95 and a capped list
+  of individual spikes, because a p95 that wide smooths away three bad keystrokes in
+  a minute of typing, which was the exact shape of the report. It hooks
+  `predictCaret`, the one point every edit primitive already routes through, so
+  `commitText`, `replaceTextBeforeCursor`, `sendDelete` and the newline path are all
+  covered without a mark in each.
+
+  `TypingStatsStore` is the user-facing half: keystrokes, WPM, the two accuracy
+  readings kept separate, a seven-day window, and key response, in Keyboard Settings.
+  Counters live in memory and reach storage when the keyboard hides -- an `apply()`
+  per key press would put a disk write on the path this release exists to speed up.
+  Durations and counts only: no text, and no network code anywhere downstream.
+
 ## [v0.1.7.1-BETA] - 2026-08-18
 
 Worked from the consolidated v0.1.7 open backlog. `.\gradlew.bat build` is green
