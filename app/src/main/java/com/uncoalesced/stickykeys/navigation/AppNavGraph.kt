@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -53,6 +55,7 @@ import com.uncoalesced.stickykeys.ui.screens.AppSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.DevicePairingScreen
 import com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.StickersLibraryScreen
+import kotlin.math.abs
 import com.uncoalesced.stickykeys.keyboardcore.R as KeyboardCoreR
 
 /** One bottom-bar destination. */
@@ -107,10 +110,28 @@ fun AppNavGraph(
             NavEntry("settings", "Settings", Icons.Outlined.Settings),
         )
 
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    /** Switches dock tabs, shared by a dock tap and a swipe so the two cannot diverge. */
+    val goToDockRoute: (String) -> Unit = { route ->
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    // Where the swipe gesture is allowed to go, in the order the dock shows them. A detail
+    // route pushed on top of a tab is deliberately not in this list: swiping out of the crop
+    // or edit screen would discard work in progress.
+    val dockIndex =
+        screens.indexOfFirst { entry ->
+            currentDestination?.hierarchy?.any { it.route == entry.route } == true
+        }
+
     Scaffold(
         bottomBar = {
-            val navBackStackEntry by navController.currentBackStackEntryAsState()
-            val currentDestination = navBackStackEntry?.destination
             // Only the rendering changed. The navigate/popUpTo/restoreState block below is the
             // same one NavigationBarItem was given, because the navigation was never the
             // problem -- four Material items in a fixed bar were.
@@ -119,22 +140,25 @@ fun AppNavGraph(
                 isSelected = { route ->
                     currentDestination?.hierarchy?.any { it.route == route } == true
                 },
-                onSelect = { route ->
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
+                onSelect = goToDockRoute,
             )
         },
     ) { innerPadding ->
         NavHost(
             navController = navController,
             startDestination = "stickers",
-            modifier = Modifier.padding(innerPadding),
+            modifier =
+                Modifier
+                    .padding(innerPadding)
+                    .dockSwipe(
+                        enabled = dockIndex >= 0,
+                        key = dockIndex,
+                        onSwipe = { direction ->
+                            screens.getOrNull(dockIndex + direction)?.let {
+                                goToDockRoute(it.route)
+                            }
+                        },
+                    ),
         ) {
             composable("stickers") {
                 StickersLibraryScreen(
@@ -378,3 +402,49 @@ private val DOCK_ITEM_HEIGHT = 44.dp
 
 /** Matches the corner-hint dimming already used on the keyboard rather than a new value. */
 private const val DOCK_INACTIVE_ALPHA = 0.6f
+
+/**
+ * A horizontal fling that moves between the dock's own destinations.
+ *
+ * Deliberately a gesture over the existing [NavHost] rather than a `HorizontalPager` holding
+ * the four screens. A pager would track the finger, which is nicer, but the four dock
+ * destinations are also the pager's only legal pages -- every other route is pushed on top of
+ * one of them -- so it would mean lifting them out of the graph and losing the `saveState` /
+ * `restoreState` behaviour that keeps each tab's scroll position across a switch. That is a
+ * large change to the navigation of the whole app in exchange for a nicer transition.
+ *
+ * ponytail: no live tracking, the page changes on lift. Move to HorizontalPager if the
+ * four dock screens ever stop being the only top-level routes.
+ *
+ * Children see the pointer first, so a horizontal drag a slider or a scrolling row has already
+ * claimed is consumed before this ever sees it -- which is what stops the Height and Key Size
+ * sliders on the Keyboard tab from flicking the user to another page.
+ *
+ * @param onSwipe called with -1 to go left (towards the first tab) or +1 to go right.
+ */
+private fun Modifier.dockSwipe(
+    enabled: Boolean,
+    key: Any,
+    onSwipe: (Int) -> Unit,
+): Modifier =
+    if (!enabled) {
+        this
+    } else {
+        this.pointerInput(key) {
+            // A quarter of the width, so a deliberate sweep moves and a stray thumb does not.
+            val threshold = size.width / 4f
+            var travelled = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { travelled = 0f },
+                onDragCancel = { travelled = 0f },
+                onDragEnd = {
+                    if (abs(travelled) >= threshold) {
+                        onSwipe(if (travelled < 0f) 1 else -1)
+                    }
+                },
+            ) { change, dragAmount ->
+                travelled += dragAmount
+                change.consume()
+            }
+        }
+    }

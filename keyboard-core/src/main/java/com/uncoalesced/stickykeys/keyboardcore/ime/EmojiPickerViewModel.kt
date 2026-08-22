@@ -125,6 +125,7 @@ class EmojiPickerViewModel
          * scrutiny. In that case the first real emoji group is the honest default.
          */
         fun openAtDefaultTab() {
+            refreshRecents()
             _selectedTab.value = if (_recentEmoji.value.isEmpty()) FIRST_EMOJI_TAB else RECENT_TAB
         }
 
@@ -136,6 +137,7 @@ class EmojiPickerViewModel
          * Recent emoji and press a tab, which is the whole of the saving the remap was for.
          */
         fun openAtStickersTab() {
+            refreshRecents()
             _selectedTab.value = STICKERS_TAB_INDEX
         }
 
@@ -144,11 +146,32 @@ class EmojiPickerViewModel
             _recentEmoji.value = keyboardPreferences.recentEmoji()
         }
 
+        /**
+         * Settles any held order and re-reads, which every door into the picker must do.
+         *
+         * This view model is scoped to the IME service rather than to an input session, so it
+         * survives the keyboard being dismissed and shown again with whatever list it last
+         * published still in [_recentEmoji]. Without this the grid reopens showing an order
+         * that a use had already superseded, and corrects itself on the next tap instead of
+         * on open.
+         */
+        private fun refreshRecents() {
+            keyboardPreferences.settleRecentEmoji()
+            _recentEmoji.value = keyboardPreferences.recentEmoji()
+        }
+
         companion object {
-            /** Tab 0 is Recent, tab 1 is Stickers, and the Unicode groups follow. */
+            /**
+             * Tab 0 is Recent, 1 is Stickers, 2 is Emoticons, and the Unicode groups follow.
+             *
+             * [FIRST_EMOJI_TAB] is the offset every group lookup subtracts, so it is the one
+             * number that has to move when a fixed tab is added ahead of the groups. Nothing
+             * indexes the groups by a literal.
+             */
             const val RECENT_TAB = 0
             const val STICKERS_TAB_INDEX = 1
-            const val FIRST_EMOJI_TAB = 2
+            const val EMOTICONS_TAB = 2
+            const val FIRST_EMOJI_TAB = 3
 
             /** Label for the one synthetic group shown while a search is running. */
             const val SEARCH_RESULTS_GROUP = "Search results"

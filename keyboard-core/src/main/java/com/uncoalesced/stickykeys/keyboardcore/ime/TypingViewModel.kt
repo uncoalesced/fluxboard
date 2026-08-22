@@ -81,11 +81,54 @@ class TypingViewModel
         /** How large a key is drawn inside its cell. Independent of the panel height. */
         val keySizePercent: StateFlow<Int> = keyboardPreferences.keySizePercent
 
+        /**
+         * Height, written live by the resize panel.
+         *
+         * The same preference the settings slider writes, deliberately: the panel is a second
+         * way to reach one setting, not a second setting. Two stores would drift the moment a
+         * user touched one and then the other.
+         */
+        fun setKeyboardHeightPercent(percent: Int) =
+            keyboardPreferences.setKeyboardHeightPercent(percent)
+
+        /** The resize panel's Reset control. */
+        fun resetKeyboardSize() = keyboardPreferences.resetKeyboardSize()
+
+        /**
+         * Whether the resize handles are showing.
+         *
+         * Deliberately not a preference. It is something the user is *doing*, not something
+         * they have configured, so it must not survive the keyboard being dismissed -- coming
+         * back to a field and finding the keys covered in drag handles would read as a bug.
+         * Cleared by [onInputStarted] along with every other session-scoped latch.
+         */
+        private val _resizeMode = MutableStateFlow(false)
+        val resizeMode: StateFlow<Boolean> = _resizeMode.asStateFlow()
+
+        fun setResizeMode(on: Boolean) {
+            _resizeMode.value = on
+        }
+
         /** Whether a second quick space becomes a full stop. */
         val doubleSpacePeriodEnabled: StateFlow<Boolean> =
             keyboardPreferences.doubleSpacePeriodEnabled
 
         private var currentWord = ""
+
+        /**
+         * The word a run of backspaces is eating, kept so it can be offered back.
+         *
+         * A backspace is the one edit with no undo of its own, and the two ways of losing a
+         * whole word are the two where the strip goes empty and leaves nothing to tap: undoing
+         * a glide, which removes the entire word in one press, and deleting a typed word down
+         * to its last character. Retyping is the only recovery, which for a glide means typing
+         * out by hand the word the gesture existed to avoid typing.
+         *
+         * Captured at the *start* of a run rather than per press: by the time the word is gone
+         * the mirror has already shrunk to nothing, so the last thing it held is a single
+         * letter rather than the word that was lost.
+         */
+        private var backspacedWord: String? = null
 
         /**
          * The word the user last finished, used to rank what comes next.
@@ -167,6 +210,8 @@ class TypingViewModel
             enterIsNewline: Boolean = false,
             enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
         ) {
+            _resizeMode.value = false
+            backspacedWord = null
             currentWord = ""
             // A different field is a different sentence, in a different app. Carrying the last
             // word over would rank the first suggestion of a new message off whatever the user
@@ -413,6 +458,9 @@ class TypingViewModel
             // at all -- see onKeyRevoked. One level deep is all that is ever needed: only the
             // press still under the finger can be taken back.
             atSentenceStartBeforeKey = atSentenceStart
+            // Typing again means the delete was meant. Holding the word past this point would
+            // put a word the user has moved on from at the front of the strip.
+            backspacedWord = null
             currentWord += char
             _undoState.value = null // Typing clears undo state
             generation++
@@ -511,10 +559,15 @@ class TypingViewModel
                 atSentenceStart =
                     startsNewSentence(textBeforeCursor.dropLast(glided.length + 1))
                 publishAutoCapitalize()
-                _suggestions.value = emptyList()
+                // One press removed a whole word, so one tap has to be able to put it back.
+                backspacedWord = glided
+                _suggestions.value = listOf(glided)
                 return glided.length + 1
             }
             if (currentWord.isNotEmpty()) {
+                // The first backspace of a run is the only moment the whole word is still
+                // known. Later presses must not overwrite it with the shrinking remainder.
+                if (backspacedWord == null) backspacedWord = currentWord
                 currentWord = currentWord.dropLast(1)
                 // Deleting back to nothing puts the caret where a sentence would start again,
                 // so capitalization has to come back with it. Forcing this false
@@ -523,7 +576,14 @@ class TypingViewModel
                 // fact as an empty field, which is what asking the text settles.
                 atSentenceStart = startsNewSentence(textBeforeCursor.dropLast(1))
                 publishAutoCapitalize()
-                updateSuggestions()
+                if (currentWord.isEmpty()) {
+                    // Nothing left to predict from, so the strip would otherwise be empty.
+                    // While the word was still shrinking the ordinary prefix suggestions cover
+                    // this already -- "hello" is among the completions of "hell".
+                    _suggestions.value = listOfNotNull(backspacedWord)
+                } else {
+                    updateSuggestions()
+                }
                 return 1
             }
             // The mirror was already empty going in; the common case is straight after
@@ -540,6 +600,7 @@ class TypingViewModel
          * decides that once the async autocorrect check resolves.
          */
         fun onSpacePressed(): Int {
+            backspacedWord = null
             currentWord = ""
             _suggestions.value = emptyList()
             _undoState.value = null

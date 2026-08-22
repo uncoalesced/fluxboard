@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.uncoalesced.stickykeys.keyboardcore.R
+import com.uncoalesced.stickykeys.keyboardcore.emoji.EMOTICONS
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 
@@ -51,6 +52,11 @@ private val TAB_STRIP_HEIGHT = 40.dp
 
 /** Emoji are drawn by the system font, so the cell only needs to be a comfortable target. */
 private val EMOJI_CELL = 44.dp
+
+/** Wide enough for the longest kaomoji in [EMOTICONS] at 13sp without clipping it. */
+private val EMOTICON_CELL = 112.dp
+
+private val EMOTICON_ROW = 40.dp
 private val STICKER_CELL = 72.dp
 
 /** Matches one key row, so the picker's bottom edge lines up with the keyboard's. */
@@ -70,6 +76,12 @@ internal fun EmojiPickerView(
     viewModel: EmojiPickerViewModel,
     fileManager: com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager,
     onEmojiClick: (String) -> Unit,
+    /**
+     * Committed as plain text and not recorded anywhere, which is what separates it from
+     * [onEmojiClick]: an emoticon is characters the keyboard could already type, so there is
+     * nothing about it for the Recent grid to be a shortcut to.
+     */
+    onEmoticonClick: (String) -> Unit,
     onStickerClick: (Sticker) -> Unit,
     onBackToKeyboard: () -> Unit,
     onBackspace: () -> Unit,
@@ -91,7 +103,9 @@ internal fun EmojiPickerView(
     // for the picker mid-message almost always wants. Stickers follows, then the emoji groups
     // in the order emoji-test.txt lists them, which is the order every other picker uses.
     val tabLabels =
-        remember(groups) { listOf(RECENT_TAB_LABEL, STICKERS_TAB) + groups.map { it.name } }
+        remember(groups) {
+            listOf(RECENT_TAB_LABEL, STICKERS_TAB, EMOTICONS_TAB_LABEL) + groups.map { it.name }
+        }
 
     Column(
         modifier =
@@ -120,7 +134,7 @@ internal fun EmojiPickerView(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_quick_arrow),
+                    painter = painterResource(R.drawable.ic_key_arrow_back),
                     contentDescription = null,
                     tint = StickyKeysTheme.colors.onSurface,
                     modifier = Modifier.size(18.dp),
@@ -254,12 +268,27 @@ internal fun EmojiPickerView(
                         .semantics { contentDescription = "Back to letters" },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = ABC_TAB,
-                    maxLines = 1,
-                    color = StickyKeysTheme.colors.onSurfaceVariant,
-                    style = StickyKeysTheme.typography.labelMedium,
-                )
+                // Arrow *and* word. "ABC" alone sits in a row of category words and reads as
+                // one more category; the arrow is what makes it an exit at a glance. Reported
+                // twice as a missing back button while both this and the leading arrow were
+                // already here, which is a discoverability failure rather than a missing one.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_key_arrow_back),
+                        contentDescription = null,
+                        tint = StickyKeysTheme.colors.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text = ABC_TAB,
+                        maxLines = 1,
+                        color = StickyKeysTheme.colors.onSurfaceVariant,
+                        style = StickyKeysTheme.typography.labelMedium,
+                    )
+                }
             }
         }
 
@@ -331,6 +360,35 @@ internal fun EmojiPickerView(
                         ) {
                             Text(text = glyph, fontSize = 24.sp, textAlign = TextAlign.Center)
                         }
+                    }
+                }
+            }
+        } else if (selectedTab == EmojiPickerViewModel.EMOTICONS_TAB) {
+            // Wider cells than the emoji grid and not square: an emoticon is a short string
+            // rather than one glyph, so a square cell sized for a single character would clip
+            // every kaomoji in the list. Nothing here is recorded into Recent -- that grid is
+            // the emoji the user sent, and mixing text into it would make the emoji key land
+            // on a mixture of the two.
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(EMOTICON_CELL),
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            ) {
+                items(items = EMOTICONS, key = { it }) { emoticon ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .height(EMOTICON_ROW)
+                                .clickable(role = Role.Button) { onEmoticonClick(emoticon) }
+                                .semantics { contentDescription = "Emoticon $emoticon" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = emoticon,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            color = StickyKeysTheme.colors.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
             }
@@ -517,6 +575,11 @@ private const val STICKERS_TAB = "Stickers"
 
 /** The first tab, and where the emoji key lands. */
 private const val RECENT_TAB_LABEL = "Recent"
+
+// The tab holds text emoticons, and the label deliberately does not say so: "Emojis" is
+// what the tester asked for it to read, matching the keyboard he compared it against.
+// The constant and the data keep the accurate name so the code still describes itself.
+private const val EMOTICONS_TAB_LABEL = "Emojis"
 
 /** The universal label for "back to the letters", on every keyboard that has this panel. */
 private const val ABC_TAB = "ABC"

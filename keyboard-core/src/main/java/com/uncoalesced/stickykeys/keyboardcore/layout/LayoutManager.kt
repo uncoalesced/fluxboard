@@ -132,7 +132,19 @@ class LayoutManager
                         parsed != null &&
                             LayoutValidator.validate(parsed) is LayoutValidationResult.Valid
                     if (usable) {
-                        layouts.add(parsed!!)
+                        // Replaces an entry already claiming this id rather than joining it.
+                        // The built-in goes into the list first and the asset presets after,
+                        // so a custom file carrying a shipped id -- which is what a restored
+                        // backup or a device migration hands over -- used to sit behind the
+                        // shipped copy, and resolveLayout takes the first match. The user's
+                        // file was read, parsed, validated and then never used, with the save
+                        // itself having succeeded and nothing reporting a problem.
+                        val existing = layouts.indexOfFirst { it.id == parsed!!.id }
+                        if (existing >= 0) {
+                            layouts[existing] = parsed!!
+                        } else {
+                            layouts.add(parsed!!)
+                        }
                     } else {
                         runCatching {
                             file.renameTo(File(customLayoutsDir, "${file.name}.corrupt"))

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- A back arrow, for leaving a panel and returning to the letters.
+
+     The emoji, sticker and clipboard panels all used ic_quick_arrow for this, which is the
+     up chevron the quick access row uses to mean "collapse". Pointing up is the wrong thing
+     for an exit, and a control that does not look like the thing it does is reported as
+     missing rather than as unclear, which is exactly what happened. Same stroke weight and
+     cap as the chevron so the two still look like one family. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M19,12 L5,12 M11,6 L5,12 L11,18" />
+</vector>
