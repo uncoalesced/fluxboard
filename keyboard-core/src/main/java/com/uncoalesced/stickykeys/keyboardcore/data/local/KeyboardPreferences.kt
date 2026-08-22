@@ -287,6 +287,24 @@ class KeyboardPreferences
                 .apply()
         }
 
+        /**
+         * Drops the held order, so the next [recentEmoji] reports what is actually stored.
+         *
+         * The freeze lapses on a clock, but nothing in the picker re-reads on a clock -- it
+         * reads once when it opens and again on each use. So a promotion the freeze deferred
+         * stayed invisible while the keyboard was closed, survived into the next session as a
+         * stale grid, and then landed all at once under the user's next tap. Every cell moving
+         * at the moment a finger comes down, once per session and never again in that session,
+         * is what the report "the emoji randomly shuffle" describes.
+         *
+         * Reopening the picker is the moment there is no burst left to protect, so it is the
+         * moment to settle. The freeze is about a finger already in flight, not about the
+         * order being sticky in general.
+         */
+        fun settleRecentEmoji() {
+            frozenRecentOrder = null
+        }
+
         private var frozenRecentOrder: List<String>? = null
         private var frozenRecentAt: Long = 0L
 

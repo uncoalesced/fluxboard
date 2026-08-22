@@ -222,6 +222,7 @@ fun MainIMEView(
                                     // emoji is almost always followed by picking another.
                                     interceptingController.commitText(glyph)
                                 },
+                                onEmoticonClick = { interceptingController.commitText(it) },
                                 onStickerClick = {
                                     onStickerClick(it)
                                     interceptingController.switchMode(AppMode.TYPING)

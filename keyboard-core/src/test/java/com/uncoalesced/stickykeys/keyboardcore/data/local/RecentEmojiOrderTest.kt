@@ -73,6 +73,50 @@ class RecentEmojiOrderTest {
         assertEquals(listOf(grinning), prefs().recentEmoji())
     }
 
+    @Test
+    fun `reopening the picker settles the order instead of deferring it to the next tap`() {
+        // Issue #28. The picker's view model lives as long as the IME service, so it carries
+        // the last order it published across a keyboard dismiss. The freeze lapses on a clock
+        // that nothing reads, so without settling on open the grid comes back showing the
+        // pre-promotion order and then jumps the moment the user taps -- once per session,
+        // which is exactly the reported "shuffles after the first use but not after that".
+        val p = prefs()
+        var now = 1_000L
+        p.clock = { now }
+
+        p.recordEmojiUse(grinning)
+        now += KeyboardPreferences.EMOJI_PROMOTION_DELAY_MS
+        p.recordEmojiUse(beaming)
+        assertEquals("held while the burst is in flight", listOf(grinning), p.recentEmoji())
+
+        // The keyboard closes and comes back. No time has to pass for this to matter: what
+        // makes the grid stale is the held order, not the clock.
+        p.settleRecentEmoji()
+        assertEquals(
+            "reopening must show the promotion, not defer it to the next tap",
+            listOf(beaming, grinning),
+            p.recentEmoji(),
+        )
+    }
+
+    @Test
+    fun `settling does not disturb a burst that has not been interrupted`() {
+        // The freeze still has to do its job. Settling is tied to the picker opening, so a
+        // run of taps with no reopen between them must behave exactly as it did before.
+        val p = prefs()
+        var now = 1_000L
+        p.clock = { now }
+
+        p.recordEmojiUse(grinning)
+        now += KeyboardPreferences.EMOJI_PROMOTION_DELAY_MS
+        assertEquals(listOf(grinning), p.recentEmoji())
+
+        p.recordEmojiUse(beaming)
+        now += 500
+        p.recordEmojiUse(laughing)
+        assertEquals("still held mid-burst", listOf(grinning), p.recentEmoji())
+    }
+
     /** A multi-code-point glyph has to survive storage whole rather than as its halves. */
     @Test
     fun `a non-BMP glyph round-trips`() {

@@ -93,7 +93,7 @@ fun ClipboardIMEView(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_quick_arrow),
+                    painter = painterResource(R.drawable.ic_key_arrow_back),
                     contentDescription = null,
                     tint = StickyKeysTheme.colors.onSurface,
                     modifier = Modifier.size(18.dp),
