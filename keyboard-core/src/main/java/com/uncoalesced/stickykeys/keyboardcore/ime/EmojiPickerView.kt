@@ -576,7 +576,10 @@ private const val STICKERS_TAB = "Stickers"
 /** The first tab, and where the emoji key lands. */
 private const val RECENT_TAB_LABEL = "Recent"
 
-private const val EMOTICONS_TAB_LABEL = "Emoticons"
+// The tab holds text emoticons, and the label deliberately does not say so: "Emojis" is
+// what the tester asked for it to read, matching the keyboard he compared it against.
+// The constant and the data keep the accurate name so the code still describes itself.
+private const val EMOTICONS_TAB_LABEL = "Emojis"
 
 /** The universal label for "back to the letters", on every keyboard that has this panel. */
 private const val ABC_TAB = "ABC"
