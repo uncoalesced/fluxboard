@@ -21,14 +21,41 @@ class MigrationPackager
         @ApplicationContext private val context: Context,
     ) {
         /**
+         * Creates a migration scratch file in cacheDir, private to this app. Every file this
+         * returns holds the personal dictionary, clipboard history and stickers in the clear, so
+         * it must not be readable by another app and must not outlive the transfer that made it.
+         */
+        fun createScratchFile(name: String): File =
+            File(context.cacheDir, SCRATCH_PREFIX + name).apply {
+                delete()
+                createNewFile()
+                setReadable(false, false)
+                setReadable(true, true)
+                setWritable(false, false)
+                setWritable(true, true)
+            }
+
+        /**
+         * Deletes any scratch file a previous transfer left behind. A transfer killed mid-flight
+         * (crash, force-stop, OOM kill) never reaches its own cleanup, so the decrypted payload
+         * would otherwise sit in cacheDir indefinitely. Call this at the start of a transfer, not
+         * from [createScratchFile] -- packaging nests a second scratch file inside the first, and
+         * sweeping there would unlink the payload zip while it is still being written.
+         */
+        fun purgeScratchFiles() {
+            context.cacheDir
+                .listFiles { file -> file.name.startsWith(SCRATCH_PREFIX) }
+                ?.forEach { it.delete() }
+        }
+
+        /**
          * Packages all relevant application data into a temporary ZIP file.
          * @param includeClipboard Whether to include clipboard history. If false, the DB is sanitized.
          * @return The temporary ZIP file.
          */
         suspend fun packageDataToTempFile(includeClipboard: Boolean): File =
             withContext(Dispatchers.IO) {
-                val tempZip = File(context.cacheDir, "migration_payload.zip")
-                if (tempZip.exists()) tempZip.delete()
+                val tempZip = createScratchFile("payload.zip")
 
                 val zos = ZipOutputStream(tempZip.outputStream())
 
@@ -92,8 +119,7 @@ class MigrationPackager
             if (!originalDb.exists()) return
 
             // Create a temporary copy to sanitize
-            val tempDb = File(context.cacheDir, "temp_keyboard_database")
-            if (tempDb.exists()) tempDb.delete()
+            val tempDb = createScratchFile("keyboard_db")
 
             // We must ensure the original DB is fully checkpointed, but since we are just reading it,
             // copying the main file might miss WAL data.
@@ -132,8 +158,11 @@ class MigrationPackager
                 sanitizedDb.close()
             }
 
-            writeFileToZip(zos, tempDb, "databases/keyboard_database")
-            tempDb.delete() // Cleanup
+            try {
+                writeFileToZip(zos, tempDb, "databases/keyboard_database")
+            } finally {
+                tempDb.delete()
+            }
         }
 
         private fun packDirectory(
@@ -228,5 +257,10 @@ class MigrationPackager
             val candidate = File(baseCanonical, relativePath).canonicalFile
             val basePrefix = baseCanonical.path + File.separator
             return if (candidate.path.startsWith(basePrefix)) candidate else null
+        }
+
+        companion object {
+            /** Marks every cacheDir file a migration creates, so a sweep can find them all. */
+            const val SCRATCH_PREFIX = "migration_"
         }
     }

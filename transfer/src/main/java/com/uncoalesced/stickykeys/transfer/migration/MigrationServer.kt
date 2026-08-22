@@ -57,6 +57,7 @@ class MigrationServer
         suspend fun startServer(includeClipboard: Boolean) =
             withContext(Dispatchers.IO) {
                 try {
+                    packager.purgeScratchFiles()
                     serverSocket = ServerSocket(0)
                     val port = serverSocket!!.localPort
                     val token = pairingManager.generatePairingToken(port)
@@ -94,26 +95,31 @@ class MigrationServer
                     dataOut.flush()
 
                     // 7. Send Encrypted Data
-                    val cipherOut = CipherOutputStream(socket.getOutputStream(), cipher)
-                    zipFile.inputStream().use { fileIn ->
-                        val buffer = ByteArray(8192)
-                        var totalRead = 0L
-                        val fileLength = zipFile.length().toFloat()
-                        var bytesRead: Int
+                    try {
+                        val cipherOut = CipherOutputStream(socket.getOutputStream(), cipher)
+                        zipFile.inputStream().use { fileIn ->
+                            val buffer = ByteArray(8192)
+                            var totalRead = 0L
+                            val fileLength = zipFile.length().toFloat()
+                            var bytesRead: Int
 
-                        while (fileIn.read(buffer).also { bytesRead = it } != -1) {
-                            cipherOut.write(buffer, 0, bytesRead)
-                            totalRead += bytesRead
-                            if (fileLength > 0) {
-                                _state.value =
-                                    MigrationServerState.Transferring(totalRead / fileLength)
+                            while (fileIn.read(buffer).also { bytesRead = it } != -1) {
+                                cipherOut.write(buffer, 0, bytesRead)
+                                totalRead += bytesRead
+                                if (fileLength > 0) {
+                                    _state.value =
+                                        MigrationServerState.Transferring(totalRead / fileLength)
+                                }
                             }
                         }
+                        cipherOut.close() // GCM flushes auth tag here
+                        socket.close()
+                        serverSocket?.close()
+                    } finally {
+                        // Holds the same plaintext data as the receiving side's copy: it must not
+                        // survive a send that threw partway through.
+                        zipFile.delete()
                     }
-                    cipherOut.close() // GCM flushes auth tag here
-                    socket.close()
-                    serverSocket?.close()
-                    zipFile.delete()
 
                     _state.value = MigrationServerState.Success
                 } catch (e: Exception) {

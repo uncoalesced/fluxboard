@@ -54,6 +54,7 @@ class MigrationClient
             withContext(Dispatchers.IO) {
                 try {
                     _state.value = MigrationClientState.Connecting
+                    packager.purgeScratchFiles()
 
                     // This verifies expiry and derives the shared secret implicitly if valid
                     val verifyResult = pairingManager.verifyAndAcceptToken(tokenString)
@@ -91,43 +92,48 @@ class MigrationClient
 
                     // 4. Download and Decrypt
                     val cipherIn = CipherInputStream(socket.getInputStream(), cipher)
-                    val tempZip = File.createTempFile("migration_receive", ".zip")
 
-                    tempZip.outputStream().use { fileOut ->
-                        val buffer = ByteArray(8192)
-                        var totalRead = 0L
-                        var bytesRead: Int
+                    // The payload lands decrypted, so it goes to private app storage rather than
+                    // the shared temp directory, and it is deleted on every exit from here --
+                    // not only on the two paths that happen to succeed.
+                    val tempZip = packager.createScratchFile("receive.zip")
+                    try {
+                        tempZip.outputStream().use { fileOut ->
+                            val buffer = ByteArray(8192)
+                            var totalRead = 0L
+                            var bytesRead: Int
 
-                        while (cipherIn.read(buffer).also { bytesRead = it } != -1) {
-                            fileOut.write(buffer, 0, bytesRead)
-                            totalRead += bytesRead
-                            if (fileLength > 0) {
-                                _state.value =
-                                    MigrationClientState.Transferring(
-                                        totalRead.toFloat() / fileLength.toFloat(),
-                                    )
+                            while (cipherIn.read(buffer).also { bytesRead = it } != -1) {
+                                fileOut.write(buffer, 0, bytesRead)
+                                totalRead += bytesRead
+                                if (fileLength > 0) {
+                                    _state.value =
+                                        MigrationClientState.Transferring(
+                                            totalRead.toFloat() / fileLength.toFloat(),
+                                        )
+                                }
                             }
                         }
-                    }
 
-                    cipherIn.close()
-                    socket.close()
+                        cipherIn.close()
+                        socket.close()
 
-                    // 5. Verify Checksum
-                    _state.value = MigrationClientState.Extracting
-                    val actualChecksum = computeChecksum(tempZip)
-                    if (!actualChecksum.contentEquals(expectedChecksum)) {
+                        // 5. Verify Checksum
+                        _state.value = MigrationClientState.Extracting
+                        val actualChecksum = computeChecksum(tempZip)
+                        if (!actualChecksum.contentEquals(expectedChecksum)) {
+                            throw SecurityException(
+                                "Checksum verification failed! Data may be corrupted or tampered with.",
+                            )
+                        }
+
+                        // 6. Extract
+                        tempZip.inputStream().use { fileIn ->
+                            packager.extractDataFromStream(fileIn)
+                        }
+                    } finally {
                         tempZip.delete()
-                        throw SecurityException(
-                            "Checksum verification failed! Data may be corrupted or tampered with.",
-                        )
                     }
-
-                    // 6. Extract
-                    tempZip.inputStream().use { fileIn ->
-                        packager.extractDataFromStream(fileIn)
-                    }
-                    tempZip.delete()
 
                     _state.value = MigrationClientState.Success
                 } catch (e: Exception) {
