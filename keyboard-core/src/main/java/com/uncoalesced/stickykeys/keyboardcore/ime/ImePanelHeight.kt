@@ -143,3 +143,29 @@ internal fun panelHeightFor(
         else -> requested
     }
 }
+
+/**
+ * The empty space held above the panel while the resize handles are open.
+ *
+ * The window has to stay still for the whole drag -- an IME window is WRAP_CONTENT, so every
+ * height change is a cross-process relayout of the host app, and a drag would be one per frame.
+ * But the *panel* has to move, or the handle is attached to nothing and the preview is a lie.
+ *
+ * Both are satisfied by padding the difference: this returns however much shorter the panel
+ * currently is than the tallest it could be, so `headroom + panel` is a constant for the whole
+ * session no matter where the drag is. The window is measured once entering resize mode and
+ * once on Done.
+ */
+@Composable
+internal fun rememberResizeHeadroom(currentPanel: Dp): Dp {
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val preferred = dimensionResource(R.dimen.ime_panel_height)
+    val numberRow = dimensionResource(R.dimen.ime_number_row_height)
+    val metrics = LocalImePanelMetrics.current
+    return remember(screenHeight, preferred, numberRow, metrics, currentPanel) {
+        val maxScale = KeyboardPreferences.MAX_KEYBOARD_HEIGHT_PERCENT / 100f
+        val base = preferred + if (metrics.showNumberRow) numberRow else 0.dp
+        val tallest = panelHeightFor(base * maxScale, screenHeight, maxScale)
+        (tallest - currentPanel).coerceAtLeast(0.dp)
+    }
+}

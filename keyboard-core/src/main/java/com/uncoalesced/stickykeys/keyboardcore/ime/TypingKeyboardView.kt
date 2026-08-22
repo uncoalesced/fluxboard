@@ -380,6 +380,7 @@ fun TypingKeyboardView(
                         action.id == "settings" ->
                             openAppAt(context, ROUTE_KEYBOARD_SETTINGS)
                         action.id == "switchime" -> keyboardController.showInputMethodPicker()
+                        action.id == "resize" -> typingViewModel.setResizeMode(true)
                     }
                     // The privacy toggle stays put. Collapsing the row on it would hide the
                     // control the instant it was used, so confirming the state means reopening

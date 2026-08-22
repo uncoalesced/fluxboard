@@ -365,6 +365,17 @@ class KeyboardPreferences
             _privateModeEnabled.value = enabled
         }
 
+        /**
+         * Returns the keyboard to the shipped height.
+         *
+         * The Reset control in the resize panel. One call rather than a write from the UI so
+         * that resetting reads as the single intention it is.
+         */
+        fun resetKeyboardSize() {
+            prefs.edit().putInt("keyboard_height_percent", DEFAULT_KEYBOARD_HEIGHT_PERCENT).apply()
+            _keyboardHeightPercent.value = DEFAULT_KEYBOARD_HEIGHT_PERCENT
+        }
+
         /** [dp] is the gap held below the bottom key row, above the gesture bar. */
         fun setKeyboardBottomPaddingDp(dp: Int) {
             val clamped = dp.coerceIn(0, MAX_BOTTOM_PADDING_DP)

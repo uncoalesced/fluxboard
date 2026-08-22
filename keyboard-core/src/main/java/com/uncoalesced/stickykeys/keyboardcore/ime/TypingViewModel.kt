@@ -81,6 +81,34 @@ class TypingViewModel
         /** How large a key is drawn inside its cell. Independent of the panel height. */
         val keySizePercent: StateFlow<Int> = keyboardPreferences.keySizePercent
 
+        /**
+         * Height, written live by the resize panel.
+         *
+         * The same preference the settings slider writes, deliberately: the panel is a second
+         * way to reach one setting, not a second setting. Two stores would drift the moment a
+         * user touched one and then the other.
+         */
+        fun setKeyboardHeightPercent(percent: Int) =
+            keyboardPreferences.setKeyboardHeightPercent(percent)
+
+        /** The resize panel's Reset control. */
+        fun resetKeyboardSize() = keyboardPreferences.resetKeyboardSize()
+
+        /**
+         * Whether the resize handles are showing.
+         *
+         * Deliberately not a preference. It is something the user is *doing*, not something
+         * they have configured, so it must not survive the keyboard being dismissed -- coming
+         * back to a field and finding the keys covered in drag handles would read as a bug.
+         * Cleared by [onInputStarted] along with every other session-scoped latch.
+         */
+        private val _resizeMode = MutableStateFlow(false)
+        val resizeMode: StateFlow<Boolean> = _resizeMode.asStateFlow()
+
+        fun setResizeMode(on: Boolean) {
+            _resizeMode.value = on
+        }
+
         /** Whether a second quick space becomes a full stop. */
         val doubleSpacePeriodEnabled: StateFlow<Boolean> =
             keyboardPreferences.doubleSpacePeriodEnabled
@@ -182,6 +210,7 @@ class TypingViewModel
             enterIsNewline: Boolean = false,
             enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
         ) {
+            _resizeMode.value = false
             backspacedWord = null
             currentWord = ""
             // A different field is a different sentence, in a different app. Carrying the last

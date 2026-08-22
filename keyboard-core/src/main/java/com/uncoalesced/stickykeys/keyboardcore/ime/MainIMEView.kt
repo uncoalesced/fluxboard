@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +24,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
@@ -119,6 +122,10 @@ fun MainIMEView(
     val numberRowShown by typingViewModel.showNumberRow.collectAsState()
     val keySizePercent by typingViewModel.keySizePercent.collectAsState()
     val showKeyHints by typingViewModel.showKeyHints.collectAsState()
+    // Session-scoped, and cleared by the view model along with every other latch when a new
+    // field is focused -- see TypingViewModel.resizeMode.
+    val resizing by typingViewModel.resizeMode.collectAsState()
+
     val panelMetrics =
         remember(
             heightPercent,
@@ -179,86 +186,108 @@ fun MainIMEView(
                         .windowInsetsPadding(WindowInsets.navigationBars)
                         .padding(bottom = panelMetrics.bottomPadding),
             ) {
-                // The three modes are the same height, so a crossfade reads as the surface changing
-                // contents rather than the window jumping. Sliding would fight the IME window, which
-                // is anchored to the bottom of the screen; a fade is the honest motion here.
-                AnimatedContent(
-                    targetState = currentAppMode,
-                    transitionSpec = {
-                        (fadeIn(animationSpec = tween(MODE_TRANSITION_MS)))
-                            .togetherWith(fadeOut(animationSpec = tween(MODE_TRANSITION_MS)))
-                    },
-                    label = "ime-mode",
-                ) { targetMode ->
-                    when (targetMode) {
-                        AppMode.TYPING -> {
-                            TypingKeyboardView(
-                                keyboardController = interceptingController,
-                                typingViewModel = typingViewModel,
-                            )
-                        }
-                        AppMode.EMOJI_PICKER, AppMode.STICKER_PICKER -> {
-                            // One view, two doors. The emoji key lands on Recent and the
-                            // stickers key on the stickers tab, in both cases overriding
-                            // whatever tab was left selected last time. Keyed on entering the
-                            // mode rather than on composition, so scrolling within the picker
-                            // does not reset it.
-                            LaunchedEffect(Unit) {
-                                if (targetMode == AppMode.STICKER_PICKER) {
-                                    emojiPickerViewModel.openAtStickersTab()
-                                } else {
-                                    emojiPickerViewModel.openAtDefaultTab()
-                                }
+                // The resize bar sits above the panel and the panel keeps its own height, so
+                // the two stack rather than the bar eating key space.
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (resizing) {
+                        // Holds the window still while the panel under it moves: the headroom
+                        // shrinks by exactly what the panel grows, so the sum -- and therefore
+                        // the window -- is constant for the whole drag. Without this the panel
+                        // could only be previewed by resizing the window on every frame, which
+                        // is the relayout storm this codebase already paid for once.
+                        Spacer(
+                            modifier =
+                                Modifier.height(rememberResizeHeadroom(rememberImePanelHeight())),
+                        )
+                        KeyboardResizeBar(
+                            onHeightDelta = { steps ->
+                                typingViewModel.setKeyboardHeightPercent(heightPercent + steps)
+                            },
+                            onReset = typingViewModel::resetKeyboardSize,
+                            onDone = { typingViewModel.setResizeMode(false) },
+                        )
+                    }
+                    // The three modes are the same height, so a crossfade reads as the surface changing
+                    // contents rather than the window jumping. Sliding would fight the IME window, which
+                    // is anchored to the bottom of the screen; a fade is the honest motion here.
+                    AnimatedContent(
+                        targetState = currentAppMode,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(MODE_TRANSITION_MS)))
+                                .togetherWith(fadeOut(animationSpec = tween(MODE_TRANSITION_MS)))
+                        },
+                        label = "ime-mode",
+                    ) { targetMode ->
+                        when (targetMode) {
+                            AppMode.TYPING -> {
+                                TypingKeyboardView(
+                                    keyboardController = interceptingController,
+                                    typingViewModel = typingViewModel,
+                                )
                             }
-                            EmojiPickerView(
-                                viewModel = emojiPickerViewModel,
-                                fileManager = fileManager,
-                                onEmojiClick = { glyph ->
-                                    // Recorded before the commit so the Recent tab is already
-                                    // correct if the user reopens the picker immediately.
-                                    emojiPickerViewModel.onEmojiUsed(glyph)
-                                    // Committed as plain text; the platform's emoji font draws
-                                    // it. Deliberately no mode switch afterwards -- picking one
-                                    // emoji is almost always followed by picking another.
-                                    interceptingController.commitText(glyph)
-                                },
-                                onEmoticonClick = { interceptingController.commitText(it) },
-                                onStickerClick = {
-                                    onStickerClick(it)
-                                    interceptingController.switchMode(AppMode.TYPING)
-                                },
-                                onBackToKeyboard = {
-                                    interceptingController.switchMode(AppMode.TYPING)
-                                },
-                                // Deletes without leaving the picker. Routed through the
-                                // controller rather than the typing model because there is no
-                                // word being tracked here -- an emoji is a committed glyph, not
-                                // a letter in progress.
-                                onBackspace = { interceptingController.sendDelete() },
-                                modifier = Modifier.height(rememberImePanelHeight()),
-                            )
-                        }
-                        AppMode.TEXT_EDIT -> {
-                            TextEditPanel(
-                                controller = interceptingController,
-                                palette = StickyKeysTheme.colors,
-                                onBackToKeyboard = {
-                                    interceptingController.switchMode(AppMode.TYPING)
-                                },
-                                modifier = Modifier.height(rememberImePanelHeight()),
-                            )
-                        }
-                        AppMode.CLIPBOARD -> {
-                            ClipboardIMEView(
-                                viewModel = clipboardIMEViewModel,
-                                onPasteText = { text ->
-                                    interceptingController.commitText(text)
-                                    interceptingController.switchMode(AppMode.TYPING)
-                                },
-                                onBackToKeyboard = {
-                                    interceptingController.switchMode(AppMode.TYPING)
-                                },
-                            )
+                            AppMode.EMOJI_PICKER, AppMode.STICKER_PICKER -> {
+                                // One view, two doors. The emoji key lands on Recent and the
+                                // stickers key on the stickers tab, in both cases overriding
+                                // whatever tab was left selected last time. Keyed on entering the
+                                // mode rather than on composition, so scrolling within the picker
+                                // does not reset it.
+                                LaunchedEffect(Unit) {
+                                    if (targetMode == AppMode.STICKER_PICKER) {
+                                        emojiPickerViewModel.openAtStickersTab()
+                                    } else {
+                                        emojiPickerViewModel.openAtDefaultTab()
+                                    }
+                                }
+                                EmojiPickerView(
+                                    viewModel = emojiPickerViewModel,
+                                    fileManager = fileManager,
+                                    onEmojiClick = { glyph ->
+                                        // Recorded before the commit so the Recent tab is already
+                                        // correct if the user reopens the picker immediately.
+                                        emojiPickerViewModel.onEmojiUsed(glyph)
+                                        // Committed as plain text; the platform's emoji font draws
+                                        // it. Deliberately no mode switch afterwards -- picking one
+                                        // emoji is almost always followed by picking another.
+                                        interceptingController.commitText(glyph)
+                                    },
+                                    onEmoticonClick = { interceptingController.commitText(it) },
+                                    onStickerClick = {
+                                        onStickerClick(it)
+                                        interceptingController.switchMode(AppMode.TYPING)
+                                    },
+                                    onBackToKeyboard = {
+                                        interceptingController.switchMode(AppMode.TYPING)
+                                    },
+                                    // Deletes without leaving the picker. Routed through the
+                                    // controller rather than the typing model because there is no
+                                    // word being tracked here -- an emoji is a committed glyph, not
+                                    // a letter in progress.
+                                    onBackspace = { interceptingController.sendDelete() },
+                                    modifier = Modifier.height(rememberImePanelHeight()),
+                                )
+                            }
+                            AppMode.TEXT_EDIT -> {
+                                TextEditPanel(
+                                    controller = interceptingController,
+                                    palette = StickyKeysTheme.colors,
+                                    onBackToKeyboard = {
+                                        interceptingController.switchMode(AppMode.TYPING)
+                                    },
+                                    modifier = Modifier.height(rememberImePanelHeight()),
+                                )
+                            }
+                            AppMode.CLIPBOARD -> {
+                                ClipboardIMEView(
+                                    viewModel = clipboardIMEViewModel,
+                                    onPasteText = { text ->
+                                        interceptingController.commitText(text)
+                                        interceptingController.switchMode(AppMode.TYPING)
+                                    },
+                                    onBackToKeyboard = {
+                                        interceptingController.switchMode(AppMode.TYPING)
+                                    },
+                                )
+                            }
                         }
                     }
                 }

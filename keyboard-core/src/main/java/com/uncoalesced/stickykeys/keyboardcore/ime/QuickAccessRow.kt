@@ -84,7 +84,11 @@ internal val quickActions =
         // Grammar check stays, being plausibly local. Move this back in one line if the
         // placeholder is wanted more than the shortcut.
         QuickAction("settings", R.drawable.ic_quick_settings, "Keyboard settings"),
-        QuickAction("grammar", R.drawable.ic_quick_grammar, "Grammar check", comingSoon = true),
+        // Took the Grammar placeholder's slot, on the same reasoning that retired the
+        // Translate one: seven is the hard ceiling above, so a shipped feature and a
+        // placeholder were competing for the same 48dp. Grammar comes back in one line
+        // if it is ever built.
+        QuickAction("resize", R.drawable.ic_quick_resize, "Resize keyboard"),
         QuickAction("clipboard", R.drawable.ic_key_clipboard, "Clipboard history"),
         QuickAction("textedit", R.drawable.ic_quick_text_edit, "Text editing"),
         QuickAction("private", R.drawable.ic_quick_private, "Private mode"),
