@@ -450,7 +450,11 @@ class PredictionEngine
                             childOffset,
                             beam.word + childChar,
                             beam.pathIndex,
-                            beam.cost + 1,
+                            // Free, matching scoreGlideCandidate. This charged 1 while the
+                            // score charged 0, so a doubled-letter reading was ranked worse
+                            // during the search than the score it was being searched for --
+                            // enough to drop it from a crowded beam and never be rescored.
+                            beam.cost + COST_DOUBLE_LETTER,
                             beam.pivotCredit,
                         ),
                     )
@@ -508,9 +512,9 @@ class PredictionEngine
             var near: Pair<Int, Int>? = null
             for (i in from until stroke.keys.size) {
                 val onPath = stroke.keys[i]
-                if (onPath == letter) return Pair(i, 0)
+                if (onPath == letter) return Pair(i, -CREDIT_KEY_ON_PATH)
                 if (near == null && KeyProximity.areAdjacent(onPath, letter)) {
-                    near = Pair(i, 3)
+                    near = Pair(i, COST_NEIGHBOUR - CREDIT_KEY_ON_PATH)
                 }
             }
             return near

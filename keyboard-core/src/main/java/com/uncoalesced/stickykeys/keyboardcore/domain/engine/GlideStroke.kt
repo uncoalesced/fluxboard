@@ -294,10 +294,16 @@ fun scoreGlideCandidate(
         }
         if (found < 0) return null
 
-        cost += foundCost
-        // Every key the path crossed between the previous letter and this one was incidental.
-        // Free, deliberately: penalising them would rank short words above long ones purely
-        // because a long word's path crosses more of the board.
+        // A letter that landed on the path is evidence *for* this reading, so it is worth
+        // something on its own. Without that, a reading is only ever charged for what it gets
+        // wrong, and a two-letter reading of a thirteen-key path has almost nothing it can be
+        // charged for -- see [CREDIT_KEY_ON_PATH].
+        cost += foundCost - CREDIT_KEY_ON_PATH
+        // Every key the path crossed between the previous letter and this one was incidental,
+        // and stays free. Charging for skipped keys is the other way to express the same
+        // preference and it is the wrong one: gliding q to p crosses the whole top row, so a
+        // per-key charge would make every long-distance word expensive for the distance it
+        // travelled rather than for how poorly it fits.
         if (stroke.pivots.contains(found)) explainedPivots.add(found)
         lastMatchedIndex = found
         pathIndex = found + 1
@@ -338,10 +344,50 @@ private fun matchesKey(
  * against every doubled word in English. With it at zero the two readings tie on structure and
  * frequency decides, which is the only signal that actually distinguishes them.
  */
-private const val COST_DOUBLE_LETTER = 0
+internal const val COST_DOUBLE_LETTER = 0
 
-/** Landing on a neighbour instead of the target is what fast gliding does. */
-private const val COST_NEIGHBOUR = 3
+/**
+ * Landing on a neighbour instead of the target is what fast gliding does.
+ *
+ * Equal to [CREDIT_KEY_ON_PATH] on purpose, which is what makes a clipped letter score zero:
+ * it forfeits exactly the credit an exact letter earns, and no more. A clipped letter is not
+ * evidence against a reading, it is the absence of evidence for it -- the finger was near that
+ * key and the path cannot say whether it meant it. Charging beyond the forfeited credit would
+ * make it evidence against, and on a fast glide, where most letters are clipped, that is a
+ * penalty for gliding quickly.
+ *
+ * It must also not be *less* than the credit, or a clipped letter would still net credit --
+ * and since a long path runs adjacent to most of the board, a long word could then outrank a
+ * short one on adjacency alone without ever touching the keys it claims.
+ */
+internal const val COST_NEIGHBOUR = 4
+
+/**
+ * What one letter landing on the path is worth to the reading that claims it.
+ *
+ * Scoring used to be penalties only: unexplained corners and clipped letters. That works while
+ * the corners survive, and corners are exactly what speed destroys -- a fast finger rounds its
+ * turns, the angle drops under the confidence gate in `buildGlideStroke`, and the pivot is
+ * never recorded. What is left is a path with two endpoints and no interior evidence, on which
+ * "hello" and "ho" both explain everything there is to explain and tie at zero. Frequency then
+ * picks the short word, every time, and only on the fast glides. That is issue #27, and it is
+ * structural rather than a tuning problem: the scorer had no way to say that a reading
+ * accounting for four of the crossed keys fits better than one accounting for two.
+ *
+ * Only an exact landing earns it. A letter merely *adjacent* to the path earns nothing, and
+ * that asymmetry is the whole guard on this: the path for a long glide runs next to most of
+ * the keyboard, so adjacency is nearly free to come by and says almost nothing. Crediting it
+ * turned a straight t-to-o drag into "tip" and "till" ahead of "to". Crossing the key itself
+ * is the part that is actually evidence.
+ *
+ * The value sits deliberately below [COST_UNEXPLAINED_PIVOT] (6), so a corner the user visibly
+ * turned stays stronger evidence than mere length: a longer word cannot bulldoze a shorter one
+ * that actually explains the shape of the path.
+ *
+ * A doubled letter earns nothing here, and must not: it matches no path position of its own,
+ * so "too" and "to" still tie exactly as [COST_DOUBLE_LETTER] describes.
+ */
+internal const val CREDIT_KEY_ON_PATH = 4
 
 /**
  * A corner the candidate does not explain.

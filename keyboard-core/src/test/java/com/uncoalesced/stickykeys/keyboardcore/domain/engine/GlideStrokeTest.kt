@@ -146,6 +146,50 @@ class GlideStrokeTest {
         assertTrue(clipped!! > scoreGlideCandidate("hello", helloStroke())!!)
     }
 
+    // --- speed, which is what removes the corners the ranking leans on --------------------
+
+    /**
+     * The same h-e-l-o path with nothing but its endpoints as corners.
+     *
+     * This is not a contrived stroke, it is what gliding the word quickly produces. A fast
+     * finger rounds its turns, the measured angle at each interior letter falls under the
+     * confidence gate in [buildGlideStroke], and those pivots are never recorded at all. So
+     * the fast reading of a path and the slow reading of the same path reach scoring with
+     * different amounts of evidence on them.
+     */
+    private fun rushedHelloStroke() = GlideStroke("hgfdertyuiklo".toList(), pivots = setOf(0, 12))
+
+    @Test
+    fun `a long word still beats a short one when speed has flattened the corners`() {
+        // Both are readings of the same path and both explain both endpoints, so every
+        // penalty the scorer knows about is zero for each of them. What separates them is
+        // that "hello" accounts for four of the keys the finger crossed and "ho" accounts for
+        // two -- and that difference has to be worth something, or the two tie and raw
+        // frequency picks the short word. This is issue #27: the same glide decodes correctly
+        // when drawn slowly and collapses to a shorter word when drawn fast.
+        val s = rushedHelloStroke()
+        val hello = scoreGlideCandidate("hello", s)
+        val ho = scoreGlideCandidate("ho", s)
+        assertNotNull(hello)
+        assertNotNull(ho)
+        assertTrue("hello ($hello) must still outrank ho ($ho) on a rushed path", hello!! < ho!!)
+    }
+
+    @Test
+    fun `a clipped letter does not cost a long reading its length advantage`() {
+        // Clipping is what fast gliding does, so charging for it must not overturn the
+        // evidence of the letters that did land. "hwllo" misses the 'e' by one key and still
+        // explains four of the crossed keys; "ho" explains two exactly and pays nothing.
+        // If a single clipped corner is enough to lose to a two-letter word, then accuracy
+        // falls away exactly as the glide gets faster, which is the reported symptom.
+        val s = rushedHelloStroke()
+        val clipped = scoreGlideCandidate("hwllo", s)
+        val short = scoreGlideCandidate("ho", s)
+        assertNotNull(clipped)
+        assertNotNull(short)
+        assertTrue("clipped ($clipped) must still outrank ho ($short)", clipped!! < short!!)
+    }
+
     // --- reducing a raw path -------------------------------------------------------------
 
     @Test
