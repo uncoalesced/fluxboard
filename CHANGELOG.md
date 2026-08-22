@@ -103,6 +103,27 @@ dictionary, clipboard and themes all survived the update.
   their own tab beside Stickers. They commit as plain text and are deliberately
   not recorded into Recents, which is the grid of emoji the user sent.
 
+- **Resize the keyboard from the keyboard.** A resize mode in the quick-access
+  row: Reset, a grab handle and Done, with the keyboard docked to the bottom and
+  its top edge dragged to change the height. Height only -- resizing means taller
+  or shorter, and making a keyboard narrower is a different feature wearing the
+  same word. It writes the same preference the Height slider in settings writes,
+  so the two are one setting reached two ways.
+
+  It is deliberately not a floating keyboard. One that can be dropped anywhere on
+  screen needs an overlay window rather than the framework's input-method window,
+  which is SYSTEM_ALERT_WINDOW territory, and this project's position is the
+  narrowest permission set that does the job.
+
+  The window does not follow the drag. An IME window's height *is* its content's
+  height, so every change is a relayout inside the app being typed into -- the
+  same thing that made a toolbar animation stutter once already. Instead the space
+  above the keyboard is padded out to whatever the panel is missing from its
+  tallest possible size, so the two always sum to the same number and the window
+  is measured once on entering and once on Done. Measured on the S8: 1552px
+  before, 2088px throughout every drag, 1539px after, and the chosen height
+  survived a reboot.
+
 - **A backspaced word stays one tap away.** Every other destructive edit here can
   be taken back; a backspace could not, and the suggestion strip went empty at
   exactly the moment there was something worth offering. Undoing a glide, or
