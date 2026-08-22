@@ -54,8 +54,21 @@ private const val COST_GAP = 3
 private const val COST_TRANSPOSE = 3
 private const val COST_SUBSTITUTE = 4
 
-/** Two ordinary edits. Beyond this the candidate is not a plausible reading of the input. */
-private const val MAX_EDIT_COST = COST_SUBSTITUTE * 2
+/**
+ * Three ordinary edits. Beyond this the candidate is not a plausible reading of the input.
+ *
+ * Raised from two deliberately, trading search width for accuracy. On the weighted scale
+ * above, two ordinary edits also bought only four adjacent slips -- and four adjacent slips is
+ * an ordinary outcome for a thumb moving quickly, so longer words were falling outside the
+ * budget for mistakes that are individually very likely. A third edit is what puts them back
+ * in reach.
+ *
+ * This widens the *pool*, not the willingness to correct: [MIN_CORRECTION_SCORE] still decides
+ * whether anything is applied, and a candidate three edits away carries three edits' worth of
+ * penalty into that decision. The cost is a wider walk on every word-ending keystroke, which
+ * is the trade this was asked for.
+ */
+private const val MAX_EDIT_COST = COST_SUBSTITUTE * 3
 
 /** The trie root sits immediately after the 4-byte "FLCT" magic. */
 private const val TRIE_ROOT_OFFSET = 4
@@ -86,8 +99,22 @@ private const val MAX_GLIDE_WORD = 24
  * multiplies the branches alive at the next letter. Kept deliberately wide: pruning is
  * insurance against a gesture nobody makes on purpose, not a ranking mechanism, and a narrow
  * beam would start cutting real words whose cost arrives late.
+ *
+ * Widened from 40. "A narrow beam cuts real words whose cost arrives late" is the exact
+ * failure mode of a long glide: the evidence separating a long reading from a short one sits
+ * at the end of the path, so the right reading can stay mid-table for most of the walk and
+ * only pull ahead once the last letters land. The wider the beam, the further a late-arriving
+ * winner can be carried, and widening can only ever keep candidates a narrower beam would
+ * have cut -- the ranking that follows is unchanged.
+ *
+ * Measured rather than assumed, against the real dictionary: at 40, at 120 and at this value
+ * the pathological stroke in GlideBeamTest -- the whole alphabet twice round with a corner
+ * every three keys, which no finger draws -- decodes in 35-37ms against that test's 5000ms
+ * ceiling, and an ordinary glide in about 30ms. The width stops being the binding constraint
+ * well before here, so the extra is insurance for the paths that do saturate it rather than
+ * work the common case pays for.
  */
-private const val MAX_GLIDE_BEAM = 40
+private const val MAX_GLIDE_BEAM = 320
 
 /**
  * Most a maximally-likely follower can take off a glide's cost.
