@@ -16,6 +16,110 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [v0.1.7.4-BETA] - 2026-08-22
+
+Glide typing that fell apart as it got faster, an emoji Recents grid that
+reshuffled itself under the user's thumb, and the decrypted device-migration
+payload sitting in the shared temp directory with default permissions. Plus two
+of zap's feature requests: swipe between the app's pages, and a separate tab for
+text emoticons. `.\gradlew.bat clean build` is green (compile, ktlint, lint, 511
+unit tests, 0 failures) and `scripts/check-source-rules.sh` passes.
+
+**Device-verified on 2026-08-22**, against the signed release installed **in
+place** on the LineageOS phone (2201117TI), so the IME binding and the on-device
+dictionary, clipboard and themes all survived the update.
+
+### Fixed
+
+- **Glide typing no longer collapses to a shorter word when you swipe quickly.**
+  The decoder only ever charged a reading for what it got wrong: corners it left
+  unexplained, letters that landed on a neighbour. That works while the corners
+  survive, and corners are exactly what speed destroys -- a fast finger rounds
+  its turns, the measured angle drops under the confidence threshold, and the
+  pivot is never recorded at all. What reaches scoring is then a path with two
+  endpoints and no interior evidence, on which "hello" and "ho" both explain
+  everything there is to explain and tie at zero. Frequency breaks the tie, and
+  frequency always prefers the short word.
+
+  A reading now earns credit for each letter that actually lands on the path, so
+  accounting for four of the keys crossed beats accounting for two. Only an exact
+  landing counts: a long path runs adjacent to most of the keyboard, so crediting
+  near-misses let a longer word win on adjacency alone without ever touching the
+  keys it claimed. The credit sits below what an unexplained corner costs, so a
+  corner the user visibly turned still outweighs mere length. Separately, the
+  beam search charged for a doubled letter while the score it was searching for
+  charged nothing, which quietly dropped words like "hello" and "coffee" out of a
+  crowded beam before they could be scored at all.
+
+- **Emoji Recents no longer reshuffles on the first use after reopening the
+  keyboard.** The grid is deliberately held still for three seconds after a tap
+  so a burst of emoji does not move the cells out from under the finger. That
+  hold lapses on a clock, but nothing re-reads on a clock -- the picker reads
+  once when it opens and again on each use. So a promotion the hold deferred
+  stayed invisible while the keyboard was closed, survived into the next session
+  as a stale grid, and then landed all at once under the user's next tap. Opening
+  the picker now settles the order, which is the moment there is no burst left to
+  protect.
+
+- **The device-migration payload is no longer written to the shared temp
+  directory.** The receiving side decrypts a transfer to a scratch file before it
+  can verify or extract it, and that file holds the personal dictionary,
+  clipboard history and sticker library in the clear. It was created with no
+  directory and no permissions given, so it landed outside the app's private
+  storage readable by default, and it was deleted only on the two paths that
+  happened to succeed -- a transfer killed partway through left it behind with no
+  cleanup path on any later launch. It now goes to private app storage with
+  explicit permissions, is deleted whatever happens, and anything a previous
+  transfer orphaned is swept on the next one. The sending side had the same leak
+  and the same fix.
+
+- **A custom layout saved under a shipped layout's id is no longer ignored.**
+  Layouts are loaded built-in first, then presets, then the user's own files,
+  with nothing checking for a clash -- and resolution takes the first entry
+  matching the id. A custom file carrying a shipped id, which is what a restored
+  backup or a device migration hands over, was read, parsed, validated and then
+  never used, while the save itself reported success. The user's file now
+  replaces the shipped entry rather than queueing behind it.
+
+- **The way out of the emoji, sticker and clipboard panels looks like a way out.**
+  All three used the quick-access row's collapse chevron -- an arrow pointing up
+  -- as their back control, and the "ABC" exit sat in a row of category names
+  reading as one more category. Both are now a proper back arrow, and the exit
+  pairs the arrow with the word. Reported twice as a missing back button while
+  both controls were already present, which is a discoverability failure rather
+  than a missing one.
+
+### Added
+
+- **Swipe between the app's pages.** A horizontal sweep across Styles, Keyboard,
+  Transfer and Settings moves between them instead of reaching for the dock. It
+  is a gesture over the existing navigation rather than a pager holding the four
+  screens, so each tab keeps its scroll position across a switch. Sliders and
+  scrolling rows claim a horizontal drag before it reaches the page, so the
+  keyboard height and key size controls still work normally.
+
+- **A separate Emoticons tab in the picker.** Text faces -- from `:)` to the
+  kaomoji long enough that typing one by hand is the whole problem -- now have
+  their own tab beside Stickers. They commit as plain text and are deliberately
+  not recorded into Recents, which is the grid of emoji the user sent.
+
+- **A backspaced word stays one tap away.** Every other destructive edit here can
+  be taken back; a backspace could not, and the suggestion strip went empty at
+  exactly the moment there was something worth offering. Undoing a glide, or
+  deleting a typed word down to nothing, now leaves that word in the strip until
+  the next keystroke. While a word is still shrinking nothing was added, because
+  ordinary prediction already covers it -- "hello" is a completion of "hell".
+
+### Not reproduced
+
+- **Symbol pages losing their edits after a version upgrade** (issue #30) could
+  not be reproduced on this build. Moving a key on symbols page 1 and on page 2,
+  saving, and then rebooting the phone and installing the next version over the
+  top left both edits in place, in the editor and on the keyboard. The
+  shipped-id shadowing fixed above is a real defect of exactly that shape and may
+  be what was hit, but it needs a restored backup or a device migration to occur
+  and is not what the report describes. Left open pending a more specific repro.
+
 ## [v0.1.7.3-BETA] - 2026-08-20
 
 zap's report on the v0.1.7.2 build: dropped characters when typing fast, a caps
