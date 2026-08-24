@@ -36,7 +36,7 @@ dependencies {
 
     // For GIF encoding
     implementation("com.shakster:gifkt-jvm:0.3.3")
-    implementation("com.squareup.okio:okio:3.9.0")
+    implementation("com.squareup.okio:okio:3.18.1")
 
     // For Animated WebP encoding
     implementation("com.aureusapps.android:webp-android:1.1.2")
@@ -48,10 +48,10 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.mockito:mockito-core:5.5.0")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test:core-ktx:1.6.1")
-    androidTestImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("org.mockito:mockito-core:5.23.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:core-ktx:1.7.0")
+    androidTestImplementation("androidx.room:room-testing:2.8.4")
 }
 
 jacoco {
