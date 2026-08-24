@@ -47,7 +47,7 @@ dependencies {
     // to play-services-mlkit-barcode-scanning and therefore to datatransport;
     // zxing-android-embedded is Apache-2.0 and Play-Services-free.
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
