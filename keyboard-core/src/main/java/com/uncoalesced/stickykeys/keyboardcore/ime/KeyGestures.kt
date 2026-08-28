@@ -700,11 +700,42 @@ internal fun Modifier.keyGestures(
                 // null  -> the threshold elapsed, this is a hold
                 // true  -> released before the threshold, an ordinary tap
                 // false -> the gesture was cancelled out from under us
+                // Travel during the hold window, tracked only for the key that can use it.
+                //
+                // `waitForUpOrCancellation` throws the finger's position away, so a drag
+                // beginning before the hold threshold elapsed was invisible. "Hold backspace
+                // and swipe left" performed as one motion takes well under that threshold,
+                // so the gesture looked absent to anyone who did not already know to hold
+                // still first and only then drag -- which is why it was reported missing
+                // twice against a feature that shipped and was verified on a device by
+                // somebody who knew the trick.
+                //
+                // Only the repeat key reads these, so only the repeat key takes the
+                // different wait. This block runs for every key on the board and the
+                // ordinary path is deliberately left byte-for-byte as it was.
+                var preTravelX = 0f
+                var preTravelY = 0f
                 val early =
                     if (heldPastThreshold) {
                         // Already established as a hold above; waiting a second full window
                         // would make every long press on a letter take twice as long.
                         null
+                    } else if (longPress is LongPress.Repeat) {
+                        withTimeoutOrNull(LONG_PRESS_MS) {
+                            var releasedCleanly = false
+                            while (true) {
+                                val change =
+                                    awaitPointerEvent().changes.firstOrNull() ?: break
+                                val delta = change.positionChange()
+                                preTravelX += delta.x
+                                preTravelY += delta.y
+                                if (!change.pressed) {
+                                    releasedCleanly = true
+                                    break
+                                }
+                            }
+                            releasedCleanly
+                        }
                     } else {
                         withTimeoutOrNull(LONG_PRESS_MS) {
                             waitForUpOrCancellation() != null
@@ -741,12 +772,22 @@ internal fun Modifier.keyGestures(
                         // lift-off, and a second detector reading the same pointer stream would
                         // have to agree with it about when the press is over.
                         var step = 0
-                        var travelX = 0f
-                        var travelY = 0f
+                        // Seeded from the hold window rather than starting at zero, so a
+                        // drag that began before the threshold is still the same gesture.
+                        var travelX = preTravelX
+                        var travelY = preTravelY
                         var accumulator = 0f
                         var wordMode = false
                         val activationPx = WORD_DELETE_ACTIVATION_DP.dp.toPx()
                         val wordStepPx = WORD_DELETE_STEP_DP.dp.toPx()
+                        // Checked once before the loop as well as inside it. The loop only
+                        // reconsiders on a new pointer event, so a finger that completed its
+                        // swipe during the hold window and then stopped moving would sit
+                        // there having earned word mode and never being given it.
+                        if (wordDeleteActivated(travelX, travelY, activationPx)) {
+                            wordMode = true
+                            onDeleteWord()
+                        }
                         while (true) {
                             // In word mode the timer stops producing deletes entirely: they are
                             // driven by travel below, so the caret follows the finger instead of
