@@ -140,8 +140,26 @@ internal fun scrubStepDp(heldMillis: Long): Float {
     return SCRUB_STEP_START_DP + (SCRUB_STEP_MIN_DP - SCRUB_STEP_START_DP) * progress
 }
 
-/** How long a press must be held before it stops counting as a tap. */
-internal const val LONG_PRESS_MS = 350L
+/**
+ * How long a press must be held before it stops counting as a tap.
+ *
+ * 150ms, down from 350ms. At the old value holding a letter for its corner symbol felt like
+ * waiting rather than pressing, which is the whole complaint: the symbol is the point of the
+ * gesture and it arrived long after the finger expected it.
+ *
+ * This is also the window the glide watch runs in, and that is the thing to understand
+ * before changing it again. The three outcomes it decides are: the finger left the key (a
+ * glide), the finger lifted (a tap), or the window elapsed with the finger still on the key
+ * (a hold). Shortening it therefore does not make glide harder to perform, it makes
+ * hesitation more expensive: a real glide is already moving in the first frames and leaves
+ * its key well inside 150ms, while a finger that rests on the first letter before setting
+ * off now gets the alternates strip sooner than it used to. That failure mode already
+ * existed at 350ms and is documented -- resting before swiping has always produced the
+ * corner symbol instead of a word.
+ *
+ * Backspace's repeat also starts from here, so hold-to-delete begins sooner too.
+ */
+internal const val LONG_PRESS_MS = 150L
 
 private const val REPEAT_FIRST_INTERVAL_MS = 90L
 private const val REPEAT_MIN_INTERVAL_MS = 22L
