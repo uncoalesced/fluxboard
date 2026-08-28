@@ -147,19 +147,43 @@ internal fun scrubStepDp(heldMillis: Long): Float {
  * waiting rather than pressing, which is the whole complaint: the symbol is the point of the
  * gesture and it arrived long after the finger expected it.
  *
- * This is also the window the glide watch runs in, and that is the thing to understand
- * before changing it again. The three outcomes it decides are: the finger left the key (a
- * glide), the finger lifted (a tap), or the window elapsed with the finger still on the key
- * (a hold). Shortening it therefore does not make glide harder to perform, it makes
- * hesitation more expensive: a real glide is already moving in the first frames and leaves
- * its key well inside 150ms, while a finger that rests on the first letter before setting
- * off now gets the alternates strip sooner than it used to. That failure mode already
- * existed at 350ms and is documented -- resting before swiping has always produced the
- * corner symbol instead of a word.
+ * This is the deadline for a finger that is *not moving*. A press that has already travelled
+ * [GLIDE_STIR_DP] is going somewhere and is given until [GLIDE_WATCH_MS] to say where, which
+ * is what keeps a shorter hold from cutting glides short. Shortening this to 150ms on its own
+ * did exactly that: gliding "ok" started committing o's corner symbol, because a diagonal
+ * needs about 190ms to clear the key it began on.
+ *
+ * A finger that rests on the first letter before setting off still reaches the alternates
+ * strip rather than gliding, and now reaches it sooner. That has always been the behaviour;
+ * resting before swiping has never produced a word.
  *
  * Backspace's repeat also starts from here, so hold-to-delete begins sooner too.
  */
 internal const val LONG_PRESS_MS = 150L
+
+/**
+ * Longest a *moving* finger is given to leave its key before the press is called a hold.
+ *
+ * The old single threshold did both jobs and could not do them differently. Shortening it to
+ * make holds prompt also cut short every glide that needs longer to clear its first key, and
+ * a diagonal is exactly that case: "ok" runs from the o key down to k and takes roughly
+ * 190ms to clear the origin at an ordinary speed. On device that turned "ok" into "{", the
+ * corner symbol of the key it started on.
+ *
+ * Kept at the value the single threshold used to have, so a glide has exactly the time it
+ * always had. Only a finger that has already travelled [GLIDE_STIR_DP] ever reaches it.
+ */
+internal const val GLIDE_WATCH_MS = 350L
+
+/**
+ * How far a finger must travel inside its own key before it stops looking like a hold.
+ *
+ * Below this it is a resting thumb, and the alternates strip should arrive on time. Above it
+ * the press is going somewhere and is worth waiting on. Deliberately larger than the 6dp slop
+ * the alternates strip already uses to absorb jitter, and well below the escape distance, so
+ * it separates "moving" from "still" without deciding anything on its own.
+ */
+internal const val GLIDE_STIR_DP = 10f
 
 private const val REPEAT_FIRST_INTERVAL_MS = 90L
 private const val REPEAT_MIN_INTERVAL_MS = 22L
@@ -655,25 +679,69 @@ internal fun Modifier.keyGestures(
                 if (glide != null && isGlideCandidate(keyOutput)) {
                     val origin = keyBounds()
                     val escapePx = GLIDE_ESCAPE_DP.dp.toPx()
+                    val stirPx = GLIDE_STIR_DP.dp.toPx()
                     var glided = false
                     var lifted = false
-                    withTimeoutOrNull(LONG_PRESS_MS) {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            if (!change.pressed) {
-                                lifted = true
-                                break
+                    var travelled = 0f
+
+                    // Whether the finger is doing anything decides how long it is given.
+                    //
+                    // A stationary finger is a hold and gets [LONG_PRESS_MS], which is short
+                    // so the corner symbol arrives promptly. A finger that is moving has not
+                    // said what it is yet, and cutting it off at the same moment is what
+                    // broke diagonal glides when the hold threshold was shortened: gliding
+                    // "ok" crosses from the o key down to the k key, which needs about 190ms
+                    // to clear the origin at an ordinary speed, so the watch expired first
+                    // and committed o's corner symbol instead of a word. Measured on device,
+                    // where it turned "ok" into "{".
+                    //
+                    // So movement buys time, up to [GLIDE_WATCH_MS]. It cannot make a hold
+                    // slow, because reaching the second phase at all requires the finger to
+                    // have already moved further than a resting thumb ever wobbles.
+                    val stirred =
+                        withTimeoutOrNull(LONG_PRESS_MS) {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change =
+                                    event.changes.firstOrNull() ?: return@withTimeoutOrNull false
+                                if (!change.pressed) {
+                                    lifted = true
+                                    return@withTimeoutOrNull false
+                                }
+                                travelled += change.positionChange().getDistance()
+                                val root = origin.topLeft + change.position
+                                if (glideEscaped(origin, root, escapePx)) {
+                                    glided = true
+                                    glide.begin(origin.center)
+                                    glide.move(root)
+                                    // Claimed only once this is definitely a glide, so an
+                                    // ordinary tap or hold is left entirely alone.
+                                    change.consume()
+                                    return@withTimeoutOrNull false
+                                }
+                                if (travelled >= stirPx) return@withTimeoutOrNull true
                             }
-                            val root = origin.topLeft + change.position
-                            if (glideEscaped(origin, root, escapePx)) {
-                                glided = true
-                                glide.begin(origin.center)
-                                glide.move(root)
-                                // Claimed only once this is definitely a glide, so an ordinary
-                                // tap or hold is left entirely alone.
-                                change.consume()
-                                break
+                            @Suppress("UNREACHABLE_CODE")
+                            false
+                        } ?: false
+
+                    if (stirred) {
+                        withTimeoutOrNull(GLIDE_WATCH_MS - LONG_PRESS_MS) {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                if (!change.pressed) {
+                                    lifted = true
+                                    break
+                                }
+                                val root = origin.topLeft + change.position
+                                if (glideEscaped(origin, root, escapePx)) {
+                                    glided = true
+                                    glide.begin(origin.center)
+                                    glide.move(root)
+                                    change.consume()
+                                    break
+                                }
                             }
                         }
                     }
