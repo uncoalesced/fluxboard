@@ -32,6 +32,15 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   keys figure beside it kept climbing would read as a broken panel rather than as
   a privacy feature.
 
+- **Contractions whose bare form is an ordinary word are offered in the
+  suggestion strip.** Typing "ill" now puts "I'll" one tap away, and the same for
+  "cant", "wont", "well", "shell" and "im". These were previously unreachable:
+  autocorrect refuses them on purpose, because rewriting them would break "I am
+  ill" and "there were three", and the suggestion path could not see them at all,
+  since "i'll" is not a prefix completion of "ill". They are offered and never
+  applied, so the typed word always stands. The bare forms that are not words of
+  their own, like "dont" and "itll", still correct outright as before.
+
 ### Changed
 
 - **The app opens on the Keyboard tab.** It opened on Styles, so the screen
@@ -50,7 +59,53 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   produced a file that could not be sent. WebP stays in the picker for anyone
   whose targets take it.
 
+- **The Enter key draws the return arrow unless the field will send.** It had
+  five different pictures: a paper plane for Send, a magnifier for Search, and
+  separate arrows for Go, Next and Done. Send keeps its own artwork because it is
+  the one action that cannot be taken back once pressed. The distinction comes
+  from what the field declares rather than which app is in front, so a messaging
+  app's compose box gets the paper plane while that same app's search box gets
+  the arrow.
+
+- **Emoji search uses the keyboard's own keys.** It drew a separate pad of plain
+  boxes with a text "del", ignoring the active theme's key shapes, sizing and
+  press feedback. It now draws through the same component the typing keyboard
+  uses. Deliberately no shift, no symbols page and no enter: emoji names are
+  lower-case English, so each would be a key that looks real and does nothing.
+
+- **Holding a key for its corner symbol takes 150ms rather than 350ms.** A moving
+  finger is given longer than a resting one, so shortening the hold does not cut
+  short a glide that needs time to leave its first key.
+
+- **Three tabs instead of four.** Transfer was a permanent quarter of the dock for
+  something done about once, when moving to a new phone. It is now a row at the
+  foot of Settings and still opens the same screen.
+
 ### Fixed
+
+- **A tap landing between two key rows typed nothing at all.** Every key is drawn
+  inset from its cell so it reads as separate from its neighbour, and the touch
+  target was the drawn key rather than the cell, so that inset belonged to no key.
+  Sideways it never showed, because a key is narrow enough that the system quietly
+  widens its touch area and covers the gap from both sides. Vertically nothing was
+  widened, and a band about 9px tall between every pair of rows swallowed presses
+  outright: no letter, no correction, no feedback. Roughly six percent of the
+  keyboard's height. This is the first mechanism found behind reports of presses
+  not registering, and it is unlikely to be the only one.
+
+- **Gliding a two-letter word typed only its first letter.** A stroke had to cross
+  three keys to count as a glide, so "ok" was thrown away, and because the first
+  letter appears the moment the finger lands, throwing the stroke away left that
+  letter sitting there with nothing explaining why. The same affected "to", "in",
+  "it", "is", "of", "on", "we", "me" and "up". Two keys is now enough, which is
+  safe because a press only becomes a glide once the finger has travelled clear of
+  the key it started on.
+
+- **Holding backspace and swiping left deletes words again.** The gesture has
+  existed since v0.1.6 and was reported missing twice, both fairly. Travel only
+  counted after the hold threshold had passed, so the swipe had to come after
+  holding still. Done as one motion, the natural way, it was over before counting
+  began and the key simply deleted characters.
 
 - **Screen headers were a status bar taller than they were drawn to be.** The
   navigation host padded its content for the system bars without marking those
