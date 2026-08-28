@@ -46,10 +46,26 @@ data class GlideStroke(
 
     companion object {
         /**
-         * Below this a glide is indistinguishable from a slightly sloppy tap, and treating it
-         * as a word would replace a deliberate single character with a guess.
+         * Two, not three, and the difference is every short word on the board.
+         *
+         * This used to be three, to stop a slightly sloppy tap being read as a word and
+         * replacing a deliberate character with a guess. That reasoning is about a stroke
+         * that never leaves its own key, and something else does that job now: a press only
+         * becomes a glide once the finger is `GLIDE_ESCAPE_DP` past the edge of the key it
+         * started on, so by the time a stroke exists at all the finger has provably crossed
+         * into a neighbour. A tap does not do that.
+         *
+         * What three cost was every two-key word. Gliding "ok" crosses exactly two keys and
+         * nothing between them, so the stroke was discarded, the "o" already committed on
+         * press was never taken back, and the gesture produced a single letter with nothing
+         * anywhere explaining why. The same held for "to", "in", "it", "is", "of", "on",
+         * "we", "me", "up", "us" and the rest of the two-letter vocabulary, which is a large
+         * share of ordinary typing.
+         *
+         * One key is still not a glide. Candidates shorter than two characters are refused
+         * separately, where the word rather than the path is judged.
          */
-        const val MIN_KEYS = 3
+        const val MIN_KEYS = 2
     }
 }
 
