@@ -100,7 +100,10 @@ fun AppSettingsScreen(
                     "image/gif" to "Standard GIF",
                 )
             val currentFormatLabel =
-                exportFormats.find { it.first == currentExportFormat }?.second ?: "Animated WebP"
+                // Falls back to the shipped default's label, not the other option's: this
+                // only fires for a stored value neither entry matches, and naming the
+                // format that is not in use would misreport what the next export produces.
+                exportFormats.find { it.first == currentExportFormat }?.second ?: "Standard GIF"
 
             Column(
                 modifier =
