@@ -324,8 +324,34 @@ class PredictionEngine
                         emptyList()
                     }
 
+                // 2b. Contractions the prefix walk cannot reach.
+                //
+                // "i'll" is in the dictionary but is not a completion of "ill" -- the trie
+                // branches at the apostrophe, so no amount of prefix walking finds it. The
+                // autocorrect path has always repaired the unambiguous cases ("dont",
+                // "youre", "itll") and deliberately refuses the rest, because the bare form
+                // of "we're", "I'll", "we'll", "she'll" and "can't" is itself an ordinary
+                // English word and rewriting it would break "I am ill", "there were three"
+                // and "well done".
+                //
+                // Offering rather than replacing is what makes those reachable without that
+                // cost: the typed word stands, and the contraction sits in the strip one tap
+                // away. This feeds suggestions only. Autocorrect is a separate path and is
+                // deliberately not given these.
+                val contractionSuggestions =
+                    try {
+                        apostropheVariantsOf(normalized).map { (word, freq) ->
+                            Suggestion(word, freq * BASE_WEIGHT)
+                        }
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+
                 // 3. Merge & Sort
                 val merged = mutableMapOf<String, Float>()
+                for (s in contractionSuggestions) {
+                    merged[s.word] = s.score
+                }
                 for (s in baseSuggestions) {
                     merged[s.word] = s.score
                 }
@@ -766,8 +792,41 @@ class PredictionEngine
                 val freq = frequencyOf(candidate) ?: continue
                 if (freq > (best?.second ?: 0)) best = candidate to freq
             }
-            return best?.first
+            return best?.first?.let { displayContraction(it) }
         }
+
+        /**
+         * Every contraction reachable by putting one apostrophe into [normalized].
+         *
+         * The same insertion sweep [restoreApostrophe] does, without the gate that stops it
+         * when the typed word is itself a dictionary entry. That gate is right for
+         * autocorrect, which replaces, and wrong here, which offers: "ill", "were", "well",
+         * "cant", "wont", "shell" and "its" are all real words *and* the bare forms of
+         * common contractions, and the only safe way to reach the second reading is to put
+         * it in the strip and let the user decide.
+         *
+         * Returns word and frequency so the caller can rank it against everything else
+         * rather than pinning it to a made-up score.
+         */
+        internal fun apostropheVariantsOf(normalized: String): List<Pair<String, Int>> {
+            if (normalized.length < 2 || normalized.contains('\'')) return emptyList()
+            return (1 until normalized.length).mapNotNull { i ->
+                val candidate = normalized.substring(0, i) + '\'' + normalized.substring(i)
+                frequencyOf(candidate)?.let { displayContraction(candidate) to it }
+            }
+        }
+
+        /**
+         * Capitalizes the one English pronoun that is always capitalized.
+         *
+         * The dictionary is lowercase throughout, which is right for every other word --
+         * case is restored from what the user typed. It cannot be for "i'm", "i'll", "i've"
+         * and "i'd", where the correct form does not depend on what was typed and a
+         * faithfully lowercase "i'll" reads as the feature being broken. Applied to the
+         * contraction alone, so nothing else in the dictionary changes shape.
+         */
+        private fun displayContraction(word: String): String =
+            if (word.startsWith("i'")) "I'" + word.substring(2) else word
 
         /**
          * Splits a run-on caused by hitting a key beside the space bar instead of the space.

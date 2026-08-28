@@ -118,4 +118,94 @@ class ContractionTest {
             assertNull("the should still be left alone", engine.getAutoCorrection("the"))
             assertTrue(engine.getSuggestions("th").contains("the"))
         }
+
+    /**
+     * A contraction whose bare form is an ordinary word is offered, never substituted.
+     *
+     * "i'll" is in the dictionary but is not a completion of "ill" -- the trie branches at
+     * the apostrophe, so the prefix walk can never reach it however far it searches. These
+     * were the contractions with no route to the user at all: the autocorrect path refuses
+     * them on purpose, because rewriting them would break "I am ill" and "there were
+     * three", and the suggestion path simply could not see them.
+     */
+    @Test
+    fun `an ambiguous contraction reaches the suggestion strip`() =
+        runBlocking {
+            val expected =
+                mapOf(
+                    "ill" to "I'll",
+                    "cant" to "can't",
+                    "wont" to "won't",
+                    "well" to "we'll",
+                    "shell" to "she'll",
+                )
+            for (typed in expected.keys) {
+                val offered = expected.getValue(typed)
+                assertTrue(
+                    "typing \"$typed\" should offer \"$offered\" in the strip",
+                    engine.apostropheVariantsOf(typed).any { it.first == offered },
+                )
+            }
+        }
+
+    /**
+     * The safety half, and the reason offering was chosen over replacing.
+     *
+     * Each of these is a word somebody meant to type. If any of them ever starts returning
+     * a correction, "I am ill" becomes "I am I'll" and the feature has done more damage
+     * than the gap it filled.
+     */
+    @Test
+    fun `an ambiguous contraction is never auto-applied`() =
+        runBlocking {
+            for (word in listOf("ill", "well", "shell", "wont", "hell", "id")) {
+                assertNull(
+                    "$word is a real word and must never be corrected to a contraction",
+                    engine.getAutoCorrection(word),
+                )
+            }
+        }
+
+    /** A bare form that is not a word still corrects outright, as it always has. */
+    @Test
+    fun `an unambiguous contraction still corrects without a tap`() =
+        runBlocking {
+            assertEquals("it'll", engine.getAutoCorrection("itll"))
+            assertEquals("you've", engine.getAutoCorrection("youve"))
+        }
+
+    /**
+     * The one pronoun that is always capitalized.
+     *
+     * The dictionary is lowercase throughout and case is otherwise restored from what the
+     * user typed, which is right for every word except this handful: a faithfully lowercase
+     * "i'll" is wrong however it was typed, and reads as the feature being broken.
+     */
+    @Test
+    fun `first person contractions are capitalized`() =
+        runBlocking {
+            assertEquals("I've", engine.getAutoCorrection("ive"))
+            assertTrue(engine.apostropheVariantsOf("ill").any { it.first == "I'll" })
+        }
+
+    /**
+     * "im" cannot autocorrect, and the strip is the only route to "I'm".
+     *
+     * Autocorrect refuses anything under three characters outright, which is a deliberate
+     * and much older rule: at two letters almost every word is one edit from several
+     * others, so correcting them confidently is how a keyboard rewrites what somebody
+     * meant. The offer path has no such floor, because offering costs the user nothing.
+     */
+    @Test
+    fun `two letter bare forms are offered even though they cannot be corrected`() =
+        runBlocking {
+            assertNull(
+                "autocorrect must not touch a two-letter word",
+                engine.getAutoCorrection("im"),
+            )
+            assertTrue(
+                "typing \"im\" should still offer \"I'm\"",
+                engine.apostropheVariantsOf("im").any { it.first == "I'm" },
+            )
+        }
 }
