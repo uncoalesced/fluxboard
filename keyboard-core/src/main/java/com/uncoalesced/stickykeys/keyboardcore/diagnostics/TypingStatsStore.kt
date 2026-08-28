@@ -43,6 +43,7 @@ class TypingStatsStore
         private val prefs = context.getSharedPreferences("typing_stats", Context.MODE_PRIVATE)
 
         private var keystrokes = 0L
+        private var words = 0L
         private var backspaces = 0L
         private var autocorrectsAccepted = 0L
         private var autocorrectsUndone = 0L
@@ -71,6 +72,20 @@ class TypingStatsStore
             keystrokes++
         }
 
+        /**
+         * One finished word.
+         *
+         * A word, not a space bar press: the count is driven from the word boundary the
+         * typing pipeline already resolves, so a glide, a tapped suggestion and an applied
+         * autocorrect each count once, and a space that ends nothing counts nothing. What
+         * is stored is the tally and never the word -- the same rule the rest of this class
+         * keeps.
+         */
+        @Synchronized
+        fun recordWord() {
+            words++
+        }
+
         @Synchronized
         fun recordBackspace() {
             backspaces++
@@ -90,6 +105,7 @@ class TypingStatsStore
         @Synchronized
         fun flush() {
             if (keystrokes == 0L &&
+                words == 0L &&
                 backspaces == 0L &&
                 autocorrectsAccepted == 0L &&
                 autocorrectsUndone == 0L
@@ -99,6 +115,7 @@ class TypingStatsStore
             val today = LocalDate.now().toEpochDay()
             val edit = prefs.edit()
             edit.putLong(LIFETIME_KEYSTROKES, prefs.getLong(LIFETIME_KEYSTROKES, 0) + keystrokes)
+            edit.putLong(LIFETIME_WORDS, prefs.getLong(LIFETIME_WORDS, 0) + words)
             edit.putLong(LIFETIME_BACKSPACES, prefs.getLong(LIFETIME_BACKSPACES, 0) + backspaces)
             edit.putLong(
                 LIFETIME_ACCEPTED,
@@ -117,6 +134,7 @@ class TypingStatsStore
                 }
             edit.apply()
             keystrokes = 0
+            words = 0
             backspaces = 0
             autocorrectsAccepted = 0
             autocorrectsUndone = 0
@@ -135,6 +153,7 @@ class TypingStatsStore
         fun snapshot(): TypingStatsSnapshot {
             val today = LocalDate.now().toEpochDay()
             val totalKeystrokes = prefs.getLong(LIFETIME_KEYSTROKES, 0) + keystrokes
+            val totalWords = prefs.getLong(LIFETIME_WORDS, 0) + words
             val totalBackspaces = prefs.getLong(LIFETIME_BACKSPACES, 0) + backspaces
             val accepted = prefs.getLong(LIFETIME_ACCEPTED, 0) + autocorrectsAccepted
             val undone = prefs.getLong(LIFETIME_UNDONE, 0) + autocorrectsUndone
@@ -142,6 +161,7 @@ class TypingStatsStore
             val latency = LatencyTracker.snapshot()
             return TypingStatsSnapshot(
                 keystrokes = totalKeystrokes,
+                words = totalWords,
                 backspaces = totalBackspaces,
                 activeMs = totalActiveMs,
                 wordsPerMinute = wpm(totalKeystrokes, totalActiveMs),
@@ -171,6 +191,7 @@ class TypingStatsStore
         fun clear() {
             prefs.edit().clear().apply()
             keystrokes = 0
+            words = 0
             backspaces = 0
             autocorrectsAccepted = 0
             autocorrectsUndone = 0
@@ -208,6 +229,7 @@ class TypingStatsStore
             const val WINDOW_DAYS = 7L
 
             private const val LIFETIME_KEYSTROKES = "lifetime_keystrokes"
+            private const val LIFETIME_WORDS = "lifetime_words"
             private const val LIFETIME_BACKSPACES = "lifetime_backspaces"
             private const val LIFETIME_ACCEPTED = "lifetime_autocorrects_accepted"
             private const val LIFETIME_UNDONE = "lifetime_autocorrects_undone"
@@ -233,6 +255,8 @@ class TypingStatsStore
  */
 data class TypingStatsSnapshot(
     val keystrokes: Long,
+    /** Finished words, counted at the word boundary rather than by dividing keystrokes. */
+    val words: Long,
     val backspaces: Long,
     val activeMs: Long,
     val wordsPerMinute: Int?,

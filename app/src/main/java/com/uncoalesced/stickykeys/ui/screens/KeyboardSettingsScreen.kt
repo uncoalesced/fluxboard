@@ -295,6 +295,62 @@ fun KeyboardSettingsScreen(
                 com.uncoalesced.stickykeys.ui.components
                     .DefaultKeyboardPrompt(viewModel.appPreferences)
 
+                // YOUR TYPING
+                //
+                // First on the screen rather than last. Everything below it is a control the
+                // user came here to change; this is the one group they came here to *read*,
+                // and at the bottom of a long scroll it was reached by accident or not at
+                // all. Present in every build, unlike the diagnostics group at the foot of
+                // the screen -- this is the user's own data rather than a tester artefact,
+                // and it never leaves the device. There is no share action here on purpose.
+                if (matches("Your typing", "speed", "accuracy", "stats")) {
+                    SettingsGroup(title = "Your typing") {
+                        StatRow("Keys typed", stats.keystrokes.toString())
+                        // Counted at the word boundary, not derived by dividing keystrokes by
+                        // five the way the WPM figure below it is. A glide is one word and a
+                        // handful of keystrokes; the two numbers are allowed to disagree.
+                        StatRow("Words typed", stats.words.toString())
+                        StatRow(
+                            "Speed",
+                            stats.wordsPerMinute?.let { "$it words a minute" }
+                                ?: "Not enough typing yet",
+                        )
+                        StatRow("Time spent typing", "${stats.activeMs / 60_000} min")
+                        // Two readings of "accuracy", each labelled for what it measures.
+                        // Deleting is not always a mistake and autocorrect being kept is a
+                        // statement about the engine, so averaging them would produce one
+                        // number that answers neither question.
+                        StatRow(
+                            "Typed without deleting",
+                            stats.cleanKeystrokePercent?.let { "$it%" } ?: "-",
+                        )
+                        StatRow(
+                            "Autocorrect kept",
+                            stats.correctionsKeptPercent?.let { "$it%" } ?: "-",
+                        )
+                        StatRow(
+                            "Key response",
+                            stats.latency.deliveryAverageMs?.let { "$it ms" } ?: "-",
+                        )
+                        Text(
+                            "Last 7 days",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                        WeekBars(stats.keystrokesByDay)
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.clearStats()
+                                stats = viewModel.statsSnapshot()
+                            },
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        ) {
+                            Text("Reset stats")
+                        }
+                    }
+                }
+
                 // TYPING
                 if (matches(labelAutoCap, labelAutoCorrect, labelGlideTyping, labelDoubleSpace)) {
                     SettingsGroup(title = "Typing") {
@@ -683,55 +739,6 @@ fun KeyboardSettingsScreen(
                             }
                         },
                     )
-                }
-
-                // YOUR TYPING
-                //
-                // Present in every build, unlike the diagnostics group below it. This is the
-                // user's own data rather than a tester artefact, and it never leaves the
-                // device -- there is no share action here on purpose.
-                if (matches("Your typing", "speed", "accuracy", "stats")) {
-                    SettingsGroup(title = "Your typing") {
-                        StatRow("Keys typed", stats.keystrokes.toString())
-                        StatRow(
-                            "Speed",
-                            stats.wordsPerMinute?.let { "$it words a minute" }
-                                ?: "Not enough typing yet",
-                        )
-                        StatRow("Time spent typing", "${stats.activeMs / 60_000} min")
-                        // Two readings of "accuracy", each labelled for what it measures.
-                        // Deleting is not always a mistake and autocorrect being kept is a
-                        // statement about the engine, so averaging them would produce one
-                        // number that answers neither question.
-                        StatRow(
-                            "Typed without deleting",
-                            stats.cleanKeystrokePercent?.let { "$it%" } ?: "-",
-                        )
-                        StatRow(
-                            "Autocorrect kept",
-                            stats.correctionsKeptPercent?.let { "$it%" } ?: "-",
-                        )
-                        StatRow(
-                            "Key response",
-                            stats.latency.deliveryAverageMs?.let { "$it ms" } ?: "-",
-                        )
-                        Text(
-                            "Last 7 days",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
-                        WeekBars(stats.keystrokesByDay)
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.clearStats()
-                                stats = viewModel.statsSnapshot()
-                            },
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        ) {
-                            Text("Reset stats")
-                        }
-                    }
                 }
 
                 // Absent entirely from a stable or F-Droid build: USAGE_LOGGING is a

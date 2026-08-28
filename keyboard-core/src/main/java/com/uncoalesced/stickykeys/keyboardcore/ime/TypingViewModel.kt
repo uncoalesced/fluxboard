@@ -436,6 +436,17 @@ class TypingViewModel
          * privacy check later.
          */
         private fun learn(word: String) {
+            // Counted here, above the incognito gate, because every path that finishes a
+            // word already arrives at this one function -- a glide, an accepted autocorrect,
+            // a tapped suggestion and an ordinary space each reach it exactly once, so the
+            // tally cannot drift from the keystroke count and a sixth way to end a word
+            // cannot be added without counting.
+            //
+            // Above rather than below the gate on purpose. Incognito suspends *writes of
+            // what was typed*; a counter holds no text, and keystrokes are already counted
+            // in a private field. Below the gate, "Words typed" would quietly stall while
+            // "Keys typed" beside it kept climbing, which reads as the stat being broken.
+            typingStats.recordWord()
             if (incognitoState.active.value) return
             previousWord = word.lowercase()
             viewModelScope.launch {
