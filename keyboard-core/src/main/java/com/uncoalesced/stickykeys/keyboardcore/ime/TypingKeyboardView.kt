@@ -797,7 +797,30 @@ internal fun KeyboardKey(
                 .graphicsLayer {
                     scaleX = pressScale
                     scaleY = pressScale
-                }.padding(keyPadding)
+                }
+                // Measured and touched at the *cell*, drawn inset from it.
+                //
+                // These two sit above `padding` on purpose, and it is a hit-testing fix
+                // rather than tidying. Below the padding they describe the painted key, and
+                // the 2dp gap around it then belongs to no key at all. Horizontally that
+                // never showed: a key is about 36dp wide, under the 48dp minimum touch
+                // target, so Compose quietly expands the touch bounds outward and the gap is
+                // covered. Vertically a key is about 52dp, over the minimum, nothing is
+                // expanded, and the gap between two rows stayed dead -- a tap landing there
+                // produced no letter, no correction and no feedback of any kind. Measured on
+                // device at 420dpi: a 9px band at every row boundary, about 6 percent of the
+                // grid's height, and it is the only mechanism found so far that drops a tap
+                // silently rather than typing the wrong thing.
+                //
+                // Keeping them together is a correctness requirement, not a preference.
+                // `keyGestures` reconstructs root coordinates as `keyBounds().topLeft +
+                // change.position`, so the rectangle reported here and the node receiving the
+                // pointer have to be the same one. Split them and every glide is decoded
+                // against a position off by the padding, which nothing would report.
+                //
+                // The rectangles handed to GlideTracker are now cells, which tile the board
+                // with no gaps, so a path crossing between two keys is still evidence of
+                // both instead of falling into a hole in the grid.
                 .onGloballyPositioned {
                     bounds.value = it.boundsInRoot()
                     // Re-registered on every layout pass rather than once: the grid changes
@@ -807,7 +830,24 @@ internal fun KeyboardKey(
                     if (glide != null && isGlideCandidate(keyOutput)) {
                         glide.register(keyOutput[0], bounds.value)
                     }
-                }
+                }.keyGestures(
+                    keyOutput = keyOutput,
+                    longPress = longPress,
+                    alternates = alternates,
+                    cellWidthPx = alternateCellWidthPx,
+                    keyBounds = { bounds.value },
+                    onCommit = onKeyPress,
+                    pressed = pressed,
+                    onScrub = onScrub,
+                    onDeleteWord = onDeleteWord,
+                    glide = glide,
+                    onGlide = onGlide,
+                    onRevoke = onKeyRevoke,
+                )
+                // Everything below this line is drawing, and the padding belongs to drawing
+                // alone: it is what makes a key look separate from its neighbour without
+                // making the space between them untouchable.
+                .padding(keyPadding)
                 // Haze before the fill so it reads as glow behind the key rather than a
                 // wash over it. Skipped entirely when off, rather than drawn at zero alpha:
                 // a shadow modifier on every key costs a render-node per key whether or not
@@ -829,19 +869,6 @@ internal fun KeyboardKey(
                 .then(
                     border?.let { Modifier.border(keyStyle.borderWidth, it, shape) }
                         ?: Modifier,
-                ).keyGestures(
-                    keyOutput = keyOutput,
-                    longPress = longPress,
-                    alternates = alternates,
-                    cellWidthPx = alternateCellWidthPx,
-                    keyBounds = { bounds.value },
-                    onCommit = onKeyPress,
-                    pressed = pressed,
-                    onScrub = onScrub,
-                    onDeleteWord = onDeleteWord,
-                    glide = glide,
-                    onGlide = onGlide,
-                    onRevoke = onKeyRevoke,
                 )
                 // pointerInput replaces `clickable`, which also supplied the button role and
                 // the click action. Both are restated here rather than lost: a screen reader
