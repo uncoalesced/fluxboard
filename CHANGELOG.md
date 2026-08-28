@@ -16,12 +16,57 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [Unreleased] - targeting v0.1.7.5-BETA
+
+### Added
+
+- **A words-typed count beside keys typed.** Counted at the word boundary rather
+  than worked out by dividing keystrokes by five the way the speed figure is, so
+  a glide reads as one word and a handful of keys, and a word taken from the
+  suggestion strip counts without being typed at all. A word abandoned halfway --
+  dragging the caret out of it -- counts for nothing, on the same reasoning that
+  keeps a half-typed fragment out of the dictionary.
+
+  It counts in private mode. The stat holds a tally and never a word, keystrokes
+  were already counted there, and a words figure that silently froze while the
+  keys figure beside it kept climbing would read as a broken panel rather than as
+  a privacy feature.
+
+### Changed
+
+- **The app opens on the Keyboard tab.** It opened on Styles, so the screen
+  almost every launch is heading for cost a tap and the first thing shown
+  described the smaller half of the app. This also moves where the system back
+  button lands, since that tab is now the root the dock pops back to.
+
+- **"Your typing" sits at the top of the Keyboard tab.** Everything else on that
+  screen is a control the user came to change; the stats are the one group they
+  came to read, and at the foot of a long scroll they were reached by accident or
+  not at all.
+
+- **New installs export as GIF rather than animated WebP.** WebP is the smaller
+  and technically better of the two, which is why it was the default, but enough
+  apps still refuse it or flatten it to a single frame that the default quietly
+  produced a file that could not be sent. WebP stays in the picker for anyone
+  whose targets take it.
+
+### Fixed
+
+- **Screen headers were a status bar taller than they were drawn to be.** The
+  navigation host padded its content for the system bars without marking those
+  insets as spent, so any screen carrying its own app bar -- every detail route in
+  the app, plus device pairing -- measured the status bar a second time and added
+  it again inside an area already padded for it. It showed worst on device
+  pairing, which is the only screen in the dock with an app bar and so the only
+  one sitting next to three tabs with no header to compare against. Fixed once at
+  the boundary the twelve affected screens share rather than in each of them.
+
 ## [v0.1.7.4-BETA] - 2026-08-22
 
 Glide typing that fell apart as it got faster, an emoji Recents grid that
 reshuffled itself under the user's thumb, and the decrypted device-migration
 payload sitting in the shared temp directory with default permissions. Plus two
-of zap's feature requests: swipe between the app's pages, and a separate tab for
+requests from the tester: swipe between the app's pages, and a separate tab for
 text emoticons. `.\gradlew.bat clean build` is green (compile, ktlint, lint, 511
 unit tests, 0 failures) and `scripts/check-source-rules.sh` passes.
 
@@ -143,12 +188,12 @@ dictionary, clipboard and themes all survived the update.
 
 ## [v0.1.7.3-BETA] - 2026-08-20
 
-zap's report on the v0.1.7.2 build: dropped characters when typing fast, a caps
-lock window that latched when he meant to turn shift off, and the keyboard
-crashing when he spammed stickers into WhatsApp. All three are fixed and
-device-verified; the third turned out to be a different bug from the one it was
-diagnosed as. `.\gradlew.bat clean build` is green (compile, ktlint, lint, 500
-unit tests, 0 failures) and `scripts/check-source-rules.sh` passes.
+A tester's report on the v0.1.7.2 build: dropped characters when typing fast, a
+caps lock window that latched when the tester meant to turn shift off, and the
+keyboard crashing when stickers were spammed into WhatsApp. All three are
+fixed and device-verified; the third turned out to be a different bug from the
+one it was diagnosed as. `.\gradlew.bat clean build` is green (compile, ktlint,
+lint, 500 unit tests, 0 failures) and `scripts/check-source-rules.sh` passes.
 
 **Device-verified on 2026-08-20**, against the signed release installed **in
 place** on the LineageOS phone (2201117TI, Android 15, 420dpi), so the IME
@@ -432,7 +477,7 @@ lookup fired when the space committed, and a completion lookup for the letter ty
 straight after -- and the slower one won whichever it was. The lookup now carries
 the generation token and publishes only if it is still current.
 
-### Fixed -- picking a key text colour wiped the key fill (zap, v0.1.6)
+### Fixed -- picking a key text colour wiped the key fill (reported in v0.1.6)
 
 "I tap on 1 color for text opacity and then it resets the field above it."
 
@@ -449,12 +494,13 @@ repaired by restoring the glyph, and one reset would not converge. This is the s
 class of defect as the v0.1.6 "two sliders reset each other to 100%" fix, one layer
 along.
 
-**This reopens and answers `docs/roadmap.md` 4E.15.** The roadmap asked zap to
-retry key haze on v0.1.6 and said that if it still reproduced it was a new defect.
-It did reproduce -- but haze was never the mechanism. `sanitized()` does not inspect
-haze at all, and the sequence zap described is the fill/text contrast reset above.
+**This reopens and answers `docs/roadmap.md` 4E.15.** The roadmap asked the
+tester to retry key haze on v0.1.6 and said that if it still reproduced it was a
+new defect. It did reproduce -- but haze was never the mechanism. `sanitized()`
+does not inspect haze at all, and the reported sequence is the fill/text
+contrast reset above.
 
-### Fixed -- the quick-access toolbar resized the IME window once per frame (zap, v0.1.6)
+### Fixed -- the quick-access toolbar resized the IME window once per frame (reported in v0.1.6)
 
 The expand animation stuttered badly enough that individual frames were visible.
 Not a recomposition regression -- `KeyboardRecompositionTest` still passes.
@@ -479,8 +525,8 @@ them is aware of the others, so on a large font scale the label was silently cut
 short. Labels now shrink to fit, capped at the size they were, so anything that
 already fitted is drawn identically.
 
-Reported by zap as "the number button got fucked some how its not scaling" and
-confirmed as this rather than a row-height problem.
+Reported as the number row looking visibly broken, with labels that would not
+scale down -- confirmed as this rather than a row-height problem.
 
 ### Added -- currencies on the number row (roadmap 3.7)
 
@@ -493,7 +539,7 @@ between the number row and the symbols page.
 The digit fraction strips for `0` and `3`-`9`, which shipped in v0.1.6 as an
 unconfirmed proposal, are confirmed as they are.
 
-### Unresolved -- glide typing produced no suggestion strip (zap, v0.1.6)
+### Unresolved -- glide typing produced no suggestion strip (reported in v0.1.6)
 
 Not fixed, but the device pass moved it a long way.
 
@@ -501,8 +547,8 @@ Not fixed, but the device pass moved it a long way.
 and both populated the strip with the readings that lost -- `w`-to-`t` gave `At `
 with `Wet`/`Set`/`Art` offered, `a`-to-`l` gave `All ` with `Asp`/`Ail`/`Awl`. Tapping
 an alternate replaced the committed word rather than appending to it. So the
-commit-to-strip path is not where zap's report lives, and `GlideSuggestionsTest` now
-pins the ordering it depends on.
+commit-to-strip path is not where the report lives, and `GlideSuggestionsTest`
+now pins the ordering it depends on.
 
 **What did reproduce the exact symptom** was resting on the first key before
 dragging: a 700ms hold then a drag committed `@`, the corner-hint alternate, and left
@@ -511,9 +557,10 @@ project already documented and had never actually watched happen.
 
 So the leading account is that the glide is never recognised, rather than that the
 strip fails to fill, which points at the activation threshold instead of
-`onGlideCommitted`. It is an account, not a diagnosis: nobody has watched zap do it,
-and `adb` cannot draw a cornered path, so whether he pauses before swiping and
-whether accuracy collapses on real multi-corner strokes both still need a hand.
+`onGlideCommitted`. It is an account, not a diagnosis: nobody has watched the
+tester do it, and `adb` cannot draw a cornered path, so whether the tester
+pauses before swiping and whether accuracy collapses on real multi-corner
+strokes both still need a hand.
 
 ## [v0.1.6.1-BETA] - 2026-08-16
 
@@ -702,8 +749,8 @@ did not cover.
 
 ### Added -- v0.1.6 work: sentence context, beam-search glide, visual pass
 
-Implemented from `V0.1.6-AUTOCORRECT-GLIDE-UPGRADE.md` (a Cowork-written spec).
-Device-verified on the LineageOS test phone against the signed release artifact,
+Implemented from `V0.1.6-AUTOCORRECT-GLIDE-UPGRADE.md`. Device-verified on the
+LineageOS test phone against the signed release artifact,
 installed in place so no app data was lost.
 
 - **Autocorrect and suggestions now see the previous word.** New asset
