@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -26,6 +27,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -375,6 +377,43 @@ fun StickersLibraryScreen(
                     val activeCategoryId =
                         (current.currentTab as? TabFilter.CategoryFilter)?.category?.id
 
+                    // A heading, which this screen was the only dock destination without.
+                    // Keyboard settings opens with one and Settings opens with the app's own
+                    // name; this one began with a row of category tabs, so nothing on it said
+                    // where you were and the tab strip had to carry that job as well as its
+                    // own. The count sits beside it because a library is a thing with a size.
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = StickyKeysTheme.spacing.md,
+                                    end = StickyKeysTheme.spacing.md,
+                                    top = StickyKeysTheme.spacing.md,
+                                    bottom = StickyKeysTheme.spacing.sm,
+                                ),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.text_styles),
+                            style = StickyKeysTheme.typography.titleLarge,
+                            color = StickyKeysTheme.colors.onBackground,
+                        )
+                        if (current.stickers.isNotEmpty()) {
+                            Text(
+                                text =
+                                    pluralStringResource(
+                                        R.plurals.sticker_count,
+                                        current.stickers.size,
+                                        current.stickers.size,
+                                    ),
+                                style = StickyKeysTheme.typography.labelMedium,
+                                color = StickyKeysTheme.colors.onSurfaceVariant,
+                            )
+                        }
+                    }
+
                     // Category & Filter Tabs
                     ScrollableTabRow(
                         selectedTabIndex =
@@ -421,16 +460,13 @@ fun StickersLibraryScreen(
 
                     // Stickers Grid
                     if (current.stickers.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "No stickers in this view.",
-                                style = StickyKeysTheme.typography.bodyMedium,
-                                color = StickyKeysTheme.colors.onBackground,
-                            )
-                        }
+                        // An empty tab used to be one grey sentence in the middle of a black
+                        // screen: "No stickers in this view." It said the same thing whether
+                        // the library was empty because the app had just been installed,
+                        // because nothing had been favourited yet, or because a category was
+                        // new -- three situations with three different next steps, and the
+                        // first of those is the first screen a new user ever sees here.
+                        EmptyLibraryState(tab = current.currentTab)
                     } else {
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(minSize = 100.dp),
@@ -769,4 +805,57 @@ private fun StickerContextMenuDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.text_close)) }
         },
     )
+}
+
+/**
+ * What an empty tab says, which depends on why it is empty.
+ *
+ * There used to be one line for all three cases: "No stickers in this view." That is the
+ * first screen a new install shows on this tab, and it read as a dead end rather than as a
+ * library waiting to be filled. The three situations have three different next steps, and
+ * only one of them is "you have not made anything yet".
+ *
+ * No illustration, deliberately. The app ships no artwork of its own beyond the launcher
+ * mark, and inventing a spot drawing here would be a design decision taken in passing.
+ */
+@Composable
+private fun EmptyLibraryState(tab: TabFilter) {
+    val headline =
+        when (tab) {
+            is TabFilter.All -> stringResource(R.string.text_library_empty_title)
+            is TabFilter.Favourites -> stringResource(R.string.text_favourites_empty_title)
+            is TabFilter.CategoryFilter ->
+                stringResource(R.string.text_category_empty_title, tab.category.name)
+        }
+    val body =
+        when (tab) {
+            is TabFilter.All -> stringResource(R.string.text_library_empty_body)
+            is TabFilter.Favourites -> stringResource(R.string.text_favourites_empty_body)
+            is TabFilter.CategoryFilter -> stringResource(R.string.text_category_empty_body)
+        }
+
+    Box(
+        modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.lg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
+        ) {
+            Text(
+                text = headline,
+                style = StickyKeysTheme.typography.titleMedium,
+                color = StickyKeysTheme.colors.onBackground,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = body,
+                style = StickyKeysTheme.typography.bodyMedium,
+                // Dimmer than the headline so the two read as one block rather than as two
+                // competing sentences.
+                color = StickyKeysTheme.colors.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
 }
