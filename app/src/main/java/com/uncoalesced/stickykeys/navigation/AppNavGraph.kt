@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -97,6 +96,12 @@ fun AppNavGraph(
 
     // The icons used to be Text(title.first()), so "Styles" and "Settings" both rendered a
     // bare "S" and the bar carried no usable signal at all.
+    //
+    // Three tabs, not four. Transfer was the fourth and is now a row at the foot of
+    // Settings: it is something you do about once, when moving to a new phone, and it held a
+    // quarter of the dock permanently for that. Its route still exists and is still reached
+    // by pushing it, which is also what makes its app bar and back arrow correct instead of
+    // the odd one out beside three tabs that have no header at all.
     val screens =
         listOf(
             NavEntry("stickers", "Styles", Icons.Outlined.Star),
@@ -107,7 +112,6 @@ fun AppNavGraph(
                 // the app module's own R class.
                 ImageVector.vectorResource(KeyboardCoreR.drawable.ic_keyboard_flux),
             ),
-            NavEntry("transfer", "Transfer", Icons.Outlined.Share),
             NavEntry("settings", "Settings", Icons.Outlined.Settings),
         )
 
@@ -227,6 +231,7 @@ fun AppNavGraph(
             composable("settings") {
                 AppSettingsScreen(
                     onNavigateToManageCategories = { navController.navigate("manage_categories") },
+                    onNavigateToTransfer = { navController.navigate("transfer") },
                 )
             }
 

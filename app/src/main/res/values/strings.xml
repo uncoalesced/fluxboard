@@ -6,6 +6,8 @@
     <string name="text_add_rename_or_delete_your_sticker_categories">Add, rename, or delete your sticker categories</string>
     <string name="text_default_export_format">Default Export Format</string>
     <string name="text_device_pairing">Device Pairing</string>
+    <string name="text_transfer_to_a_new_device">Transfer to a new device</string>
+    <string name="text_transfer_row_summary">Move your stickers and settings over your local network</string>
     <string name="text_">+</string>
     <string name="desc_back">Back</string>
     <string name="desc_delete_category">Delete category</string>

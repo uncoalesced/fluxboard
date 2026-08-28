@@ -85,6 +85,7 @@ class AppSettingsViewModel
 fun AppSettingsScreen(
     viewModel: AppSettingsViewModel = hiltViewModel(),
     onNavigateToManageCategories: () -> Unit,
+    onNavigateToTransfer: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -279,6 +280,39 @@ fun AppSettingsScreen(
                     text = "This format is used when converting videos to stickers.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Transfer, which used to be a dock tab of its own.
+                //
+                // It is a thing you do roughly once, when moving to a new phone, and it held
+                // a quarter of the dock permanently for that. Here it costs one row and the
+                // dock drops to three tabs. The screen itself is unchanged and still a
+                // pushed route, which is also what makes its app bar and back arrow correct
+                // rather than the odd one out among the tabs.
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToTransfer() }
+                            .padding(vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_transfer_to_a_new_device),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_transfer_row_summary),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    Text(
+                        text = "→",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
