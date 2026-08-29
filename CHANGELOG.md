@@ -16,14 +16,14 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
-## [Unreleased] - targeting v0.1.7.5-BETA
+## [v0.1.7.5-BETA] - 2026-08-29
 
 ### Added
 
-- **A words-typed count beside keys typed.** Counted at the word boundary rather
-  than worked out by dividing keystrokes by five the way the speed figure is, so
-  a glide reads as one word and a handful of keys, and a word taken from the
-  suggestion strip counts without being typed at all. A word abandoned halfway --
+- **A words-typed count beside keys typed.** Counted at the word boundary, not
+  by dividing keystrokes by five the way the speed figure is, so a glide reads as
+  one word and a handful of keys, and a word taken from the suggestion strip
+  counts without being typed at all. A word abandoned halfway --
   dragging the caret out of it -- counts for nothing, on the same reasoning that
   keeps a half-typed fragment out of the dictionary.
 
@@ -63,7 +63,7 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   five different pictures: a paper plane for Send, a magnifier for Search, and
   separate arrows for Go, Next and Done. Send keeps its own artwork because it is
   the one action that cannot be taken back once pressed. The distinction comes
-  from what the field declares rather than which app is in front, so a messaging
+  from what the field declares, not from which app is in front, so a messaging
   app's compose box gets the paper plane while that same app's search box gets
   the arrow.
 
