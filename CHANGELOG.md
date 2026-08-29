@@ -54,10 +54,9 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   not at all.
 
 - **New installs export as GIF rather than animated WebP.** WebP is the smaller
-  and technically better of the two, which is why it was the default, but enough
-  apps still refuse it or flatten it to a single frame that the default quietly
-  produced a file that could not be sent. WebP stays in the picker for anyone
-  whose targets take it.
+  and technically better format, and was the previous default, but enough apps
+  still refuse it or flatten it to a single frame that the default produced files
+  that could not be sent. WebP remains available in the picker.
 
 - **The Enter key draws the return arrow unless the field will send.** It had
   five different pictures: a paper plane for Send, a magnifier for Search, and
@@ -100,8 +99,8 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   widens its touch area and covers the gap from both sides. Vertically nothing was
   widened, and a band about 9px tall between every pair of rows swallowed presses
   outright: no letter, no correction, no feedback. Roughly six percent of the
-  keyboard's height. This is the first mechanism found behind reports of presses
-  not registering, and it is unlikely to be the only one.
+  keyboard's height. This accounts for one cause of presses that do not register
+  and is unlikely to be the only one.
 
 - **Gliding a two-letter word typed only its first letter.** A stroke had to cross
   three keys to count as a glide, so "ok" was thrown away, and because the first
@@ -112,10 +111,10 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   the key it started on.
 
 - **Holding backspace and swiping left deletes words again.** The gesture has
-  existed since v0.1.6 and was reported missing twice, both fairly. Travel only
-  counted after the hold threshold had passed, so the swipe had to come after
-  holding still. Done as one motion, the natural way, it was over before counting
-  began and the key simply deleted characters.
+  existed since v0.1.6 but travel was only counted after the hold threshold had
+  passed, so the swipe had to follow a deliberate pause. Performed as one motion
+  it was over before counting began, and the key deleted single characters
+  instead.
 
 - **The sticker panel stayed open after sending a sticker.** It switched straight
   back to the keyboard, so sending two stickers meant reopening the picker and
@@ -125,8 +124,8 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 - **The typing stats were read once and then never refreshed.** The counters live
   in the keyboard's process and reach storage when the keyboard is hidden, so the
   panel showed whatever had been recorded when the screen was first opened. Coming
-  back to it, or reaching it from the keyboard's settings shortcut, showed old
-  numbers, which is indistinguishable from the counter not working.
+  back to it, or reaching it from the keyboard's settings shortcut, showed stale
+  figures that are indistinguishable from the counter not working.
 
 - **Screen headers were a status bar taller than they were drawn to be.** The
   navigation host padded its content for the system bars without marking those
