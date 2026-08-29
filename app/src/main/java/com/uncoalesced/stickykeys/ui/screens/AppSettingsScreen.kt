@@ -209,6 +209,9 @@ fun AppSettingsScreen(
                 Text(
                     stringResource(R.string.text_app_theme),
                     style = MaterialTheme.typography.titleMedium,
+                    // Accented like every other section heading in the app, so a
+                    // long settings page reads as sections rather than one column.
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 val currentThemeMode by viewModel.themeMode.collectAsState()
@@ -240,6 +243,9 @@ fun AppSettingsScreen(
                 Text(
                     stringResource(R.string.text_default_export_format),
                     style = MaterialTheme.typography.titleMedium,
+                    // Accented like every other section heading in the app, so a
+                    // long settings page reads as sections rather than one column.
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 ExposedDropdownMenuBox(
@@ -325,6 +331,9 @@ fun AppSettingsScreen(
                 Text(
                     stringResource(R.string.text_about),
                     style = MaterialTheme.typography.titleMedium,
+                    // Accented like every other section heading in the app, so a
+                    // long settings page reads as sections rather than one column.
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LinkRow(

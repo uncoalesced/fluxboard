@@ -34,6 +34,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,10 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.R
@@ -217,6 +221,27 @@ fun KeyboardSettingsScreen(
 
             var stats by remember { mutableStateOf(viewModel.statsSnapshot()) }
 
+            // Re-read whenever the screen resumes, not only when it is first composed.
+            //
+            // The counters live in the keyboard's process and reach storage when the
+            // keyboard is hidden, so the numbers here are always a snapshot of what had been
+            // flushed at the moment this screen was built. Once built it stayed built: coming
+            // back to the app, or arriving through the keyboard's own settings shortcut with
+            // this tab already open, showed whatever had been true the first time. Observed
+            // on device reading 693 keys and 0 words while the phone had just recorded more
+            // of both, which reads as the stat being broken rather than as staleness.
+            val statsLifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(statsLifecycleOwner) {
+                val observer =
+                    LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            stats = viewModel.statsSnapshot()
+                        }
+                    }
+                statsLifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { statsLifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+
             var showClearClipboardDialog by remember { mutableStateOf(false) }
             var showResetAppearanceDialog by remember { mutableStateOf(false) }
             val context = LocalContext.current
@@ -275,6 +300,7 @@ fun KeyboardSettingsScreen(
                 Text(
                     text = "Keyboard Settings",
                     style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
 
@@ -817,7 +843,13 @@ private fun SettingsGroup(
             fontSize = 11.sp,
             letterSpacing = 0.6.sp,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // The accent rather than muted grey. The palette has an accent and this screen
+            // was not using it anywhere except a switch thumb, so a long settings page read
+            // as one undifferentiated grey column and the section headings did not separate
+            // it into sections. Fern measures 8.19 against this background, which is the
+            // highest contrast in the palette, so the smallest text on the screen is also
+            // the most legible rather than the least.
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
         Card(

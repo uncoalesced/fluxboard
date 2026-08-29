@@ -398,7 +398,9 @@ fun StickersLibraryScreen(
                         Text(
                             text = stringResource(R.string.text_styles),
                             style = StickyKeysTheme.typography.titleLarge,
-                            color = StickyKeysTheme.colors.onBackground,
+                            // The accent, matching the section headings on the other two
+                            // tabs. The palette has one and the app was barely using it.
+                            color = StickyKeysTheme.colors.primary,
                         )
                         if (current.stickers.isNotEmpty()) {
                             Text(
