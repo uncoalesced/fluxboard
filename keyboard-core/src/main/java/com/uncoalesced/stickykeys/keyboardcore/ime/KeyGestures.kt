@@ -140,8 +140,50 @@ internal fun scrubStepDp(heldMillis: Long): Float {
     return SCRUB_STEP_START_DP + (SCRUB_STEP_MIN_DP - SCRUB_STEP_START_DP) * progress
 }
 
-/** How long a press must be held before it stops counting as a tap. */
-internal const val LONG_PRESS_MS = 350L
+/**
+ * How long a press must be held before it stops counting as a tap.
+ *
+ * 150ms, down from 350ms. At the old value holding a letter for its corner symbol felt like
+ * waiting rather than pressing, which is the whole complaint: the symbol is the point of the
+ * gesture and it arrived long after the finger expected it.
+ *
+ * This is the deadline for a finger that is *not moving*. A press that has already travelled
+ * [GLIDE_STIR_DP] is going somewhere and is given until [GLIDE_WATCH_MS] to say where, which
+ * is what keeps a shorter hold from cutting glides short. Shortening this to 150ms on its own
+ * did exactly that: gliding "ok" started committing o's corner symbol, because a diagonal
+ * needs about 190ms to clear the key it began on.
+ *
+ * A finger that rests on the first letter before setting off still reaches the alternates
+ * strip rather than gliding, and now reaches it sooner. That has always been the behaviour;
+ * resting before swiping has never produced a word.
+ *
+ * Backspace's repeat also starts from here, so hold-to-delete begins sooner too.
+ */
+internal const val LONG_PRESS_MS = 150L
+
+/**
+ * Longest a *moving* finger is given to leave its key before the press is called a hold.
+ *
+ * The old single threshold did both jobs and could not do them differently. Shortening it to
+ * make holds prompt also cut short every glide that needs longer to clear its first key, and
+ * a diagonal is exactly that case: "ok" runs from the o key down to k and takes roughly
+ * 190ms to clear the origin at an ordinary speed. On device that turned "ok" into "{", the
+ * corner symbol of the key it started on.
+ *
+ * Kept at the value the single threshold used to have, so a glide has exactly the time it
+ * always had. Only a finger that has already travelled [GLIDE_STIR_DP] ever reaches it.
+ */
+internal const val GLIDE_WATCH_MS = 350L
+
+/**
+ * How far a finger must travel inside its own key before it stops looking like a hold.
+ *
+ * Below this it is a resting thumb, and the alternates strip should arrive on time. Above it
+ * the press is going somewhere and is worth waiting on. Deliberately larger than the 6dp slop
+ * the alternates strip already uses to absorb jitter, and well below the escape distance, so
+ * it separates "moving" from "still" without deciding anything on its own.
+ */
+internal const val GLIDE_STIR_DP = 10f
 
 private const val REPEAT_FIRST_INTERVAL_MS = 90L
 private const val REPEAT_MIN_INTERVAL_MS = 22L
@@ -637,25 +679,69 @@ internal fun Modifier.keyGestures(
                 if (glide != null && isGlideCandidate(keyOutput)) {
                     val origin = keyBounds()
                     val escapePx = GLIDE_ESCAPE_DP.dp.toPx()
+                    val stirPx = GLIDE_STIR_DP.dp.toPx()
                     var glided = false
                     var lifted = false
-                    withTimeoutOrNull(LONG_PRESS_MS) {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            if (!change.pressed) {
-                                lifted = true
-                                break
+                    var travelled = 0f
+
+                    // Whether the finger is doing anything decides how long it is given.
+                    //
+                    // A stationary finger is a hold and gets [LONG_PRESS_MS], which is short
+                    // so the corner symbol arrives promptly. A finger that is moving has not
+                    // said what it is yet, and cutting it off at the same moment is what
+                    // broke diagonal glides when the hold threshold was shortened: gliding
+                    // "ok" crosses from the o key down to the k key, which needs about 190ms
+                    // to clear the origin at an ordinary speed, so the watch expired first
+                    // and committed o's corner symbol instead of a word. Measured on device,
+                    // where it turned "ok" into "{".
+                    //
+                    // So movement buys time, up to [GLIDE_WATCH_MS]. It cannot make a hold
+                    // slow, because reaching the second phase at all requires the finger to
+                    // have already moved further than a resting thumb ever wobbles.
+                    val stirred =
+                        withTimeoutOrNull(LONG_PRESS_MS) {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change =
+                                    event.changes.firstOrNull() ?: return@withTimeoutOrNull false
+                                if (!change.pressed) {
+                                    lifted = true
+                                    return@withTimeoutOrNull false
+                                }
+                                travelled += change.positionChange().getDistance()
+                                val root = origin.topLeft + change.position
+                                if (glideEscaped(origin, root, escapePx)) {
+                                    glided = true
+                                    glide.begin(origin.center)
+                                    glide.move(root)
+                                    // Claimed only once this is definitely a glide, so an
+                                    // ordinary tap or hold is left entirely alone.
+                                    change.consume()
+                                    return@withTimeoutOrNull false
+                                }
+                                if (travelled >= stirPx) return@withTimeoutOrNull true
                             }
-                            val root = origin.topLeft + change.position
-                            if (glideEscaped(origin, root, escapePx)) {
-                                glided = true
-                                glide.begin(origin.center)
-                                glide.move(root)
-                                // Claimed only once this is definitely a glide, so an ordinary
-                                // tap or hold is left entirely alone.
-                                change.consume()
-                                break
+                            @Suppress("UNREACHABLE_CODE")
+                            false
+                        } ?: false
+
+                    if (stirred) {
+                        withTimeoutOrNull(GLIDE_WATCH_MS - LONG_PRESS_MS) {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                if (!change.pressed) {
+                                    lifted = true
+                                    break
+                                }
+                                val root = origin.topLeft + change.position
+                                if (glideEscaped(origin, root, escapePx)) {
+                                    glided = true
+                                    glide.begin(origin.center)
+                                    glide.move(root)
+                                    change.consume()
+                                    break
+                                }
                             }
                         }
                     }
@@ -700,11 +786,42 @@ internal fun Modifier.keyGestures(
                 // null  -> the threshold elapsed, this is a hold
                 // true  -> released before the threshold, an ordinary tap
                 // false -> the gesture was cancelled out from under us
+                // Travel during the hold window, tracked only for the key that can use it.
+                //
+                // `waitForUpOrCancellation` throws the finger's position away, so a drag
+                // beginning before the hold threshold elapsed was invisible. "Hold backspace
+                // and swipe left" performed as one motion takes well under that threshold,
+                // so the gesture looked absent to anyone who did not already know to hold
+                // still first and only then drag -- which is why it was reported missing
+                // twice against a feature that shipped and was verified on a device by
+                // somebody who knew the trick.
+                //
+                // Only the repeat key reads these, so only the repeat key takes the
+                // different wait. This block runs for every key on the board and the
+                // ordinary path is deliberately left byte-for-byte as it was.
+                var preTravelX = 0f
+                var preTravelY = 0f
                 val early =
                     if (heldPastThreshold) {
                         // Already established as a hold above; waiting a second full window
                         // would make every long press on a letter take twice as long.
                         null
+                    } else if (longPress is LongPress.Repeat) {
+                        withTimeoutOrNull(LONG_PRESS_MS) {
+                            var releasedCleanly = false
+                            while (true) {
+                                val change =
+                                    awaitPointerEvent().changes.firstOrNull() ?: break
+                                val delta = change.positionChange()
+                                preTravelX += delta.x
+                                preTravelY += delta.y
+                                if (!change.pressed) {
+                                    releasedCleanly = true
+                                    break
+                                }
+                            }
+                            releasedCleanly
+                        }
                     } else {
                         withTimeoutOrNull(LONG_PRESS_MS) {
                             waitForUpOrCancellation() != null
@@ -741,12 +858,22 @@ internal fun Modifier.keyGestures(
                         // lift-off, and a second detector reading the same pointer stream would
                         // have to agree with it about when the press is over.
                         var step = 0
-                        var travelX = 0f
-                        var travelY = 0f
+                        // Seeded from the hold window rather than starting at zero, so a
+                        // drag that began before the threshold is still the same gesture.
+                        var travelX = preTravelX
+                        var travelY = preTravelY
                         var accumulator = 0f
                         var wordMode = false
                         val activationPx = WORD_DELETE_ACTIVATION_DP.dp.toPx()
                         val wordStepPx = WORD_DELETE_STEP_DP.dp.toPx()
+                        // Checked once before the loop as well as inside it. The loop only
+                        // reconsiders on a new pointer event, so a finger that completed its
+                        // swipe during the hold window and then stopped moving would sit
+                        // there having earned word mode and never being given it.
+                        if (wordDeleteActivated(travelX, travelY, activationPx)) {
+                            wordMode = true
+                            onDeleteWord()
+                        }
                         while (true) {
                             // In word mode the timer stops producing deletes entirely: they are
                             // driven by travel below, so the caret follows the finger instead of

@@ -86,8 +86,12 @@ class VideoConvertViewModelTest {
 
             assertEquals(VideoConvertUiState.Done, vm.uiState.value)
             assertEquals(1, repository.saved.size)
+            // Real `AppPreferences`, untouched, so this is the shipped default arriving on
+            // the saved file rather than a value the test chose. It is the only place that
+            // proves the export-format preference reaches the conversion at all -- the
+            // setting is otherwise a picker writing to a key nothing visibly reads.
             assertEquals(
-                "image/webp",
+                "image/gif",
                 repository.saved
                     .single()
                     .first.mimeType,

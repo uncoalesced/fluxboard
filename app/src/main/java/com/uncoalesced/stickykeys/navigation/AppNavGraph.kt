@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -96,6 +96,12 @@ fun AppNavGraph(
 
     // The icons used to be Text(title.first()), so "Styles" and "Settings" both rendered a
     // bare "S" and the bar carried no usable signal at all.
+    //
+    // Three tabs, not four. Transfer was the fourth and is now a row at the foot of
+    // Settings: it is something you do about once, when moving to a new phone, and it held a
+    // quarter of the dock permanently for that. Its route still exists and is still reached
+    // by pushing it, which is also what makes its app bar and back arrow correct instead of
+    // the odd one out beside three tabs that have no header at all.
     val screens =
         listOf(
             NavEntry("stickers", "Styles", Icons.Outlined.Star),
@@ -106,7 +112,6 @@ fun AppNavGraph(
                 // the app module's own R class.
                 ImageVector.vectorResource(KeyboardCoreR.drawable.ic_keyboard_flux),
             ),
-            NavEntry("transfer", "Transfer", Icons.Outlined.Share),
             NavEntry("settings", "Settings", Icons.Outlined.Settings),
         )
 
@@ -146,10 +151,27 @@ fun AppNavGraph(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = "stickers",
+            // The keyboard, not the sticker library. The keyboard is the app's flagship and
+            // the reason almost every launch happens -- landing on Styles meant the common
+            // case cost a tap and the first screen described the smaller half of the app.
+            //
+            // This is also the back-stack root every dock tap pops to, so it decides where
+            // the system back button lands, not merely what is drawn first.
+            startDestination = "keyboard",
             modifier =
                 Modifier
                     .padding(innerPadding)
+                    // Padding alone is half the job. `Scaffold` hands its content the insets
+                    // it wants applied but does not mark them as spent, so a screen that
+                    // nests its own `Scaffold` or `TopAppBar` -- twelve of them do, every
+                    // detail route in the app plus device pairing -- reads the full status
+                    // bar height again and adds a second copy of it inside an area that has
+                    // already been padded for it. The result is a header roughly a status
+                    // bar taller than it was drawn to be, worst on device pairing because
+                    // that one sits in the dock beside three tabs that have no app bar at
+                    // all to compare it against. Consuming here fixes every one of them at
+                    // the shared boundary instead of per screen.
+                    .consumeWindowInsets(innerPadding)
                     .dockSwipe(
                         enabled = dockIndex >= 0,
                         key = dockIndex,
@@ -209,6 +231,7 @@ fun AppNavGraph(
             composable("settings") {
                 AppSettingsScreen(
                     onNavigateToManageCategories = { navController.navigate("manage_categories") },
+                    onNavigateToTransfer = { navController.navigate("transfer") },
                 )
             }
 

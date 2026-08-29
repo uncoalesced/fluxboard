@@ -34,6 +34,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,10 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.R
@@ -217,6 +221,27 @@ fun KeyboardSettingsScreen(
 
             var stats by remember { mutableStateOf(viewModel.statsSnapshot()) }
 
+            // Re-read whenever the screen resumes, not only when it is first composed.
+            //
+            // The counters live in the keyboard's process and reach storage when the
+            // keyboard is hidden, so the numbers here are always a snapshot of what had been
+            // flushed at the moment this screen was built. Once built it stayed built: coming
+            // back to the app, or arriving through the keyboard's own settings shortcut with
+            // this tab already open, showed whatever had been true the first time. Observed
+            // on device reading 693 keys and 0 words while the phone had just recorded more
+            // of both, which reads as the stat being broken rather than as staleness.
+            val statsLifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(statsLifecycleOwner) {
+                val observer =
+                    LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            stats = viewModel.statsSnapshot()
+                        }
+                    }
+                statsLifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { statsLifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+
             var showClearClipboardDialog by remember { mutableStateOf(false) }
             var showResetAppearanceDialog by remember { mutableStateOf(false) }
             val context = LocalContext.current
@@ -275,6 +300,7 @@ fun KeyboardSettingsScreen(
                 Text(
                     text = "Keyboard Settings",
                     style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
 
@@ -294,6 +320,62 @@ fun KeyboardSettingsScreen(
                 // been into a customiser. Shows itself at most once, ever.
                 com.uncoalesced.stickykeys.ui.components
                     .DefaultKeyboardPrompt(viewModel.appPreferences)
+
+                // YOUR TYPING
+                //
+                // First on the screen rather than last. Everything below it is a control the
+                // user came here to change; this is the one group they came here to *read*,
+                // and at the bottom of a long scroll it was reached by accident or not at
+                // all. Present in every build, unlike the diagnostics group at the foot of
+                // the screen -- this is the user's own data rather than a tester artefact,
+                // and it never leaves the device. There is no share action here on purpose.
+                if (matches("Your typing", "speed", "accuracy", "stats")) {
+                    SettingsGroup(title = "Your typing") {
+                        StatRow("Keys typed", stats.keystrokes.toString())
+                        // Counted at the word boundary, not derived by dividing keystrokes by
+                        // five the way the WPM figure below it is. A glide is one word and a
+                        // handful of keystrokes; the two numbers are allowed to disagree.
+                        StatRow("Words typed", stats.words.toString())
+                        StatRow(
+                            "Speed",
+                            stats.wordsPerMinute?.let { "$it words a minute" }
+                                ?: "Not enough typing yet",
+                        )
+                        StatRow("Time spent typing", "${stats.activeMs / 60_000} min")
+                        // Two readings of "accuracy", each labelled for what it measures.
+                        // Deleting is not always a mistake and autocorrect being kept is a
+                        // statement about the engine, so averaging them would produce one
+                        // number that answers neither question.
+                        StatRow(
+                            "Typed without deleting",
+                            stats.cleanKeystrokePercent?.let { "$it%" } ?: "-",
+                        )
+                        StatRow(
+                            "Autocorrect kept",
+                            stats.correctionsKeptPercent?.let { "$it%" } ?: "-",
+                        )
+                        StatRow(
+                            "Key response",
+                            stats.latency.deliveryAverageMs?.let { "$it ms" } ?: "-",
+                        )
+                        Text(
+                            "Last 7 days",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                        WeekBars(stats.keystrokesByDay)
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.clearStats()
+                                stats = viewModel.statsSnapshot()
+                            },
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        ) {
+                            Text("Reset stats")
+                        }
+                    }
+                }
 
                 // TYPING
                 if (matches(labelAutoCap, labelAutoCorrect, labelGlideTyping, labelDoubleSpace)) {
@@ -685,55 +767,6 @@ fun KeyboardSettingsScreen(
                     )
                 }
 
-                // YOUR TYPING
-                //
-                // Present in every build, unlike the diagnostics group below it. This is the
-                // user's own data rather than a tester artefact, and it never leaves the
-                // device -- there is no share action here on purpose.
-                if (matches("Your typing", "speed", "accuracy", "stats")) {
-                    SettingsGroup(title = "Your typing") {
-                        StatRow("Keys typed", stats.keystrokes.toString())
-                        StatRow(
-                            "Speed",
-                            stats.wordsPerMinute?.let { "$it words a minute" }
-                                ?: "Not enough typing yet",
-                        )
-                        StatRow("Time spent typing", "${stats.activeMs / 60_000} min")
-                        // Two readings of "accuracy", each labelled for what it measures.
-                        // Deleting is not always a mistake and autocorrect being kept is a
-                        // statement about the engine, so averaging them would produce one
-                        // number that answers neither question.
-                        StatRow(
-                            "Typed without deleting",
-                            stats.cleanKeystrokePercent?.let { "$it%" } ?: "-",
-                        )
-                        StatRow(
-                            "Autocorrect kept",
-                            stats.correctionsKeptPercent?.let { "$it%" } ?: "-",
-                        )
-                        StatRow(
-                            "Key response",
-                            stats.latency.deliveryAverageMs?.let { "$it ms" } ?: "-",
-                        )
-                        Text(
-                            "Last 7 days",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
-                        WeekBars(stats.keystrokesByDay)
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.clearStats()
-                                stats = viewModel.statsSnapshot()
-                            },
-                            modifier = Modifier.padding(vertical = 8.dp),
-                        ) {
-                            Text("Reset stats")
-                        }
-                    }
-                }
-
                 // Absent entirely from a stable or F-Droid build: USAGE_LOGGING is a
                 // compile-time false there, so this whole block folds away rather than
                 // showing a control for a file that is never written.
@@ -810,7 +843,13 @@ private fun SettingsGroup(
             fontSize = 11.sp,
             letterSpacing = 0.6.sp,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // The accent rather than muted grey. The palette has an accent and this screen
+            // was not using it anywhere except a switch thumb, so a long settings page read
+            // as one undifferentiated grey column and the section headings did not separate
+            // it into sections. Fern measures 8.19 against this background, which is the
+            // highest contrast in the palette, so the smallest text on the screen is also
+            // the most legible rather than the least.
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
         )
         Card(

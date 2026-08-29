@@ -68,6 +68,13 @@ collaboration-workflow.md
 .notes/
 
 
+# Scratch space for a working session: device screenshots, uiautomator dumps,
+# pushed shell scripts, pulled logs. Kept inside the repo so it is one known
+# place that can be cleared wholesale, rather than scattered through the system
+# temp directory where it outlives the session and is easy to delete by accident.
+# Nothing here is ever an input to a build.
+.temp/
+
 # Python (dictionary-tools/ build pipeline)
 __pycache__/
 *.pyc

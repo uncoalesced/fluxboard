@@ -14,8 +14,10 @@ class AppPreferencesTest {
     private fun prefs() = AppPreferences(ApplicationProvider.getApplicationContext())
 
     @Test
-    fun `defaults to webp when nothing has been chosen`() {
-        assertEquals("image/webp", prefs().defaultExportFormat.value)
+    fun `defaults to gif when nothing has been chosen`() {
+        // The default is a compatibility choice, not a quality one -- see the comment on
+        // the field itself. Pinned because it is a one-word edit away from reverting.
+        assertEquals("image/gif", prefs().defaultExportFormat.value)
     }
 
     @Test
@@ -23,14 +25,14 @@ class AppPreferencesTest {
         // The flow is driven by an OnSharedPreferenceChangeListener rather than re-read on
         // access, so a listener that stops firing would silently freeze the setting.
         val preferences = prefs()
-        preferences.setDefaultExportFormat("image/gif")
-        assertEquals("image/gif", preferences.defaultExportFormat.value)
+        preferences.setDefaultExportFormat("image/webp")
+        assertEquals("image/webp", preferences.defaultExportFormat.value)
     }
 
     @Test
     fun `the choice survives a new instance reading the same store`() {
-        prefs().setDefaultExportFormat("image/gif")
-        assertEquals("image/gif", prefs().defaultExportFormat.value)
+        prefs().setDefaultExportFormat("image/webp")
+        assertEquals("image/webp", prefs().defaultExportFormat.value)
     }
 
     @Test

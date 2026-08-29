@@ -27,9 +27,15 @@ class AppPreferences
         // that was the only strong reference to ours, and the listener is then collected in
         // release builds only. Each setter publishes to its own flow instead.
 
+        // GIF rather than WebP, which is the smaller and technically better of the two.
+        // Export format is chosen by where the sticker is going, not by what encodes best:
+        // GIF is the one every chat app, forum and image host has accepted for decades,
+        // while animated WebP is still refused or flattened to a still frame in enough
+        // places that the default silently produced a file the user could not send. WebP
+        // stays one tap away in Settings for anyone whose targets take it.
         private val _defaultExportFormat =
             MutableStateFlow(
-                prefs.getString("default_export_format", "image/webp") ?: "image/webp",
+                prefs.getString("default_export_format", "image/gif") ?: "image/gif",
             )
         val defaultExportFormat: StateFlow<String> = _defaultExportFormat.asStateFlow()
 

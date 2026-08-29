@@ -45,6 +45,52 @@ class TypingStatsStoreTest {
     }
 
     @Test
+    fun `words are counted apart from keystrokes and survive a restart`() {
+        // The two are deliberately independent rather than one derived from the other. A
+        // glide is several keystrokes and one word; a tapped suggestion is one word and no
+        // letter keystrokes at all. Asserting different totals here is what stops the word
+        // count quietly becoming keystrokes divided by five.
+        val first = store()
+        repeat(12) { first.recordKeystroke() }
+        repeat(3) { first.recordWord() }
+        first.flush()
+
+        val snapshot = store().snapshot()
+        assertEquals(12L, snapshot.keystrokes)
+        assertEquals(3L, snapshot.words)
+    }
+
+    @Test
+    fun `a word counted but not yet flushed is still shown`() {
+        val store = store()
+        store.recordWord()
+        assertEquals(1L, store.snapshot().words)
+    }
+
+    @Test
+    fun `a flush carrying only words is not skipped as empty`() {
+        // The flush returns early when nothing has been counted, and the emptiness test has
+        // to name every counter. Miss one and a session that produced only that counter is
+        // silently discarded -- which for words is a real session: finishing a word by
+        // tapping a suggestion records a word and no keystroke.
+        val first = store()
+        first.recordWord()
+        first.flush()
+
+        assertEquals(1L, store().snapshot().words)
+    }
+
+    @Test
+    fun `reset clears the word count with everything else`() {
+        val store = store()
+        repeat(4) { store.recordWord() }
+        store.flush()
+        store.clear()
+
+        assertEquals(0L, store.snapshot().words)
+    }
+
+    @Test
     fun `unflushed counters are still shown`() {
         // Opening Settings straight from the keyboard must not show a total that stops short
         // of what was just typed; that reads as the feature being broken, not as a boundary.

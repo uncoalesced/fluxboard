@@ -251,10 +251,18 @@ fun MainIMEView(
                                         interceptingController.commitText(glyph)
                                     },
                                     onEmoticonClick = { interceptingController.commitText(it) },
-                                    onStickerClick = {
-                                        onStickerClick(it)
-                                        interceptingController.switchMode(AppMode.TYPING)
-                                    },
+                                    // Stays open, like the two above it. Sending a sticker used
+                                    // to switch straight back to the keyboard, so the panel shut
+                                    // itself after one use and a second sticker meant reopening
+                                    // the picker and finding the tab again. Reported as the
+                                    // sticker screen exiting on its own, and it was this line.
+                                    //
+                                    // The exits are the back arrow and the ABC chip, which is
+                                    // true of every other panel here. A panel that closes itself
+                                    // on use is the odd one out, and it also made the picker the
+                                    // only surface where the way out was "do the thing it is
+                                    // for".
+                                    onStickerClick = { onStickerClick(it) },
                                     onBackToKeyboard = {
                                         interceptingController.switchMode(AppMode.TYPING)
                                     },

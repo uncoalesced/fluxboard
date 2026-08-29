@@ -85,6 +85,7 @@ class AppSettingsViewModel
 fun AppSettingsScreen(
     viewModel: AppSettingsViewModel = hiltViewModel(),
     onNavigateToManageCategories: () -> Unit,
+    onNavigateToTransfer: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -100,7 +101,10 @@ fun AppSettingsScreen(
                     "image/gif" to "Standard GIF",
                 )
             val currentFormatLabel =
-                exportFormats.find { it.first == currentExportFormat }?.second ?: "Animated WebP"
+                // Falls back to the shipped default's label, not the other option's: this
+                // only fires for a stored value neither entry matches, and naming the
+                // format that is not in use would misreport what the next export produces.
+                exportFormats.find { it.first == currentExportFormat }?.second ?: "Standard GIF"
 
             Column(
                 modifier =
@@ -205,6 +209,9 @@ fun AppSettingsScreen(
                 Text(
                     stringResource(R.string.text_app_theme),
                     style = MaterialTheme.typography.titleMedium,
+                    // Accented like every other section heading in the app, so a
+                    // long settings page reads as sections rather than one column.
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 val currentThemeMode by viewModel.themeMode.collectAsState()
@@ -236,6 +243,9 @@ fun AppSettingsScreen(
                 Text(
                     stringResource(R.string.text_default_export_format),
                     style = MaterialTheme.typography.titleMedium,
+                    // Accented like every other section heading in the app, so a
+                    // long settings page reads as sections rather than one column.
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 ExposedDropdownMenuBox(
@@ -279,6 +289,39 @@ fun AppSettingsScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
+                // Transfer, which used to be a dock tab of its own.
+                //
+                // It is a thing you do roughly once, when moving to a new phone, and it held
+                // a quarter of the dock permanently for that. Here it costs one row and the
+                // dock drops to three tabs. The screen itself is unchanged and still a
+                // pushed route, which is also what makes its app bar and back arrow correct
+                // rather than the odd one out among the tabs.
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToTransfer() }
+                            .padding(vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.text_transfer_to_a_new_device),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(
+                            stringResource(R.string.text_transfer_row_summary),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    Text(
+                        text = "→",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
                 // About
                 //
                 // Two rows, two destinations: the repository, and the author's profile. The
@@ -288,6 +331,9 @@ fun AppSettingsScreen(
                 Text(
                     stringResource(R.string.text_about),
                     style = MaterialTheme.typography.titleMedium,
+                    // Accented like every other section heading in the app, so a
+                    // long settings page reads as sections rather than one column.
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LinkRow(

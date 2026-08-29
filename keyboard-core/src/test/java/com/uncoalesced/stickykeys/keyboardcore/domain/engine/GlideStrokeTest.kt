@@ -345,8 +345,19 @@ class GlideStrokeTest {
     }
 
     @Test
-    fun `too few keys is not a glide`() {
+    fun `one key is not a glide`() {
         assertTrue(buildGlideStroke(listOf(GlidePoint(0f, 0f, 'h'))).isUsable.not())
+    }
+
+    @Test
+    fun `two keys is a glide, because a tap cannot cross into a neighbour`() {
+        // The "ok" case. Two keys with nothing between them used to be discarded, so the
+        // letter committed on press was never taken back and the gesture produced a single
+        // character. A press only becomes a glide after leaving its own key by the escape
+        // distance, so a stroke that exists at all has already crossed a boundary.
+        val two = listOf('o', 'k').map { GlidePoint(0f, 0f, it) }
+        assertTrue(buildGlideStroke(two).isUsable)
+
         val three = listOf('h', 'j', 'k').map { GlidePoint(0f, 0f, it) }
         assertTrue(buildGlideStroke(three).isUsable)
     }

@@ -9,11 +9,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The Enter key draws what it will do.
+ * The Enter key draws the return arrow unless the field will send.
  *
- * Behaviour was already correct -- `sendEnter` has read the field's declared action since
- * v0.1.4 -- but the key always showed the same return arrow, so a field that would *send*
- * looked identical to one that would insert a newline.
+ * Send earns its own glyph because it is the one action the user cannot take back -- the
+ * message leaves. Search, Go, Next and Done each had their own artwork until v0.1.7.5 and
+ * now do not: five pictures on one key taught nobody anything, and the return arrow is what
+ * people already read as "Enter".
+ *
+ * The distinction is drawn from the action the field declares and never from which app is
+ * in front. A search box inside a messaging app declares IME_ACTION_SEARCH and therefore
+ * gets the plain arrow, while that same app's compose field declares IME_ACTION_SEND and
+ * gets the paper plane -- which is the behaviour asked for, reached without the keyboard
+ * knowing any app's name.
  *
  * The pair worth pinning is UNSPECIFIED and NONE. They are 0 and 1 respectively, so the
  * natural `action != IME_ACTION_NONE` test reads a plain text field (which reports
@@ -24,12 +31,18 @@ class EnterKeyGlyphTest {
         keyGlyph("ENTER", enterAction = action) as KeyGlyph.Icon
 
     @Test
-    fun `each declared action gets its own artwork`() {
+    fun `only a send field gets its own artwork`() {
         assertEquals(R.drawable.ic_key_enter_send, enterIcon(EditorInfo.IME_ACTION_SEND).res)
-        assertEquals(R.drawable.ic_key_search, enterIcon(EditorInfo.IME_ACTION_SEARCH).res)
-        assertEquals(R.drawable.ic_key_enter_go, enterIcon(EditorInfo.IME_ACTION_GO).res)
-        assertEquals(R.drawable.ic_key_enter_next, enterIcon(EditorInfo.IME_ACTION_NEXT).res)
-        assertEquals(R.drawable.ic_key_enter_done, enterIcon(EditorInfo.IME_ACTION_DONE).res)
+    }
+
+    @Test
+    fun `every other declared action draws the plain return arrow`() {
+        // The case that prompted this: a search box inside a messaging app. The app is one
+        // that sends, the field is not, and the key must say so.
+        assertEquals(R.drawable.ic_key_enter, enterIcon(EditorInfo.IME_ACTION_SEARCH).res)
+        assertEquals(R.drawable.ic_key_enter, enterIcon(EditorInfo.IME_ACTION_GO).res)
+        assertEquals(R.drawable.ic_key_enter, enterIcon(EditorInfo.IME_ACTION_NEXT).res)
+        assertEquals(R.drawable.ic_key_enter, enterIcon(EditorInfo.IME_ACTION_DONE).res)
     }
 
     @Test
@@ -42,25 +55,34 @@ class EnterKeyGlyphTest {
     }
 
     @Test
-    fun `the five actions are all distinguishable from each other`() {
-        val icons =
+    fun `send is the only action that differs from the arrow`() {
+        val nonSending =
             listOf(
-                EditorInfo.IME_ACTION_SEND,
                 EditorInfo.IME_ACTION_SEARCH,
                 EditorInfo.IME_ACTION_GO,
                 EditorInfo.IME_ACTION_NEXT,
                 EditorInfo.IME_ACTION_DONE,
+                EditorInfo.IME_ACTION_UNSPECIFIED,
+                EditorInfo.IME_ACTION_NONE,
             ).map { enterIcon(it).res }
-        assertEquals("no two actions may share artwork", icons.size, icons.toSet().size)
-        assertTrue(icons.none { it == R.drawable.ic_key_enter })
+        assertTrue(
+            "only a send field may draw something other than the return arrow",
+            nonSending.all { it == R.drawable.ic_key_enter },
+        )
+        assertNotEquals(
+            R.drawable.ic_key_enter,
+            enterIcon(EditorInfo.IME_ACTION_SEND).res,
+        )
     }
 
     /** The description is read aloud, so it has to change with the artwork. */
     @Test
     fun `the accessibility description names the action`() {
         assertEquals("Send", enterIcon(EditorInfo.IME_ACTION_SEND).description)
-        assertEquals("Search", enterIcon(EditorInfo.IME_ACTION_SEARCH).description)
-        assertEquals("Done", enterIcon(EditorInfo.IME_ACTION_DONE).description)
+        // These read as "Enter" now because that is what the key draws and does. A
+        // description that still said "Done" would describe artwork that is no longer there.
+        assertEquals("Enter", enterIcon(EditorInfo.IME_ACTION_SEARCH).description)
+        assertEquals("Enter", enterIcon(EditorInfo.IME_ACTION_DONE).description)
         assertEquals("Enter", enterIcon(EditorInfo.IME_ACTION_UNSPECIFIED).description)
     }
 

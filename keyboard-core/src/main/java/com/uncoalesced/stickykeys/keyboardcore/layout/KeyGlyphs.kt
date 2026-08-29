@@ -56,21 +56,30 @@ fun keyGlyph(
                 ShiftRendering.LOCKED -> KeyGlyph.Icon(R.drawable.ic_key_shift_lock, "Caps lock")
             }
         "DEL" -> KeyGlyph.Icon(R.drawable.ic_key_backspace, "Backspace")
-        // What the key will actually do, drawn on the key.
+        // The return arrow everywhere except a send field.
         //
-        // Deliberately not gated on `enterInsertsNewline` being false: a field may both
-        // accept newlines and declare an action, and the specific icon is still the honest
-        // one there. The newline case is exactly IME_ACTION_UNSPECIFIED or IME_ACTION_NONE,
-        // which fall to the branch below on their own -- and those two are a trap worth
-        // naming, because UNSPECIFIED is 0 while NONE is 1, so the obvious
-        // `action != IME_ACTION_NONE` test treats a plain text field as actionable.
+        // Send is the one action worth drawing differently, because it is the one where the
+        // key does something the user cannot take back: the message leaves. Search, Go, Next
+        // and Done all previously had their own glyph and no longer do -- five different
+        // pictures on one key taught nobody anything, and the return arrow is what people
+        // already read as "Enter". Joel's decision, 2026-08-28, and it reverses his own
+        // 2026-08-16 call that the Done tick was correct; the tick is now the return arrow
+        // like everything else that is not Send.
+        //
+        // Driven by the action the field declares, never by which app is in front. WhatsApp,
+        // Messenger and the AOSP messaging app all set IME_ACTION_SEND, so they get the paper
+        // plane without this keyboard knowing their names -- and a package list would be both
+        // fragile and against this project's no-app-heuristics position.
+        //
+        // Deliberately not gated on `enterInsertsNewline` being false: a field may both accept
+        // newlines and declare an action, and Send is still the honest icon there. The newline
+        // case is exactly IME_ACTION_UNSPECIFIED or IME_ACTION_NONE, which fall to the else
+        // branch on their own -- and those two are a trap worth naming, because UNSPECIFIED is
+        // 0 while NONE is 1, so the obvious `action != IME_ACTION_NONE` test treats a plain
+        // text field as actionable.
         "ENTER" ->
             when (enterAction) {
                 EditorInfo.IME_ACTION_SEND -> KeyGlyph.Icon(R.drawable.ic_key_enter_send, "Send")
-                EditorInfo.IME_ACTION_SEARCH -> KeyGlyph.Icon(R.drawable.ic_key_search, "Search")
-                EditorInfo.IME_ACTION_GO -> KeyGlyph.Icon(R.drawable.ic_key_enter_go, "Go")
-                EditorInfo.IME_ACTION_NEXT -> KeyGlyph.Icon(R.drawable.ic_key_enter_next, "Next")
-                EditorInfo.IME_ACTION_DONE -> KeyGlyph.Icon(R.drawable.ic_key_enter_done, "Done")
                 else -> KeyGlyph.Icon(R.drawable.ic_key_enter, "Enter")
             }
         // Two doors into the same picker, and they must not look alike: a user who put both on

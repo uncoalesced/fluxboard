@@ -6,6 +6,15 @@
     <string name="text_add_rename_or_delete_your_sticker_categories">Add, rename, or delete your sticker categories</string>
     <string name="text_default_export_format">Default Export Format</string>
     <string name="text_device_pairing">Device Pairing</string>
+    <string name="text_styles">Styles</string>
+    <string name="text_library_empty_title">No stickers yet</string>
+    <string name="text_library_empty_body">Make one from a photo, a screenshot or a video clip using the buttons below.</string>
+    <string name="text_favourites_empty_title">No favourites yet</string>
+    <string name="text_favourites_empty_body">Tap the star on any sticker to keep it here.</string>
+    <string name="text_category_empty_title">%1$s is empty</string>
+    <string name="text_category_empty_body">Press and hold a sticker to move it into this category.</string>
+    <string name="text_transfer_to_a_new_device">Transfer to a new device</string>
+    <string name="text_transfer_row_summary">Move your stickers and settings over your local network</string>
     <string name="text_">+</string>
     <string name="desc_back">Back</string>
     <string name="desc_delete_category">Delete category</string>
@@ -158,4 +167,8 @@
     <string name="text_about">About</string>
     <string name="text_source_code">Source code</string>
     <string name="text_uncoalesced">uncoalesced</string>
+    <plurals name="sticker_count">
+        <item quantity="one">%1$d sticker</item>
+        <item quantity="other">%1$d stickers</item>
+    </plurals>
 </resources>

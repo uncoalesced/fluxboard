@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.keyboardcore.emoji.EMOTICONS
+import com.uncoalesced.stickykeys.keyboardcore.layout.KeyDefinition
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 
@@ -483,16 +485,29 @@ internal fun EmojiPickerView(
 }
 
 /**
- * The letter pad that drives emoji search.
+ * The keyboard that drives emoji search.
  *
- * A private, deliberately plain keypad rather than the real key grid. Search here matches
- * the English names in `emoji_data.txt`, so a remapped or non-Latin layout would make the
- * feature unusable rather than personal -- and routing the real keyboard's output into a
- * query would mean teaching the typing path about a second destination for every keystroke,
- * which is the one part of this codebase where a mistake reaches the user's actual message.
+ * This used to be a private keypad of its own: plain boxes with a text "del", ignoring the
+ * active theme's key shapes, haze, sizing and press feedback. It looked like a different
+ * product bolted into the middle of the keyboard, which is what it was.
  *
- * No long press, no glide, no alternates: there is nothing to reach for behind a letter
- * when the whole vocabulary is a-z.
+ * It now draws through [KeyboardRowsView], the same composable the typing keyboard uses, so
+ * the keys are the user's keys. That was previously argued against on the grounds that it
+ * would mean "teaching the typing path about a second destination for every keystroke". It
+ * does not: [KeyboardRowsView] already takes its handler as a parameter, so this is a second
+ * *caller* of a shared view rather than a second destination inside one path. Nothing in
+ * `TypingKeyboardView` or `StickyKeysIME` is touched, and no keystroke here can reach the
+ * editor -- the handler below only ever calls back into the picker's own query.
+ *
+ * The letters are the shipped a-z rather than the user's remapped layout, and that part of
+ * the original reasoning still holds: search matches the English names in
+ * `emoji_data.txt`, so a layout that moves or replaces the Latin letters would make the
+ * feature unusable rather than personal.
+ *
+ * Deliberately no shift, no symbols page and no enter. Emoji names are lower-case English,
+ * so each of those would be a key that draws like every other key and does nothing when
+ * pressed, which is worse than not drawing it. Backspace is a real repeat key, so holding it
+ * clears the query the way holding it anywhere else deletes.
  */
 @Composable
 private fun EmojiSearchPad(
@@ -500,73 +515,65 @@ private fun EmojiSearchPad(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        SEARCH_PAD_ROWS.forEachIndexed { index, row ->
-            Row(
-                modifier = Modifier.fillMaxWidth().height(SEARCH_PAD_KEY_HEIGHT),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                row.forEach { letter ->
-                    SearchPadKey(
-                        label = letter,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onLetter(letter) },
-                    )
-                }
-                // Backspace shares the last row, where a thumb already expects it.
-                if (index == SEARCH_PAD_ROWS.lastIndex) {
-                    SearchPadKey(
-                        label = SEARCH_PAD_DELETE,
-                        modifier = Modifier.weight(1.6f),
-                        onClick = onDelete,
-                        description = "Delete",
-                    )
+    // Hoisted and remembered for the same reason the typing keyboard hoists its handler: a
+    // lambda rebuilt per recomposition is a changed parameter on every key, which takes the
+    // whole grid out of skipping.
+    val letter = rememberUpdatedState(onLetter)
+    val delete = rememberUpdatedState(onDelete)
+    val onKeyPress =
+        remember {
+            { output: String ->
+                when (output) {
+                    "DEL" -> delete.value()
+                    "SPACE" -> letter.value(" ")
+                    else -> letter.value(output)
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SearchPadKey(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    description: String = label,
-) {
-    Box(
-        modifier =
-            modifier
-                .fillMaxHeight()
-                .background(
-                    StickyKeysTheme.colors.surfaceVariant,
-                    StickyKeysTheme.shapes.small,
-                ).clickable(role = Role.Button, onClick = onClick)
-                .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = StickyKeysTheme.colors.onSurfaceVariant,
-            style = StickyKeysTheme.typography.labelLarge,
+    Box(modifier = modifier.fillMaxWidth().height(SEARCH_KEYBOARD_HEIGHT)) {
+        KeyboardRowsView(
+            keyRows = SEARCH_KEYBOARD_ROWS,
+            mode = KeyboardMode.LETTERS_LOWER,
+            palette = StickyKeysTheme.colors,
+            hasBackgroundImage = false,
+            onKeyPress = onKeyPress,
+            modifier = Modifier.fillMaxSize(),
+            // No glide. A swipe across a search pad has no word to decode against, and the
+            // decoder is gated on the typing field's privacy state, which does not apply here.
+            glide = null,
         )
     }
 }
 
-private val SEARCH_PAD_ROWS =
-    listOf(
-        "qwertyuiop".map { it.toString() },
-        "asdfghjkl".map { it.toString() },
-        "zxcvbnm".map { it.toString() },
+/**
+ * The search keyboard's own rows: the shipped letters, a backspace, and a space bar.
+ *
+ * Built here rather than taken from `KeyboardLayouts.letterRows` because that carries the
+ * action row, whose symbols page, emoji key and enter key have nothing to do in a search
+ * box. No hints and no alternates, so no letter here offers a corner symbol that the query
+ * has no use for.
+ */
+private val SEARCH_KEYBOARD_ROWS =
+    KeyboardRows(
+        listOf(
+            "qwertyuiop".map { KeyDefinition(id = "search_$it", output = it.toString()) },
+            "asdfghjkl".map { KeyDefinition(id = "search_$it", output = it.toString()) },
+            "zxcvbnm".map { KeyDefinition(id = "search_$it", output = it.toString()) } +
+                KeyDefinition(id = "search_del", output = "DEL", weight = 1.5f),
+            listOf(KeyDefinition(id = "search_space", output = "SPACE", weight = 10f)),
+        ),
     )
 
-private val SEARCH_PAD_KEY_HEIGHT = 34.dp
-
-/** Drawn rather than an icon: the pad has no icon vocabulary of its own. */
-private const val SEARCH_PAD_DELETE = "del"
+/**
+ * Four rows, sized so the emoji results keep room to be results.
+ *
+ * At the typing keyboard's own row height this came to 176dp, which left the grid above it
+ * about one and a half rows of emoji inside the picker's fixed panel -- narrower than the
+ * plain pad it replaced, so the search got prettier and less useful in the same change.
+ * Measured on device. 148dp keeps rows comfortably above the 34dp the old pad used while
+ * giving the results back roughly a full row.
+ */
+private val SEARCH_KEYBOARD_HEIGHT = 148.dp
 
 private const val SEARCH_HINT = "Search emoji"
 private const val SEARCH_PROMPT = "Type a name, like heart or cat"
