@@ -369,10 +369,35 @@ class PredictionEngine
                     }
                 }
 
-                return@withContext merged.entries
-                    .sortedByDescending { it.value }
-                    .take(MAX_SUGGESTIONS)
-                    .map { it.key }
+                val ranked =
+                    merged.entries
+                        .sortedByDescending { it.value }
+                        .take(MAX_SUGGESTIONS)
+                        .map { it.key }
+
+                // 5. One slot is kept for a contraction, when the typed letters are the bare
+                // form of one.
+                //
+                // Ranking alone is not enough, and the case that showed it is "im". The strip
+                // holds three, and "image", "important" and "images" are all commoner than
+                // any single contraction, so "I'm" was computed, scored and then cut --
+                // leaving one of the most frequent words in English unreachable while three
+                // completions of a word the user had not finished took every slot. Measured
+                // on device; "ill", "cant" and "well" happened to have weaker competition and
+                // so looked fine.
+                //
+                // The trade is deliberate. A completion is a guess about a word still being
+                // typed, while the bare form of a contraction is a complete thing the user
+                // already finished typing, so it has the better claim on the last slot. Only
+                // one is ever promoted, and only when none made it on merit, so the ordinary
+                // case is untouched.
+                val bestContraction = contractionSuggestions.maxByOrNull { it.score }?.word
+                return@withContext when {
+                    bestContraction == null -> ranked
+                    ranked.contains(bestContraction) -> ranked
+                    ranked.size < MAX_SUGGESTIONS -> ranked + bestContraction
+                    else -> ranked.dropLast(1) + bestContraction
+                }
             }
 
         /**

@@ -189,6 +189,36 @@ class ContractionTest {
         }
 
     /**
+     * A contraction keeps a slot in the strip even when three completions outrank it.
+     *
+     * Found on a device, not in review. "image", "important" and "images" are each commoner
+     * than any single contraction, so for "im" the strip filled with completions of a word
+     * the user had not finished and "I'm" was computed, scored and then cut. Ranking alone
+     * cannot fix that without over-weighting contractions everywhere else, so exactly one is
+     * promoted, and only when none reached the strip on merit.
+     */
+    @Test
+    fun `a contraction is not ranked out of the strip by commoner completions`() =
+        runBlocking {
+            val suggestions = engine.getSuggestions("im")
+            assertTrue(
+                "expected I'm among suggestions for \"im\", got $suggestions",
+                suggestions.contains("I'm"),
+            )
+        }
+
+    /** Promotion takes one slot at most and leaves the rest of the ranking alone. */
+    @Test
+    fun `promoting a contraction does not empty the strip of completions`() =
+        runBlocking {
+            val suggestions = engine.getSuggestions("im")
+            assertTrue(
+                "expected ordinary completions alongside it, got $suggestions",
+                suggestions.any { !it.contains("'") },
+            )
+        }
+
+    /**
      * "im" cannot autocorrect, and the strip is the only route to "I'm".
      *
      * Autocorrect refuses anything under three characters outright, which is a deliberate

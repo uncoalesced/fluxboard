@@ -564,8 +564,16 @@ private val SEARCH_KEYBOARD_ROWS =
         ),
     )
 
-/** Four rows at roughly the height the typing keyboard gives its own. */
-private val SEARCH_KEYBOARD_HEIGHT = 176.dp
+/**
+ * Four rows, sized so the emoji results keep room to be results.
+ *
+ * At the typing keyboard's own row height this came to 176dp, which left the grid above it
+ * about one and a half rows of emoji inside the picker's fixed panel -- narrower than the
+ * plain pad it replaced, so the search got prettier and less useful in the same change.
+ * Measured on device. 148dp keeps rows comfortably above the 34dp the old pad used while
+ * giving the results back roughly a full row.
+ */
+private val SEARCH_KEYBOARD_HEIGHT = 148.dp
 
 private const val SEARCH_HINT = "Search emoji"
 private const val SEARCH_PROMPT = "Type a name, like heart or cat"
