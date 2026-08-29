@@ -81,6 +81,16 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   something done about once, when moving to a new phone. It is now a row at the
   foot of Settings and still opens the same screen.
 
+- **The app uses the accent colour it already had.** Every screen heading and
+  every section label was the same muted grey as the body text, so a long settings
+  page read as one undifferentiated column. No colour value changed and the
+  palette is the same one; it is simply being used.
+
+- **The sticker library opens with a heading and a count**, which it was the only
+  tab without. Its empty tabs now say what is missing and how to add to it,
+  instead of showing one grey sentence whether the app had just been installed,
+  nothing had been favourited, or a category was new.
+
 ### Fixed
 
 - **A tap landing between two key rows typed nothing at all.** Every key is drawn
@@ -106,6 +116,17 @@ so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
   counted after the hold threshold had passed, so the swipe had to come after
   holding still. Done as one motion, the natural way, it was over before counting
   began and the key simply deleted characters.
+
+- **The sticker panel stayed open after sending a sticker.** It switched straight
+  back to the keyboard, so sending two stickers meant reopening the picker and
+  finding the tab again. Emoji and emoticons already stayed open. The way out is
+  still the back arrow and the ABC key.
+
+- **The typing stats were read once and then never refreshed.** The counters live
+  in the keyboard's process and reach storage when the keyboard is hidden, so the
+  panel showed whatever had been recorded when the screen was first opened. Coming
+  back to it, or reaching it from the keyboard's settings shortcut, showed old
+  numbers, which is indistinguishable from the counter not working.
 
 - **Screen headers were a status bar taller than they were drawn to be.** The
   navigation host padded its content for the system bars without marking those
