@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -20,10 +19,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    buildFeatures {
-        compose = true
-    }
 }
 
 kotlin {
@@ -32,22 +27,13 @@ kotlin {
     }
 }
 
+// This module has no UI. It is pairing, packaging, crypto and sockets, and the app
+// module owns every screen that drives it -- including the QR pairing screen, which
+// declares ZXing and qrcode-kotlin itself. Compose, activity-compose, core-ktx and
+// the two QR libraries were all declared here and imported by nothing: there is not
+// one androidx import in transfer/src/main. Adding a dependency back means a source
+// file needs it, not that a sibling module has it.
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-
-    // 4.5.0 chosen as a version known safe for Android Compose
-    implementation("io.github.g0dkar:qrcode-kotlin-android:4.5.0")
-    // ZXing for QR scanning. Both quickie variants (bundled and unbundled) resolve
-    // to play-services-mlkit-barcode-scanning and therefore to datatransport;
-    // zxing-android-embedded is Apache-2.0 and Play-Services-free.
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     implementation(libs.hilt.android)
