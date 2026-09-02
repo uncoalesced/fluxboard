@@ -114,10 +114,6 @@ class LayoutEditorViewModel
             _selectedKeyId.value = null
         }
 
-        /** Rows of the page currently being edited. */
-        fun currentPageRows(): List<List<KeyDefinition>> =
-            _editingLayout.value.pages()[_editingPage.value]
-
         private fun updateCurrentPage(
             transform: (List<List<KeyDefinition>>) -> List<List<KeyDefinition>>,
         ) {

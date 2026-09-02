@@ -687,10 +687,6 @@ class TypingViewModel
             learn(corrected)
         }
 
-        fun clearUndoState() {
-            _undoState.value = null
-        }
-
         fun onUndoApplied() {
             usageLog.onAutocorrectUndone()
             typingStats.recordAutocorrectUndone()

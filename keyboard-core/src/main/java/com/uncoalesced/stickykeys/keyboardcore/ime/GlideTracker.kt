@@ -78,10 +78,6 @@ internal class GlideTracker {
         if (bounds.width > 0f) keyWidthPx = bounds.width
     }
 
-    fun forget(key: Char) {
-        keyRects.remove(key)
-    }
-
     fun begin(at: Offset) {
         points.clear()
         points.add(at)
