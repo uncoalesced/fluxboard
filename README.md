@@ -1,5 +1,11 @@
 # FluxBoard
 
+
+<div align="center">
+  <img src="assets/logos/flux_logo_beta_transparent.png" alt="FluxBoard" width="400">
+</div>
+
+
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-3DDC84.svg)
 ![Language](https://img.shields.io/badge/language-Kotlin-7F52FF.svg)
