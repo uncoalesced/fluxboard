@@ -1,3 +1,4 @@
+// Engineered by uncoalesced
 plugins {
     id("jacoco")
     alias(libs.plugins.android.library)

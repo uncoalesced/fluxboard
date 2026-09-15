@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
 <baseline version="1.0">
     <file name="src/main/java/com/uncoalesced/stickykeys/transfer/migration/LinkSharingManager.kt">
         <error line="55" column="100" source="standard:max-line-length" />

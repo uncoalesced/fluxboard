@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # FluxBoard
 
 
@@ -103,7 +105,7 @@ The short version: the app has no analytics, no crash reporting, no ad SDK, and
 no Google Play Services dependency. Your dictionary, clipboard history, stickers,
 and themes stay in the app's private storage.
 
-The longer version is in [PRIVACY.md](PRIVACY.md), including which permissions
+The longer version is in [PRIVACY.md](docs/PRIVACY.md), including which permissions
 exist and why, and what is deliberately kept out of cloud backup.
 
 Two of those claims are checked by CI on every build rather than asserted:
@@ -153,11 +155,11 @@ the data layer and the image pipeline. `transfer` is device-to-device migration.
 `app` depends on the other three, and `keyboard-core` also depends on
 `sticker-core` because the keyboard renders the sticker library.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) covers the conventions in more detail.
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) covers the conventions in more detail.
 
 ## Contributing
 
-Please do. [CONTRIBUTING.md](CONTRIBUTING.md) covers the build, the house style,
+Please do. [CONTRIBUTING.md](docs/CONTRIBUTING.md) covers the build, the house style,
 and the few rules that are not negotiable — chiefly that nothing may add
 telemetry or a Play Services dependency, and that every source file carries the
 provenance line.
@@ -186,8 +188,8 @@ ideas.
 ## Licence
 
 [MIT](LICENSE). Copyright 2026 uncoalesced and ZapCannonYT. See
-[AUTHORS.md](AUTHORS.md).
+[AUTHORS.md](docs/AUTHORS.md).
 
-Use of this app is also covered by [TERMS.md](TERMS.md), which mostly says what
+Use of this app is also covered by [TERMS.md](docs/TERMS.md), which mostly says what
 the MIT licence already says: there is no warranty, and you are responsible for
 what you type.

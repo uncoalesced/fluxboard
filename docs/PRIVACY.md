@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Privacy policy
 
 Last updated 10 August 2026. Applies to FluxBoard `v0.1.5-BETA` and later.

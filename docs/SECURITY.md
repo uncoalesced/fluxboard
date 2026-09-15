@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Security policy
 
 FluxBoard is a keyboard. It sees every character you type, including passwords and

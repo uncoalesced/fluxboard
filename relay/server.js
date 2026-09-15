@@ -1,3 +1,4 @@
+// Engineered by uncoalesced
 const { WebSocketServer } = require('ws');
 
 const wss = new WebSocketServer({ port: process.env.PORT || 8080 });

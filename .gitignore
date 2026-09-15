@@ -57,9 +57,10 @@ Thumbs.db
 .agents/
 .agents/skills/
 AGENTS.md
-docs/
 CLAUDE.md
 collaboration-workflow.md
+docs/roadmap.md
+docs/distribution/
 
 # Everything that is a plan rather than documentation lives here: finished release
 # plans, the phase files, device checklists, research and agent prompts. One

@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Terms and conditions
 
 Last updated 10 August 2026. Applies to FluxBoard `v0.1.5-BETA` and later.
@@ -11,7 +13,7 @@ What follows is short on purpose.
 
 ## The licence is the real agreement
 
-The software is provided under the [MIT licence](LICENSE). You may use, copy,
+The software is provided under the [MIT licence](../LICENSE). You may use, copy,
 modify, and redistribute it, including commercially, provided the copyright notice
 and licence text travel with it.
 
