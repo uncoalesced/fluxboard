@@ -8,7 +8,6 @@ import com.uncoalesced.stickykeys.data.local.AppPreferences
 import com.uncoalesced.stickykeys.stickercore.animation.AnimatedStickerConverter
 import com.uncoalesced.stickykeys.stickercore.animation.ConversionQuality
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
-import com.uncoalesced.stickykeys.stickercore.domain.model.Pack
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -247,8 +246,6 @@ private class RecordingRepository : StickerRepository {
 
     override fun getAllStickers(): Flow<List<Sticker>> = flowOf(emptyList())
 
-    override fun getStickersByPack(packId: String): Flow<List<Sticker>> = flowOf(emptyList())
-
     override fun getStickersByCategory(categoryId: String): Flow<List<Sticker>> =
         flowOf(emptyList())
 
@@ -267,12 +264,6 @@ private class RecordingRepository : StickerRepository {
     override suspend fun deleteSticker(id: String) = Unit
 
     override suspend fun toggleFavourite(id: String) = Unit
-
-    override fun getAllPacks(): Flow<List<Pack>> = flowOf(emptyList())
-
-    override suspend fun savePack(pack: Pack) = Unit
-
-    override suspend fun deletePack(id: String) = Unit
 
     override fun getAllCategories(): Flow<List<Category>> = flowOf(emptyList())
 

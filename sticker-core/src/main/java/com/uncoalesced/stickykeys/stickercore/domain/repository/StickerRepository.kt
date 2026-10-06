@@ -2,15 +2,12 @@
 package com.uncoalesced.stickykeys.stickercore.domain.repository
 
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
-import com.uncoalesced.stickykeys.stickercore.domain.model.Pack
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import kotlinx.coroutines.flow.Flow
 
 interface StickerRepository {
     // Queries
     fun getAllStickers(): Flow<List<Sticker>>
-
-    fun getStickersByPack(packId: String): Flow<List<Sticker>>
 
     fun getStickersByCategory(categoryId: String): Flow<List<Sticker>>
 
@@ -36,13 +33,6 @@ interface StickerRepository {
     suspend fun deleteSticker(id: String)
 
     suspend fun toggleFavourite(id: String)
-
-    // Packs
-    fun getAllPacks(): Flow<List<Pack>>
-
-    suspend fun savePack(pack: Pack)
-
-    suspend fun deletePack(id: String)
 
     // Categories
     fun getAllCategories(): Flow<List<Category>>

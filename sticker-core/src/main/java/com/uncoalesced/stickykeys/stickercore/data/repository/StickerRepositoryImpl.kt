@@ -3,13 +3,10 @@ package com.uncoalesced.stickykeys.stickercore.data.repository
 
 import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
 import com.uncoalesced.stickykeys.stickercore.data.local.dao.CategoryDao
-import com.uncoalesced.stickykeys.stickercore.data.local.dao.PackDao
 import com.uncoalesced.stickykeys.stickercore.data.local.dao.StickerDao
 import com.uncoalesced.stickykeys.stickercore.data.local.entity.CategoryEntity
-import com.uncoalesced.stickykeys.stickercore.data.local.entity.PackEntity
 import com.uncoalesced.stickykeys.stickercore.data.local.entity.StickerEntity
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
-import com.uncoalesced.stickykeys.stickercore.domain.model.Pack
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +21,6 @@ class StickerRepositoryImpl
     @Inject
     constructor(
         private val stickerDao: StickerDao,
-        private val packDao: PackDao,
         private val categoryDao: CategoryDao,
         private val fileManager: StickerFileManager,
     ) : StickerRepository {
@@ -51,10 +47,6 @@ class StickerRepositoryImpl
                 mimeType = mimeType,
             )
 
-        private fun PackEntity.toDomain() = Pack(id, name, author, createdAt)
-
-        private fun Pack.toEntity() = PackEntity(id, name, author, createdAt)
-
         private fun CategoryEntity.toDomain() = Category(id, name, sortOrder)
 
         private fun Category.toEntity() = CategoryEntity(id, name, sortOrder)
@@ -63,13 +55,6 @@ class StickerRepositoryImpl
         override fun getAllStickers(): Flow<List<Sticker>> =
             stickerDao.getAllStickers().map { list ->
                 list.map { it.toDomain() }
-            }
-
-        override fun getStickersByPack(packId: String): Flow<List<Sticker>> =
-            stickerDao.getStickersByPack(packId).map { list ->
-                list.map {
-                    it.toDomain()
-                }
             }
 
         override fun getStickersByCategory(categoryId: String): Flow<List<Sticker>> =
@@ -132,22 +117,6 @@ class StickerRepositoryImpl
                 if (entity != null) {
                     stickerDao.updateSticker(entity.copy(isFavourite = !entity.isFavourite))
                 }
-            }
-
-        // --- Packs ---
-        override fun getAllPacks(): Flow<List<Pack>> =
-            packDao.getAllPacks().map { list ->
-                list.map { it.toDomain() }
-            }
-
-        override suspend fun savePack(pack: Pack) =
-            withContext(Dispatchers.IO) {
-                packDao.insertPack(pack.toEntity())
-            }
-
-        override suspend fun deletePack(id: String) =
-            withContext(Dispatchers.IO) {
-                packDao.deletePackById(id)
             }
 
         // --- Categories ---

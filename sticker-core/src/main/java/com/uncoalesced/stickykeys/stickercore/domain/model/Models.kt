@@ -14,13 +14,6 @@ data class Sticker(
     val thumbnailFile: File,
 )
 
-data class Pack(
-    val id: String,
-    val name: String,
-    val author: String,
-    val createdAt: Long,
-)
-
 data class Category(
     val id: String,
     val name: String,

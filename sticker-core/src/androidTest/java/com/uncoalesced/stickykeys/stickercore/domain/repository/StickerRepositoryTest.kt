@@ -23,7 +23,7 @@ import java.io.File
 
 /**
  * Phase 4 DoD: insert/query/delete a sticker end-to-end (DB row + file on disk),
- * and favourites/categories queryable independently of packs.
+ * and favourites/categories queryable.
  */
 @RunWith(AndroidJUnit4::class)
 class StickerRepositoryTest {
@@ -44,7 +44,6 @@ class StickerRepositoryTest {
         repository =
             StickerRepositoryImpl(
                 database.stickerDao(),
-                database.packDao(),
                 database.categoryDao(),
                 fileManager,
             )
