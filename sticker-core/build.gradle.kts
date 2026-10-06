@@ -37,7 +37,6 @@ dependencies {
 
     // For GIF encoding
     implementation("com.shakster:gifkt-jvm:0.3.3")
-    implementation("com.squareup.okio:okio:3.9.0")
 
     // For Animated WebP encoding
     implementation("com.aureusapps.android:webp-android:1.1.2")
@@ -55,84 +54,4 @@ dependencies {
     androidTestImplementation("androidx.room:room-testing:2.6.1")
 }
 
-jacoco {
-    toolVersion = "0.8.12"
-}
-
-tasks.withType<Test> {
-    useJUnit()
-    // Need this for robolectric to work nicely with jacoco
-    configure<JacocoTaskExtension> {
-        isIncludeNoLocationClasses = true
-        setExcludes(listOf("jdk.internal.*"))
-    }
-}
-
-tasks.register<JacocoReport>("jacocoTestReport") {
-    dependsOn("testDebugUnitTest")
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-    }
-
-    val fileFilter =
-        mutableSetOf(
-            "**/R.class",
-            "**/R$*.class",
-            "**/BuildConfig.*",
-            "**/Manifest*.*",
-            "**/*Test*.*",
-            "android/**/*.*",
-            "**/*_Impl*.*",
-            "**/Dagger*.*",
-            "**/*Module*.*",
-        )
-    val debugTree =
-        fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
-            exclude(fileFilter)
-        }
-    val mainSrc = "${project.projectDir}/src/main/java"
-
-    sourceDirectories.setFrom(files(mainSrc))
-    classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(
-        fileTree(layout.buildDirectory.get())
-            .include("jacoco/testDebugUnitTest.exec"),
-    )
-}
-
-tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
-    dependsOn("jacocoTestReport")
-    val fileFilter =
-        mutableSetOf(
-            "**/R.class",
-            "**/R$*.class",
-            "**/BuildConfig.*",
-            "**/Manifest*.*",
-            "**/*Test*.*",
-            "android/**/*.*",
-            "**/*_Impl*.*",
-            "**/Dagger*.*",
-            "**/*Module*.*",
-        )
-    val debugTree =
-        fileTree("${layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
-            exclude(fileFilter)
-        }
-    val mainSrc = "${project.projectDir}/src/main/java"
-
-    sourceDirectories.setFrom(files(mainSrc))
-    classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(
-        fileTree(layout.buildDirectory.get())
-            .include("jacoco/testDebugUnitTest.exec"),
-    )
-
-    violationRules {
-        rule {
-            limit {
-                minimum = 0.70.toBigDecimal()
-            }
-        }
-    }
-}
+apply(from = rootProject.file("gradle/jacoco-module.gradle.kts"))
