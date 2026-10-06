@@ -2,7 +2,6 @@
 package com.uncoalesced.stickykeys.ui.screens.creation
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -10,7 +9,6 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
@@ -20,6 +18,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,29 +37,24 @@ fun EraseScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var loadFailed by remember { mutableStateOf(false) }
 
     val paths = remember { mutableStateListOf<Path>() }
     var currentPath by remember { mutableStateOf<Path?>(null) }
 
     LaunchedEffect(uriString) {
         withContext(Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(uriString)
-                val stream = context.contentResolver.openInputStream(uri)
-                val bmp = BitmapFactory.decodeStream(stream)
-                // We need a mutable ARGB_8888 bitmap to support transparent erasing
-                val mutableBmp = bmp.copy(Bitmap.Config.ARGB_8888, true)
-                bmp.recycle()
-                bitmap = mutableBmp
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            // Mutable ARGB_8888, so erasing can paint transparency.
+            bitmap = context.decodeBitmap(uriString, mutable = true)
+            loadFailed = bitmap == null
         }
     }
 
     if (bitmap == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        if (loadFailed) {
+            ErrorScreen(stringResource(R.string.text_image_load_failed))
+        } else {
+            LoadingScreen()
         }
         return
     }

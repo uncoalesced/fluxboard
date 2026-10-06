@@ -2,7 +2,6 @@
 package com.uncoalesced.stickykeys.ui.screens
 
 import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +39,7 @@ import com.uncoalesced.stickykeys.stickercore.domain.model.Category
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -119,9 +119,7 @@ class StickersViewModel
 
                 uriStrings.forEach { uriStr ->
                     try {
-                        val uri = Uri.parse(uriStr)
-                        val stream = context.contentResolver.openInputStream(uri)
-                        val finalBmp = BitmapFactory.decodeStream(stream)
+                        val finalBmp = context.decodeBitmap(uriStr)
                         if (finalBmp != null) {
                             // Imported as-is. v1 has no automatic background removal --
                             // use the single-image flow and the manual eraser for cutouts.

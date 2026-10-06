@@ -2,7 +2,6 @@
 package com.uncoalesced.stickykeys.ui.screens.edit
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.net.Uri
@@ -24,6 +23,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +43,7 @@ fun TextOverlayScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var loadFailed by remember { mutableStateOf(false) }
 
     var text by remember { mutableStateOf("Sticky!") }
     var textPosition by remember { mutableStateOf(Offset(200f, 200f)) }
@@ -59,19 +62,16 @@ fun TextOverlayScreen(
 
     LaunchedEffect(uriString) {
         withContext(Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(uriString)
-                val stream = context.contentResolver.openInputStream(uri)
-                originalBitmap = BitmapFactory.decodeStream(stream)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            originalBitmap = context.decodeBitmap(uriString)
+            loadFailed = originalBitmap == null
         }
     }
 
     if (originalBitmap == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        if (loadFailed) {
+            ErrorScreen(stringResource(R.string.text_image_load_failed))
+        } else {
+            LoadingScreen()
         }
         return
     }

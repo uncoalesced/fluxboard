@@ -2,12 +2,12 @@
 package com.uncoalesced.stickykeys.ui.screens.edit
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -107,9 +107,10 @@ class EditStickerViewModel
             context: android.content.Context,
             uriString: String,
         ): Pair<ByteArray, ByteArray> {
-            val uri = Uri.parse(uriString)
-            val stream = context.contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(stream)
+            val bitmap =
+                checkNotNull(context.decodeBitmap(uriString)) {
+                    "Cannot decode $uriString"
+                }
 
             val webpBytes =
                 ByteArrayOutputStream()

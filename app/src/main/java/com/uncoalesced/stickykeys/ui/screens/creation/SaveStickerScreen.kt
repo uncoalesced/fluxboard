@@ -2,8 +2,6 @@
 package com.uncoalesced.stickykeys.ui.screens.creation
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -18,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,13 +37,7 @@ fun SaveStickerScreen(
 
     LaunchedEffect(uriString) {
         withContext(Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(uriString)
-                val stream = context.contentResolver.openInputStream(uri)
-                bitmap = BitmapFactory.decodeStream(stream)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            bitmap = context.decodeBitmap(uriString)
         }
     }
 

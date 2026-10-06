@@ -1,8 +1,6 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
-import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import com.uncoalesced.stickykeys.ui.screens.creation.CropScreen
 import com.uncoalesced.stickykeys.ui.screens.creation.EraseScreen
 
@@ -124,14 +123,7 @@ private fun EditOverviewScreen(
 ) {
     val context = LocalContext.current
     var bitmap by remember(currentUriString) {
-        mutableStateOf(
-            try {
-                val stream = context.contentResolver.openInputStream(Uri.parse(currentUriString))
-                BitmapFactory.decodeStream(stream)
-            } catch (e: Exception) {
-                null
-            },
-        )
+        mutableStateOf(context.decodeBitmap(currentUriString))
     }
 
     Scaffold(
