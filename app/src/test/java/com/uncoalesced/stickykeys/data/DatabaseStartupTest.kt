@@ -43,7 +43,6 @@ class DatabaseStartupTest {
                 .build()
         try {
             assertNotNull("stickerDao", db.stickerDao())
-            assertNotNull("packDao", db.packDao())
             assertNotNull("categoryDao", db.categoryDao())
             assertTrue("database should open", db.openHelper.writableDatabase.isOpen)
         } finally {

@@ -1,3 +1,4 @@
+# Engineered by uncoalesced
 """Build the FLCT binary prefix trie shipped as keyboard-core/assets/base_dict.bin.
 
 The frequency corpus (count_1w.txt) is web-derived, so it contains common

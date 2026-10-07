@@ -11,7 +11,7 @@ contact_links:
       clipboard. A public issue describing that is a working exploit, so please use
       this instead.
   - name: How the app handles your data
-    url: https://github.com/uncoalesced/fluxboard/blob/main/PRIVACY.md
+    url: https://github.com/uncoalesced/fluxboard/blob/main/docs/PRIVACY.md
     about: What is stored, where, which permissions exist, and how to verify it.
   - name: Known gaps in this beta
     url: https://github.com/uncoalesced/fluxboard/blob/main/README.md#what-does-not-work-yet

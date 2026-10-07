@@ -1,10 +1,17 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.transfer.migration
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -49,6 +56,10 @@ class StickerTransferService
 
         /**
          * Sender side: Generates link, waits for connection on LAN or Relay, sends file, closes.
+         *
+         * ponytail: nothing calls this yet. No screen creates a share link, so this is the
+         * unwired half of link sharing, kept until the relay is decided (RelayClient still
+         * points at the emulator loopback). Only receiveSticker is live.
          */
         fun sendSticker(stickerFile: File) {
             currentJob?.cancel()

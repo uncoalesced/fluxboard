@@ -57,9 +57,10 @@ Thumbs.db
 .agents/
 .agents/skills/
 AGENTS.md
-docs/
 CLAUDE.md
 collaboration-workflow.md
+docs/roadmap.md
+docs/distribution/
 
 # Everything that is a plan rather than documentation lives here: finished release
 # plans, the phase files, device checklists, research and agent prompts. One
@@ -84,3 +85,9 @@ keystore.properties
 *.jks
 *.keystore
 *.p12
+
+# build_flictionary.py takes its output path as an argument, so it is easy to run
+# it here and leave a second copy of the dictionary beside the tool that built it.
+# The shipped one is keyboard-core/src/main/assets/base_dict.bin and that is the
+# only one; a tracked duplicate can only drift out of step with it.
+dictionary-tools/*.bin

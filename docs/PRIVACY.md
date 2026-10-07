@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Privacy policy
 
 Last updated 10 August 2026. Applies to FluxBoard `v0.1.5-BETA` and later.
@@ -134,11 +136,10 @@ You do not have to take our word for it, and you should not have to.
 - CI also proves the tester usage log is absent from release builds as a class,
   not just disabled by a flag. A runtime boolean cannot make a class stop
   existing, so this is checked against the built artifact.
-- [docs/privacy-audit.md](docs/privacy-audit.md) records what was verified by
-  reading the source and the dependency tree, and is honest about the one part
-  that has not been done: a runtime traffic capture on a physical device. The
-  static and artifact-level checks are not a substitute for it, and it is not
-  claimed as complete.
+- One part has not been done, and is named here rather than left to be found: no
+  runtime traffic capture on a physical device. Everything above was verified by
+  reading the source and the dependency tree or by checking the built artifact,
+  and none of that is a substitute for watching the running app's network.
 
 ## Children
 

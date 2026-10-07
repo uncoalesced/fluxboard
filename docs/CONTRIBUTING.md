@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Contributing
 
 Bug reports are worth more to this project right now than patches. It is a beta, it

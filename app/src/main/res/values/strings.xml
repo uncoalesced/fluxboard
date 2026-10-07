@@ -1,4 +1,5 @@
 <?xml version="1.0" ?>
+<!-- Engineered by uncoalesced -->
 <resources>
     <string name="app_name">FluxBoard</string>
     <string name="text_close">Close</string>
@@ -42,12 +43,10 @@
     <string name="text_set_default_keyboard_title">Set FluxBoard as your default keyboard?</string>
     <string name="text_set_default_keyboard_body">You have FluxBoard set up the way you want it. Make it the keyboard that opens everywhere by choosing it in the system picker. Android only lets you make that choice yourself, so this just opens the picker.</string>
     <string name="text_set_default_keyboard_confirm">Open picker</string>
-    <string name="text_typing_assistance">Typing Assistance</string>
     <string name="text_auto_capitalization">Auto-Capitalization</string>
     <string name="text_auto_correction">Auto-Correction</string>
     <string name="text_number_row">Number row</string>
     <string name="text_number_row_summary">Always show 1-0 above the letters. The corner symbols on each key are reached by holding it, and are unaffected by this.</string>
-    <string name="text_keyboard_size">Keyboard size</string>
     <string name="text_keyboard_height">Height</string>
     <string name="text_keyboard_height_summary">Scales the whole keyboard. The number row adds its own height on top of this, so turning it on no longer shrinks the letter keys.</string>
     <string name="text_keyboard_bottom_padding">Space below keys</string>
@@ -62,14 +61,11 @@
     <string name="text_customize_theme">Customize Theme</string>
     <string name="text_layout">Layout</string>
     <string name="text_customize_layout">Customize Layout</string>
-    <string name="text_haptics">Haptics</string>
     <string name="text_vibration_feedback">Vibration Feedback</string>
     <string name="text_vibration_strength">Vibration Strength</string>
-    <string name="text_privacy_data">Privacy &amp; Data</string>
     <string name="text_clear_clipboard_history">Clear Clipboard History</string>
     <string name="text_clear_clipboard_confirm">Are you sure you want to delete all saved clipboard history? This action is irreversible.</string>
     <string name="text_clear">Clear</string>
-    <string name="text_troubleshooting">Troubleshooting</string>
     <string name="text_reset_keyboard_appearance">Reset Keyboard Appearance</string>
     <string name="text_reset_appearance_summary">If the keyboard stops drawing its keys, or a theme or layout leaves it unusable, this returns it to the shipped defaults.</string>
     <string name="text_reset_appearance_confirm">This deletes every custom theme, keyboard background and custom layout, and switches back to the default dark theme and QWERTY. Your other keyboard settings are not changed. This cannot be undone.</string>
@@ -84,7 +80,6 @@
     <string name="text_save_layout">Save Layout</string>
     <string name="text_reset_to_qwerty">Reset to QWERTY</string>
     <string name="text_remap_key">Remap Key</string>
-    <string name="text_enter_the_new_output_character_or_label">Enter the new output character or label:</string>
     <string name="text_apply">Apply</string>
     <string name="text_no_categories_found">No categories found.</string>
     <string name="text_delete_category">Delete Category?</string>
@@ -110,19 +105,10 @@
     <string name="text_sticker_options">Sticker Options</string>
     <string name="text_assign_category">Assign Category:</string>
     <string name="text_delete_sticker">Delete Sticker</string>
-    <string name="desc_sticker">Sticker</string>
-    <string name="text_title_large">Title Large</string>
-    <string name="text_title_medium">Title Medium</string>
-    <string name="text_body_large">Body Large</string>
-    <string name="text_body_medium">Body Medium</string>
-    <string name="text_label_large">Label Large</string>
-    <string name="text_label_medium">Label Medium</string>
-    <string name="text_keyboard_key">Keyboard Key</string>
     <string name="text_keyboard_themes">Keyboard Themes</string>
     <string name="text_set_background_image">Set Background Image</string>
     <string name="text_remove_image">Remove Image</string>
     <string name="text_create_orange_accent_theme">Create Orange Accent Theme</string>
-    <string name="text_transfer_share">Transfer &amp; Share</string>
     <string name="text_segmenting_subject">Preparing image...</string>
     <string name="text_crop_image">Crop Image</string>
     <string name="text_next">Next</string>
@@ -146,6 +132,7 @@
     <string name="text_sticker_text">Sticker Text</string>
     <string name="text_color">Color</string>
     <string name="text_conversion_error">Conversion Error</string>
+    <string name="text_image_load_failed">Could not open this image. It may have been moved or deleted.</string>
     <string name="text_creating_gif">Creating GIF...</string>
     <string name="text_select_output_quality">Select Output Quality</string>
     <string name="text_convert_to_gif">Convert to GIF</string>

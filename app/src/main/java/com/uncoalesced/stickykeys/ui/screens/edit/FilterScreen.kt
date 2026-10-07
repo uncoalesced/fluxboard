@@ -2,7 +2,6 @@
 package com.uncoalesced.stickykeys.ui.screens.edit
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -10,9 +9,31 @@ import android.graphics.Paint
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,6 +43,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -39,6 +63,7 @@ fun FilterScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var loadFailed by remember { mutableStateOf(false) }
 
     var brightness by remember { mutableFloatStateOf(0f) } // -100 to 100
     var contrast by remember { mutableFloatStateOf(1f) } // 0 to 2
@@ -46,19 +71,16 @@ fun FilterScreen(
 
     LaunchedEffect(uriString) {
         withContext(Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(uriString)
-                val stream = context.contentResolver.openInputStream(uri)
-                originalBitmap = BitmapFactory.decodeStream(stream)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            originalBitmap = context.decodeBitmap(uriString)
+            loadFailed = originalBitmap == null
         }
     }
 
     if (originalBitmap == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        if (loadFailed) {
+            ErrorScreen(stringResource(R.string.text_image_load_failed))
+        } else {
+            LoadingScreen()
         }
         return
     }

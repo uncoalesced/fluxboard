@@ -1,3 +1,4 @@
+// Engineered by uncoalesced
 import java.util.Properties
 
 plugins {
@@ -295,7 +296,9 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
 
     implementation("io.github.g0dkar:qrcode-kotlin-android:4.5.0")
-    // ZXing for QR scanning (Apache-2.0, no Play Services) -- see docs/repo-reference.md.
+    // ZXing for QR scanning: Apache-2.0 and Play-Services-free. Both Quickie variants,
+    // bundled included, resolve to play-services-mlkit-barcode-scanning and therefore to
+    // com.google.android.datatransport, so neither can be used here.
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     implementation(libs.hilt.android)

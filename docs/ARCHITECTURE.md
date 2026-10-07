@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Architecture
 
 What the code actually does, as of `v0.1.5-BETA`. Where a decision looks odd, the

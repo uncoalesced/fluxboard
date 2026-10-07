@@ -1,20 +1,49 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -40,10 +69,20 @@ import com.uncoalesced.stickykeys.stickercore.domain.model.Category
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -119,9 +158,7 @@ class StickersViewModel
 
                 uriStrings.forEach { uriStr ->
                     try {
-                        val uri = Uri.parse(uriStr)
-                        val stream = context.contentResolver.openInputStream(uri)
-                        val finalBmp = BitmapFactory.decodeStream(stream)
+                        val finalBmp = context.decodeBitmap(uriStr)
                         if (finalBmp != null) {
                             // Imported as-is. v1 has no automatic background removal --
                             // use the single-image flow and the manual eraser for cutouts.
@@ -133,14 +170,14 @@ class StickersViewModel
                                             android.os.Build.VERSION_CODES.R
                                         ) {
                                             finalBmp.compress(
-                                                android.graphics.Bitmap.CompressFormat.WEBP_LOSSLESS,
+                                                Bitmap.CompressFormat.WEBP_LOSSLESS,
                                                 100,
                                                 this,
                                             )
                                         } else {
                                             @Suppress("DEPRECATION")
                                             finalBmp.compress(
-                                                android.graphics.Bitmap.CompressFormat.WEBP,
+                                                Bitmap.CompressFormat.WEBP,
                                                 100,
                                                 this,
                                             )
@@ -151,7 +188,7 @@ class StickersViewModel
                                 ByteArrayOutputStream()
                                     .apply {
                                         val thumbBmp =
-                                            android.graphics.Bitmap.createScaledBitmap(
+                                            Bitmap.createScaledBitmap(
                                                 finalBmp,
                                                 256,
                                                 256,
@@ -161,14 +198,14 @@ class StickersViewModel
                                             android.os.Build.VERSION_CODES.R
                                         ) {
                                             thumbBmp.compress(
-                                                android.graphics.Bitmap.CompressFormat.WEBP_LOSSY,
+                                                Bitmap.CompressFormat.WEBP_LOSSY,
                                                 80,
                                                 this,
                                             )
                                         } else {
                                             @Suppress("DEPRECATION")
                                             thumbBmp.compress(
-                                                android.graphics.Bitmap.CompressFormat.WEBP,
+                                                Bitmap.CompressFormat.WEBP,
                                                 80,
                                                 this,
                                             )

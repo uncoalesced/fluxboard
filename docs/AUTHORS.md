@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Authors
 
 FluxBoard is written by two people.
@@ -10,7 +12,7 @@ the data layer, device pairing and transfer, and the sticker pipeline.
 trim UI, and the research behind the segmentation and platform-compatibility
 decisions. Documentation from here on.
 
-Copyright 2026 uncoalesced and ZapCannonYT, under the [MIT licence](LICENSE).
+Copyright 2026 uncoalesced and ZapCannonYT, under the [MIT licence](../LICENSE).
 
 ## Credit for contributions
 

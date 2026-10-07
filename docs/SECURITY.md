@@ -1,3 +1,5 @@
+<!-- Engineered by uncoalesced -->
+
 # Security policy
 
 FluxBoard is a keyboard. It sees every character you type, including passwords and
@@ -87,8 +89,7 @@ from a diverged branch would ship a commit that never went through review.
 Written down rather than left for someone to find:
 
 - No runtime traffic capture has been done on a physical device. The static and
-  artifact-level checks above are not a substitute, and
-  [docs/privacy-audit.md](docs/privacy-audit.md) says so too.
+  artifact-level checks above are not a substitute for one.
 - Release signing depends on one key held outside the repository. Losing it breaks
   in-place updates for everyone on a release build.
 - The instrumented test suite compiles but has never been executed, because it

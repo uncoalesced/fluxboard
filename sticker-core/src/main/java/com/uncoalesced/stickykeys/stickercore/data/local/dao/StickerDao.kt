@@ -17,9 +17,6 @@ interface StickerDao {
     @Query("SELECT * FROM stickers WHERE id = :id")
     fun getStickerById(id: String): StickerEntity?
 
-    @Query("SELECT * FROM stickers WHERE packId = :packId ORDER BY createdAt DESC")
-    fun getStickersByPack(packId: String): Flow<List<StickerEntity>>
-
     @Query("SELECT * FROM stickers WHERE categoryId = :categoryId ORDER BY createdAt DESC")
     fun getStickersByCategory(categoryId: String): Flow<List<StickerEntity>>
 
