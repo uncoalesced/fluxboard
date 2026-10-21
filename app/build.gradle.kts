@@ -187,9 +187,10 @@ val verifyRoomKeepRules by tasks.registering {
     }
 }
 
-/** The class that must never reach a stable build. Named once, used by the check below. */
-// Every class that exists only in keyboard-core/src/debug and records anything. Each must be
-// absent from the release build; add new debug-only recorders here.
+/**
+ * Every class that exists only in keyboard-core/src/debug and records anything. None may reach
+ * a stable build; add new debug-only recorders here. Used by the check below.
+ */
 private val debugOnlyRecorderClasses =
     listOf(
         "com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageLog",
@@ -244,7 +245,9 @@ val verifyNoUsageLoggingInRelease by tasks.registering {
             mapping.useLines { lines ->
                 lines
                     .filter { !it.startsWith(" ") }
-                    .mapNotNull { line -> debugOnlyRecorderClasses.firstOrNull { line.startsWith(it) } }
+                    .mapNotNull { line ->
+                        debugOnlyRecorderClasses.firstOrNull { line.startsWith(it) }
+                    }
                     .toSet()
             }
 
