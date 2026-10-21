@@ -50,63 +50,6 @@ internal data class KeyboardRows(
 )
 
 /**
- * The key press handler, allocated once.
- *
- * Building this lambda inline at the call site meant a fresh `Function0` per key per
- * recomposition: it captures the controller, the ViewModel and the coroutine scope, all of
- * which Compose treats as unstable, so the compiler could not memoize it. A new lambda
- * instance never compares equal to the previous one, so every key saw a "changed" parameter
- * and recomposed -- which is why the whole keyboard rebuilt on each keystroke despite
- * [KeyboardKey] already being marked skippable.
- *
- * The mode is read through [modeState] rather than captured by value, so the handler stays
- * one instance for the life of the keyboard while still seeing the current mode.
- */
-@Composable
-internal fun rememberKeyPressHandler(
-    keyboardController: KeyboardController,
-    typingViewModel: TypingViewModel,
-    coroutineScope: kotlinx.coroutines.CoroutineScope,
-    modeState: androidx.compose.runtime.MutableState<KeyboardMode>,
-): (String) -> Unit =
-    remember(keyboardController, typingViewModel, coroutineScope, modeState) {
-        { key: String ->
-            handleKeyPress(
-                key,
-                keyboardController,
-                modeState.value,
-                typingViewModel,
-                coroutineScope,
-            ) { newMode -> modeState.value = newMode }
-        }
-    }
-
-/**
- * The counterpart to [rememberKeyPressHandler], for a press that turned out not to be a
- * keystroke.
- *
- * Remembered for exactly the reason that one is: it is captured by every key's gesture
- * modifier, so a fresh instance per recomposition would hand all of them a changed parameter
- * and take the whole grid out of skipping -- the invariant `KeyboardRecompositionTest`
- * measures.
- */
-@Composable
-internal fun rememberKeyRevokeHandler(
-    keyboardController: KeyboardController,
-    typingViewModel: TypingViewModel,
-): (String) -> Unit =
-    remember(keyboardController, typingViewModel) {
-        { key: String ->
-            // Sized from the key itself rather than from the editor, unlike every other
-            // destructive edit here. This one is not a guess about what is in front of the
-            // caret: this keyboard put that character there microseconds ago and the gesture
-            // that would have let anything else move has not finished yet.
-            keyboardController.deleteBefore(key.length)
-            typingViewModel.onKeyRevoked(key)
-        }
-    }
-
-/**
  * The colours a key is painted with.
  *
  * [border] and [haze] are null when their effect is off, rather than transparent, so the
