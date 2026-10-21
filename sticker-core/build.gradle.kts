@@ -54,4 +54,6 @@ dependencies {
     androidTestImplementation("androidx.room:room-testing:2.6.1")
 }
 
+// Instruction coverage floor for jacocoTestCoverageVerification; see the script below.
+extra["coverageMinimum"] = 0.11
 apply(from = rootProject.file("gradle/jacoco-module.gradle.kts"))

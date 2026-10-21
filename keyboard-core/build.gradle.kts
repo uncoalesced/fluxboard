@@ -84,4 +84,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
+// Instruction coverage floor for jacocoTestCoverageVerification; see the script below.
+extra["coverageMinimum"] = 0.43
 apply(from = rootProject.file("gradle/jacoco-module.gradle.kts"))
