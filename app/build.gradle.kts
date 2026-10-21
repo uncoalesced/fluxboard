@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.baselineprofile)
 }
 
 // Release signing credentials, deliberately kept out of the repository:
@@ -68,6 +69,19 @@ android {
             )
             signingConfig =
                 if (hasReleaseSigning) signingConfigs.getByName("release") else null
+        }
+        // The two build types the baseline profile plugin generates against. Declared here
+        // rather than left to the plugin so they can be installed: they copy release, and a
+        // release build is unsigned whenever keystore.properties is absent. Debug-signed, and
+        // with their own application id so generating a profile on a phone never replaces,
+        // or wipes the data of, the copy of the app somebody uses there.
+        for (name in listOf("benchmarkRelease", "nonMinifiedRelease")) {
+            create(name) {
+                initWith(getByName("release"))
+                signingConfig = signingConfigs.getByName("debug")
+                applicationIdSuffix = ".benchmark"
+                matchingFallbacks += listOf("release")
+            }
         }
     }
     compileOptions {
@@ -281,6 +295,11 @@ dependencies {
     implementation(project(":sticker-core"))
     implementation(project(":keyboard-core"))
     implementation(project(":transfer"))
+
+    // Installs the generated baseline profile on devices whose store did not. Already on the
+    // classpath transitively through Compose; declared so the profile cannot silently lose it.
+    implementation(libs.androidx.profileinstaller)
+    baselineProfile(project(":baselineprofile"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
