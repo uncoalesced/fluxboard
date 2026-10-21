@@ -83,10 +83,15 @@ tasks.register<JacocoReport>("jacocoTestReport") {
 tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     dependsOn("jacocoTestReport")
     coverDebugUnitTests()
+    // Each module sets its own floor (coverageMinimum in its build script), ratcheted to just
+    // under what it measured when this gate first measured anything, on 2026-10-21. The old
+    // single 0.70 had never actually been checked; raise a module's floor as its tests grow,
+    // never lower it to make a red build green.
+    val floor = project.extra["coverageMinimum"].toString().toBigDecimal()
     violationRules {
         rule {
             limit {
-                minimum = 0.70.toBigDecimal()
+                minimum = floor
             }
         }
     }
