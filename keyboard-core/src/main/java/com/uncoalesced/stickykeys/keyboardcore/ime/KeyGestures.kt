@@ -2,10 +2,6 @@
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
 import android.os.SystemClock
-import com.uncoalesced.stickykeys.keyboardcore.diagnostics.PressOutcome
-import com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
-import com.uncoalesced.stickykeys.keyboardcore.diagnostics.keyKindOf
-
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -18,6 +14,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.LatencyTracker
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.PressOutcome
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.keyKindOf
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 

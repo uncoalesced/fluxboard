@@ -1,13 +1,12 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
-import androidx.compose.runtime.CompositionLocalProvider
-
 import android.inputmethodservice.InputMethodService
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
