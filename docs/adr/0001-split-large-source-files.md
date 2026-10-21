@@ -2,7 +2,7 @@
 
 # ADR 0001: Split the large source files along their real seams
 
-- Status: Proposed
+- Status: Accepted (2026-10-21)
 - Date: 2026-10-21
 - Applies to: `v0.1.7.5-BETA` (tag `pre-refactor`)
 
