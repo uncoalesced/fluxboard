@@ -84,7 +84,9 @@ key grid, which squashes every key and shifts the board under the user's thumbs.
 
 ## Gestures
 
-`KeyGestures.kt` holds one press state machine, not per-key handlers. It replaces
+`KeyGestures.kt` holds one press state machine, not per-key handlers. Its
+thresholds and pure decisions are in `KeyGestureRules.kt`, the long-press
+alternates in `KeyAlternates.kt`, and the space-bar scrub in `ScrubGesture.kt`. It replaces
 `clickable` rather than sitting beside it, because two detectors both claim the
 down event, which is why the button role and click action are restated in
 `semantics` or the keys become unreachable in TalkBack.
@@ -112,6 +114,13 @@ search and moves focus out of the field entirely.
 The dictionary is one shared `MappedByteBuffer`. Every read takes its own cursor
 via `duplicate()`, because navigating the shared instance's position corrupts
 concurrent lookups.
+
+`PredictionEngine` maps the dictionary, learns words and ranks completions. The
+glide decoder (`GlideDecoder`) and spelling correction (`SpellingCorrector`) are
+plain classes with no Android in them, built from a function that hands out
+cursors, so tests can run them on a JVM against the shipped `base_dict.bin`.
+`Flictionary.kt` describes the file format and holds the exact-word lookup they
+share.
 
 Edit costs are weighted by key geometry rather than uniform. Uniform costs make
 every one-edit candidate a tie, which hands the decision to raw frequency and
@@ -177,3 +186,34 @@ Emoji ship as categorisation data only. Android draws the glyphs from its own fo
 and `EmojiRepository` filters by `Paint.hasGlyph()` rather than an SDK version table,
 because font coverage tracks the system font and OEMs update that on their own
 schedule.
+
+## Where things are
+
+The keyboard's own code is in `keyboard-core/.../ime/`, the prediction engine in
+`keyboard-core/.../domain/engine/`, and the settings app in `app/.../ui/screens/`.
+
+| Looking for | File |
+|---|---|
+| The keyboard board and its state wiring | `ime/TypingKeyboardView.kt` |
+| One key, its glyph and press feedback | `ime/KeyboardKey.kt` |
+| The suggestion strip's chips | `ime/SuggestionStrip.kt` |
+| The glide trail drawn over the keys | `ime/GlideTrail.kt` |
+| The handlers every key is wired with | `ime/KeyHandlers.kt` |
+| What a key press does | `ime/KeyPressHandling.kt` |
+| Press, hold and glide detection | `ime/KeyGestures.kt`, thresholds in `ime/KeyGestureRules.kt` |
+| Long-press alternates | `ime/KeyAlternates.kt` |
+| Word boundaries and sentence starts | `ime/TextBeforeCursor.kt` |
+| Building the IME's ViewModels | `ime/ImeViewModelFactory.kt` |
+| Sending a sticker into the editor | `ime/StickerCommit.kt` |
+| Glide decoding | `domain/engine/GlideDecoder.kt` |
+| Autocorrect | `domain/engine/SpellingCorrector.kt` |
+| A settings screen's state | `ui/screens/<Name>ViewModel.kt`, beside `<Name>Screen.kt` |
+
+Conventions for new code, from ADR 0001 (`docs/adr/`):
+
+- One file per thing a reader would search for, named after it.
+- Pure logic, with no Compose and no Android, goes in its own file with a test that
+  calls it directly. Thresholds live beside the logic that reads them.
+- A screen's ViewModel and UI state go in `<Name>ViewModel.kt`; the composables in
+  `<Name>Screen.kt`.
+- Moving code never widens visibility past what the new file needs.
