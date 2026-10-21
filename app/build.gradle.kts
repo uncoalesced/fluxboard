@@ -188,7 +188,13 @@ val verifyRoomKeepRules by tasks.registering {
 }
 
 /** The class that must never reach a stable build. Named once, used by the check below. */
-private val usageLogClass = "com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageLog"
+// Every class that exists only in keyboard-core/src/debug and records anything. Each must be
+// absent from the release build; add new debug-only recorders here.
+private val debugOnlyRecorderClasses =
+    listOf(
+        "com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageLog",
+        "com.uncoalesced.stickykeys.keyboardcore.diagnostics.PressLog",
+    )
 
 /**
  * Fails the release build if the tester usage log survives into it.
@@ -236,15 +242,16 @@ val verifyNoUsageLoggingInRelease by tasks.registering {
         // is real evidence of removal.
         val survived =
             mapping.useLines { lines ->
-                lines.any { line ->
-                    !line.startsWith(" ") && line.startsWith(usageLogClass)
-                }
+                lines
+                    .filter { !it.startsWith(" ") }
+                    .mapNotNull { line -> debugOnlyRecorderClasses.firstOrNull { line.startsWith(it) } }
+                    .toSet()
             }
 
-        if (survived) {
+        if (survived.isNotEmpty()) {
             throw GradleException(
                 buildString {
-                    appendLine("$usageLogClass survived into the release build.")
+                    appendLine("${survived.joinToString()} survived into the release build.")
                     appendLine()
                     appendLine(
                         "The alpha/beta usage log must not exist in a stable or F-Droid build.",
@@ -259,7 +266,8 @@ val verifyNoUsageLoggingInRelease by tasks.registering {
             )
         }
         logger.lifecycle(
-            "verifyNoUsageLoggingInRelease: $usageLogClass absent from the release build.",
+            "verifyNoUsageLoggingInRelease: ${debugOnlyRecorderClasses.joinToString()} " +
+                "absent from the release build.",
         )
     }
 }

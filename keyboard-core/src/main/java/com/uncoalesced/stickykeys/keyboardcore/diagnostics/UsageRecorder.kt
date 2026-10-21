@@ -44,6 +44,25 @@ interface UsageRecorder {
 
     fun onScrubGesture()
 
+    /**
+     * A finger went down somewhere on the key grid, seen before any key reacts to it.
+     * [pointersDown] counts every finger on the grid at that moment, this one included.
+     */
+    fun onTouchDown(
+        uptimeMillis: Long,
+        pointersDown: Int,
+    )
+
+    /**
+     * A press on a key ended. [kind] says what sort of key, never which one; [heldMillis] is
+     * from the down event to the end of the gesture.
+     */
+    fun onPressResolved(
+        kind: KeyKind,
+        outcome: PressOutcome,
+        heldMillis: Long,
+    )
+
     /** A content URI for the log, or null when there is nothing to share. */
     fun shareIntentFile(): Uri?
 

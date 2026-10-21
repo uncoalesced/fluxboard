@@ -37,6 +37,17 @@ object NoOpUsageRecorder : UsageRecorder {
 
     override fun onScrubGesture() = Unit
 
+    override fun onTouchDown(
+        uptimeMillis: Long,
+        pointersDown: Int,
+    ) = Unit
+
+    override fun onPressResolved(
+        kind: KeyKind,
+        outcome: PressOutcome,
+        heldMillis: Long,
+    ) = Unit
+
     override fun shareIntentFile(): Uri? = null
 
     override fun clear() = Unit

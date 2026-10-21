@@ -1,6 +1,11 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import android.os.SystemClock
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.PressOutcome
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
+import com.uncoalesced.stickykeys.keyboardcore.diagnostics.keyKindOf
+
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -39,6 +44,7 @@ internal fun Modifier.keyGestures(
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
     onRevoke: (String) -> Unit = {},
+    recorder: UsageRecorder? = null,
 ): Modifier =
     this.pointerInput(keyOutput, longPress, alternates, cellWidthPx, glide) {
         awaitEachGesture {
@@ -54,6 +60,9 @@ internal fun Modifier.keyGestures(
             // key, where a lambda parameter would be reallocated on each recomposition and
             // take the whole grid out of skipping.
             pressed.value = true
+            // What this press ended as, for the debug build's per-press log. Assigned next to
+            // each call that decides it; nothing reads it until the finally block below.
+            var outcome = PressOutcome.NOTHING
             try {
                 // The keystroke lands here rather than on release. See commitsOnPress for the
                 // measurement that moved it, and for why only letters are eligible.
@@ -61,11 +70,13 @@ internal fun Modifier.keyGestures(
                 if (commitsOnPress(keyOutput, longPress)) {
                     onCommit(keyOutput)
                     committedOnPress = true
+                    outcome = PressOutcome.COMMITTED
                 }
                 // Scrubbing is decided before the long-press clock, not after it. Gating it on
                 // the hold threshold would mean the cursor sat still for the first 350ms of a
                 // drag, which reads as the gesture being broken rather than deliberate.
                 if (longPress is LongPress.Scrub) {
+                    outcome = PressOutcome.SCRUB
                     runScrub(
                         activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
                         stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
@@ -186,6 +197,7 @@ internal fun Modifier.keyGestures(
                         if (committedOnPress) {
                             committedOnPress = false
                             onRevoke(keyOutput)
+                            outcome = PressOutcome.NOTHING
                         }
                         while (true) {
                             val event = awaitPointerEvent()
@@ -193,7 +205,10 @@ internal fun Modifier.keyGestures(
                             glide.move(origin.topLeft + change.position)
                             change.consume()
                             if (!change.pressed) {
-                                glide.finish()?.let(onGlide)
+                                glide.finish()?.let {
+                                    outcome = PressOutcome.GLIDE
+                                    onGlide(it)
+                                }
                                 return@awaitEachGesture
                             }
                         }
@@ -204,6 +219,7 @@ internal fun Modifier.keyGestures(
                         // Already on screen for an eligible key; this is the lift that only
                         // confirms it.
                         if (!committedOnPress) onCommit(keyOutput)
+                        outcome = PressOutcome.COMMITTED
                         return@awaitEachGesture
                     }
                     // Still down, still on the key: this is a hold, and the window has already
@@ -212,6 +228,7 @@ internal fun Modifier.keyGestures(
                     if (committedOnPress) {
                         committedOnPress = false
                         onRevoke(keyOutput)
+                        outcome = PressOutcome.NOTHING
                     }
                     heldPastThreshold = true
                 }
@@ -262,12 +279,16 @@ internal fun Modifier.keyGestures(
                     }
 
                 when {
-                    early == true -> if (!committedOnPress) onCommit(keyOutput)
+                    early == true -> {
+                        if (!committedOnPress) onCommit(keyOutput)
+                        outcome = PressOutcome.COMMITTED
+                    }
                     // Cancelled out from under us before it resolved into anything.
                     early == false ->
                         if (committedOnPress) {
                             committedOnPress = false
                             onRevoke(keyOutput)
+                            outcome = PressOutcome.NOTHING
                         }
                     longPress is LongPress.None -> {
                         // Held, but this key has no hold behaviour: still a keystroke on
@@ -275,6 +296,7 @@ internal fun Modifier.keyGestures(
                         // swallow it.
                         if (waitForUpOrCancellation() != null) {
                             if (!committedOnPress) onCommit(keyOutput)
+                            outcome = PressOutcome.COMMITTED
                         } else {
                             if (committedOnPress) {
                                 committedOnPress = false
@@ -290,6 +312,7 @@ internal fun Modifier.keyGestures(
                         // ordering matters: the wait is what already ends the gesture on
                         // lift-off, and a second detector reading the same pointer stream would
                         // have to agree with it about when the press is over.
+                        outcome = PressOutcome.REPEAT
                         var step = 0
                         // Seeded from the hold window rather than starting at zero, so a
                         // drag that began before the threshold is still the same gesture.
@@ -359,6 +382,7 @@ internal fun Modifier.keyGestures(
                         if (committedOnPress) {
                             committedOnPress = false
                             onRevoke(keyOutput)
+                            outcome = PressOutcome.NOTHING
                         }
                         alternates.show(
                             longPress.options,
@@ -402,7 +426,10 @@ internal fun Modifier.keyGestures(
                         }
                         val picked = if (committed) alternates.consume() else null
                         alternates.hide()
-                        if (picked != null) onCommit(picked)
+                        if (picked != null) {
+                            onCommit(picked)
+                            outcome = PressOutcome.ALTERNATE
+                        }
                     }
                 }
             } finally {
@@ -411,6 +438,13 @@ internal fun Modifier.keyGestures(
                 // cancelled by the composition going away mid-press. A key stuck in its
                 // pressed colour is worse than no feedback at all.
                 pressed.value = false
+                if (recorder != null && recorder.enabled) {
+                    recorder.onPressResolved(
+                        keyKindOf(keyOutput),
+                        outcome,
+                        SystemClock.uptimeMillis() - down.uptimeMillis,
+                    )
+                }
             }
         }
     }
