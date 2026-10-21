@@ -51,6 +51,7 @@ class UsageLog
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
+        private val pressLog: PressLog,
     ) : UsageRecorder {
         /**
          * Always true here. This file is compiled only into debug variants, so its mere
@@ -81,6 +82,7 @@ class UsageLog
             val started = sessionStartedAt
             if (started == 0L) return
             sessionStartedAt = 0L
+            pressLog.flush()
             val durationMs = max(0L, System.currentTimeMillis() - started)
             // Read on this thread and reset here, so the window belongs to the session being
             // written rather than to whatever gets typed while the write is queued.
@@ -112,6 +114,22 @@ class UsageLog
         override fun onScrubGesture() {
             scrubGestures++
         }
+
+        override fun onTouchDown(
+            uptimeMillis: Long,
+            pointersDown: Int,
+        ) = pressLog.onTouchDown(uptimeMillis, pointersDown)
+
+        override fun onPressResolved(
+            kind: KeyKind,
+            outcome: PressOutcome,
+            heldMillis: Long,
+        ) = pressLog.onPressResolved(
+            kind,
+            outcome,
+            heldMillis,
+            android.os.SystemClock.uptimeMillis(),
+        )
 
         private suspend fun appendSession(
             durationMs: Long,
@@ -209,6 +227,7 @@ class UsageLog
         }
 
         override fun clear() {
+            pressLog.clear()
             scope.launch { mutex.withLock { file.delete() } }
         }
 
