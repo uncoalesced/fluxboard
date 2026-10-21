@@ -247,8 +247,7 @@ val verifyNoUsageLoggingInRelease by tasks.registering {
                     .filter { !it.startsWith(" ") }
                     .mapNotNull { line ->
                         debugOnlyRecorderClasses.firstOrNull { line.startsWith(it) }
-                    }
-                    .toSet()
+                    }.toSet()
             }
 
         if (survived.isNotEmpty()) {
