@@ -70,9 +70,6 @@ private const val COST_SUBSTITUTE = 4
  */
 private const val MAX_EDIT_COST = COST_SUBSTITUTE * 3
 
-/** The trie root sits immediately after the 4-byte "FLCT" magic. */
-private const val TRIE_ROOT_OFFSET = 4
-
 /**
  * How many glide readings to keep.
  *
@@ -890,34 +887,7 @@ class PredictionEngine
         /** Frequency of an exact dictionary word, or null when it is not a terminal node. */
         private fun frequencyOf(word: String): Int? {
             val buf = reader() ?: return null
-            return try {
-                var offset = 4 // after the FLCT magic
-                for (char in word) {
-                    buf.position(offset)
-                    buf.get() // frequency
-                    buf.get() // terminal flag
-                    val childCount = buf.get().toInt() and 0xFF
-                    var next = -1
-                    for (i in 0 until childCount) {
-                        val c1 = buf.get().toInt() and 0xFF
-                        val c2 = buf.get().toInt() and 0xFF
-                        val childChar = ((c1 shl 8) or c2).toChar()
-                        val childOffset = buf.getInt()
-                        if (childChar == char) {
-                            next = childOffset
-                            break
-                        }
-                    }
-                    if (next < 0) return null
-                    offset = next
-                }
-                buf.position(offset)
-                val freq = buf.get().toInt() and 0xFF
-                val isTerminal = buf.get().toInt() and 0xFF
-                if (isTerminal == 1) freq else null
-            } catch (e: Exception) {
-                null
-            }
+            return trieFrequencyOf(buf, word)
         }
 
         /**
