@@ -21,6 +21,9 @@ android {
         minSdk = 28
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The benchmark build types install the app under this id (see app/build.gradle.kts),
+        // beside the user's own copy. The plugin does not pass it on connected devices.
+        testInstrumentationRunnerArguments["targetAppId"] = "com.uncoalesced.stickykeys.benchmark"
     }
 
     compileOptions {
