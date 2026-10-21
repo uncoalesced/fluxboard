@@ -1,23 +1,15 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
-import android.content.ClipDescription
-import android.content.Intent
 import android.inputmethodservice.InputMethodService
-import android.os.Build
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import androidx.compose.ui.platform.ComposeView
-import androidx.core.content.FileProvider
-import androidx.core.view.inputmethod.EditorInfoCompat
-import androidx.core.view.inputmethod.InputConnectionCompat
-import androidx.core.view.inputmethod.InputContentInfoCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
@@ -31,7 +23,6 @@ import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.LatencyTracker
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
 import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
-import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -103,14 +94,6 @@ class StickyKeysIME :
      */
     private var caretMoveRefused = false
 
-    /**
-     * When the last sticker commit was allowed through, on the uptime clock.
-     *
-     * Held so [commitStickerContent] can refuse a tap that arrives on top of the previous one.
-     * See [STICKER_COMMIT_MIN_INTERVAL_MS] for why that path needs a floor at all.
-     */
-    private var lastStickerCommitAt = 0L
-
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -120,33 +103,23 @@ class StickyKeysIME :
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
+    /** Sends a tapped sticker into the focused editor. Built on first use, after injection. */
+    private val stickerCommit by lazy { StickerCommit(fileManager, hapticsManager) }
+
     private val viewModelFactory by lazy {
-        object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                if (modelClass.isAssignableFrom(TypingViewModel::class.java)) {
-                    return TypingViewModel(
-                        predictionEngine,
-                        keyboardPreferences,
-                        themeManager,
-                        layoutManager,
-                        hapticsManager,
-                        incognitoState,
-                        usageLog,
-                        typingStats,
-                    ) as T
-                } else if (modelClass.isAssignableFrom(ClipboardIMEViewModel::class.java)) {
-                    return ClipboardIMEViewModel(clipboardDao) as T
-                } else if (modelClass.isAssignableFrom(EmojiPickerViewModel::class.java)) {
-                    return EmojiPickerViewModel(
-                        repository,
-                        emojiRepository,
-                        keyboardPreferences,
-                    ) as T
-                }
-                throw IllegalArgumentException("Unknown ViewModel class")
-            }
-        }
+        ImeViewModelFactory(
+            predictionEngine = predictionEngine,
+            keyboardPreferences = keyboardPreferences,
+            themeManager = themeManager,
+            layoutManager = layoutManager,
+            hapticsManager = hapticsManager,
+            incognitoState = incognitoState,
+            usageLog = usageLog,
+            typingStats = typingStats,
+            clipboardDao = clipboardDao,
+            repository = repository,
+            emojiRepository = emojiRepository,
+        )
     }
 
     override fun onCreate() {
@@ -236,7 +209,7 @@ class StickyKeysIME :
                         clipboardIMEViewModel = clipboardViewModel,
                         emojiPickerViewModel = emojiPickerViewModel,
                         fileManager = fileManager,
-                        onStickerClick = { commitStickerContent(it) },
+                        onStickerClick = { stickerCommit.commit(this@StickyKeysIME, it) },
                     )
                 }
             }
@@ -681,81 +654,6 @@ class StickyKeysIME :
         imm?.showInputMethodPicker()
     }
 
-    private fun commitStickerContent(sticker: Sticker) {
-        // Refused before anything else happens, including the haptic: a tap that is being
-        // dropped should cost nothing at all, and a buzz for a sticker that was never sent
-        // says the opposite of what happened.
-        val now = android.os.SystemClock.uptimeMillis()
-        if (now - lastStickerCommitAt < STICKER_COMMIT_MIN_INTERVAL_MS) return
-        lastStickerCommitAt = now
-
-        hapticsManager.performStickerSendHaptic()
-        val file = fileManager.getStickerFile(sticker.id)
-        if (!file.exists()) return
-
-        val uri =
-            FileProvider.getUriForFile(
-                this,
-                "com.uncoalesced.stickykeys.fileprovider",
-                file,
-            )
-
-        val editorInfo = currentInputEditorInfo ?: return
-        val inputConnection = currentInputConnection ?: return
-
-        // The type the *content* actually is, from the resolver -- which now answers, because
-        // the provider reads the file header. The value recorded in Room is used only as a
-        // fallback: a sticker imported before a conversion, or edited outside the app, can
-        // disagree with what is on disk, and the receiving app will believe the bytes.
-        val mimeType =
-            contentResolver.getType(uri) ?: sticker.mimeType
-
-        val declared = EditorInfoCompat.getContentMimeTypes(editorInfo)
-        val accepted = declared.firstOrNull { ClipDescription.compareMimeTypes(mimeType, it) }
-        if (accepted == null) {
-            // The field genuinely does not take this content. Say so rather than doing
-            // nothing: a tap that produces no response at all is indistinguishable from the
-            // keyboard being broken, which is how this reported as "stickers do not work".
-            hapticsManager.performKeyPressHaptic()
-            return
-        }
-
-        val clip = ClipDescription("Sticker", arrayOf(mimeType))
-        val contentInfo = InputContentInfoCompat(uri, clip, null)
-
-        var flags = 0
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
-            flags = flags or InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION
-        } else {
-            grantUriPermission(editorInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-
-        // Belt and braces on the permission grant. INPUT_CONTENT_GRANT_READ_URI_PERMISSION is
-        // the sanctioned route and is what the flag above asks for, but it grants to the
-        // *IME target* as the framework understands it -- and an app whose text field lives in
-        // one process while its media import runs in another (both of these do) can end up
-        // reading the URI from a component the implicit grant never covered. An explicit grant
-        // to the editor's package costs nothing and closes that gap.
-        runCatching {
-            grantUriPermission(editorInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-
-        val committed =
-            InputConnectionCompat.commitContent(
-                inputConnection,
-                editorInfo,
-                contentInfo,
-                flags,
-                null,
-            )
-        if (!committed) {
-            // The editor declared the type and then refused the content anyway. Nothing more
-            // can be done through the InputConnection, and silently swallowing it is what
-            // made this look like the sticker feature simply not existing.
-            hapticsManager.performKeyPressHaptic()
-        }
-    }
-
     private companion object {
         /**
          * Upper bound on how much surrounding text a single cursor move will pull across IPC.
@@ -766,28 +664,5 @@ class StickyKeysIME :
          * characters covers any realistic line while staying far inside that limit.
          */
         const val MAX_SCAN = 2000
-
-        /**
-         * Floor between two sticker commits.
-         *
-         * Every commit is synchronous main-thread work with two blocking parts: disk I/O (the
-         * file check, and the header sniff the resolver runs behind `getType`) and binder IPC
-         * into the host app, which has to accept or refuse the content before the call
-         * returns. One of those is cheap. A dozen queued behind an app that is slow to answer
-         * is a stalled main thread, and a stalled IME main thread is an ANR -- which is what
-         * "spamming the stickers crashed the keyboard" looks like from the outside
-         * (roadmap 4J.3).
-         *
-         * A floor between events rather than a queue, which is the same shape the scrub's
-         * haptic throttle uses in `KeyGestures.kt` for the same reason: the tap that arrives
-         * too soon is dropped, not deferred, because deferring it would still run the work.
-         *
-         * ponytail: 300ms is a guess, and it is the *only* thing standing between a fast tap
-         * run and the main thread. Set the number from a device: if a reproduction still
-         * stalls, the real fix is moving the file read off the main thread rather than raising
-         * this further -- a debounce large enough to hide a slow host is one a user notices as
-         * "the sticker didn't send".
-         */
-        const val STICKER_COMMIT_MIN_INTERVAL_MS = 300L
     }
 }
