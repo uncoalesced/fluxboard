@@ -22,6 +22,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
@@ -152,12 +155,38 @@ internal fun KeyboardRowsView(
         }
     val gridOrigin = remember { mutableStateOf(Offset.Zero) }
 
+    // Debug builds only: every finger that lands on the grid, seen before any key reacts. A
+    // touch that appears here with no per-press outcome after it never reached a key. The
+    // modifier is not attached at all when recording is off, so a release grid is unchanged.
+    val recorder = LocalUsageRecorder.current
+    val touchObserver =
+        if (recorder != null && recorder.enabled) {
+            Modifier.pointerInput(recorder) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val fingers = event.changes.count { it.pressed }
+                        for (change in event.changes) {
+                            if (change.changedToDownIgnoreConsumed()) {
+                                recorder.onTouchDown(change.uptimeMillis, fingers)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Modifier
+        }
+
     Box(
         modifier =
-            modifier.fillMaxWidth().onGloballyPositioned {
-                gridOrigin.value =
-                    it.positionInRoot()
-            },
+            modifier
+                .fillMaxWidth()
+                .then(touchObserver)
+                .onGloballyPositioned {
+                    gridOrigin.value =
+                        it.positionInRoot()
+                },
     ) {
         Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
             for (row in keyRows.rows) {

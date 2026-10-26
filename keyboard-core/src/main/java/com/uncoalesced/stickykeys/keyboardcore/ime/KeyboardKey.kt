@@ -228,6 +228,7 @@ internal fun KeyboardKey(
                     glide = glide,
                     onGlide = onGlide,
                     onRevoke = onKeyRevoke,
+                    recorder = LocalUsageRecorder.current,
                 )
                 // Everything below this line is drawing, and the padding belongs to drawing
                 // alone: it is what makes a key look separate from its neighbour without

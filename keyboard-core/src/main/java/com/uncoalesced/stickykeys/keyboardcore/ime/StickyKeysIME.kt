@@ -6,6 +6,7 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -203,14 +204,16 @@ class StickyKeysIME :
                             viewModelFactory,
                         )[EmojiPickerViewModel::class.java]
 
-                    MainIMEView(
-                        keyboardController = this@StickyKeysIME,
-                        typingViewModel = typingViewModel,
-                        clipboardIMEViewModel = clipboardViewModel,
-                        emojiPickerViewModel = emojiPickerViewModel,
-                        fileManager = fileManager,
-                        onStickerClick = { stickerCommit.commit(this@StickyKeysIME, it) },
-                    )
+                    CompositionLocalProvider(LocalUsageRecorder provides usageLog) {
+                        MainIMEView(
+                            keyboardController = this@StickyKeysIME,
+                            typingViewModel = typingViewModel,
+                            clipboardIMEViewModel = clipboardViewModel,
+                            emojiPickerViewModel = emojiPickerViewModel,
+                            fileManager = fileManager,
+                            onStickerClick = { stickerCommit.commit(this@StickyKeysIME, it) },
+                        )
+                    }
                 }
             }
         return view
