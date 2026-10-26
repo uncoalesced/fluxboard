@@ -81,6 +81,7 @@ internal fun KeyboardKey(
     glide: GlideTracker? = null,
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
     onKeyRevoke: (String) -> Unit = {},
+    drawInset: KeyDrawInset = KeyDrawInset.None,
 ) {
     val spokenLabel = accessibleKeyLabel(keyOutput)
     val spokenState = accessibleKeyState(keyOutput, mode)
@@ -233,6 +234,12 @@ internal fun KeyboardKey(
                 // Everything below this line is drawing, and the padding belongs to drawing
                 // alone: it is what makes a key look separate from its neighbour without
                 // making the space between them untouchable.
+                //
+                // The draw inset is the same idea one level out. An end key's cell also covers
+                // the home row's half-key stagger and the panel margin, so a thumb landing
+                // there types the key instead of nothing (roadmap 4R.1); the key is still
+                // painted where it always was.
+                .drawInset(drawInset)
                 .padding(keyPadding)
                 // Haze before the fill so it reads as glow behind the key rather than a
                 // wash over it. Skipped entirely when off, rather than drawn at zero alpha:
