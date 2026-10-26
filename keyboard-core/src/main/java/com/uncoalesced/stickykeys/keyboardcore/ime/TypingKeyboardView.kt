@@ -310,7 +310,11 @@ fun TypingKeyboardView(
                                 } else {
                                     Color.Transparent
                                 },
-                            ).padding(contentPadding),
+                            )
+                            // Vertical only. The side margin is handed to the key grid as
+                            // edgeInset instead, so the outermost keys own it rather than it
+                            // being a strip down each edge where a tap types nothing (4R.1).
+                            .padding(vertical = contentPadding),
                 ) {
                     // Suggestion strip; also carries the passive incognito indicator.
                     //
@@ -324,6 +328,7 @@ fun TypingKeyboardView(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
+                                    .padding(horizontal = contentPadding)
                                     .height(stripHeight)
                                     .background(StickyKeysTheme.colors.surface)
                                     .padding(horizontal = 8.dp),
@@ -457,6 +462,7 @@ fun TypingKeyboardView(
                             glide = if (glideEnabled) glideTracker else null,
                             onGlide = onGlide,
                             enterAction = enterAction,
+                            edgeInset = contentPadding,
                         )
                         if (glideEnabled) {
                             GlideTrailOverlay(glideTracker = glideTracker)

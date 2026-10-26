@@ -25,10 +25,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyDefinition
@@ -37,6 +41,7 @@ import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysColors
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import kotlin.math.roundToInt
 
 /**
  * The key grid, in a wrapper Compose can prove is stable.
@@ -139,7 +144,13 @@ internal fun KeyboardRowsView(
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
     onKeyRevoke: (String) -> Unit = {},
     enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
+    edgeInset: Dp = 0.dp,
 ) {
+    val rows =
+        remember(keyRows, edgeInset) {
+            keyRows.rows.map { RowCells(rowCells(it, edgeInset)) }
+        }
+
     // One strip for the whole grid, not one per key. A popup owned by the key that opened it
     // is dismissed by its own pointer-exit the moment the finger slides across to choose.
     val alternates = remember { KeyAlternatesState() }
@@ -189,19 +200,21 @@ internal fun KeyboardRowsView(
                 },
     ) {
         Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
-            for (row in keyRows.rows) {
-                Row(
+            for (cells in rows) {
+                KeyRowLayout(
+                    cells = cells,
+                    edgeInset = edgeInset,
                     // Rows share whatever height is left after the suggestion strip rather than
                     // each claiming a fixed key height. That is what lets the same layout work in
                     // a short landscape window without overflowing it.
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    for (keyDef in row) {
+                    for (cell in cells.cells) {
+                        val keyDef = cell.key
                         if (keyDef.output == KeyboardLayouts.SPACER) {
-                            // Width only: the home row is inset by half a key at each end, and
-                            // a spacer expresses that without the row needing its own layout.
-                            Spacer(modifier = Modifier.weight(keyDef.weight).fillMaxHeight())
+                            // Only an interior spacer reaches here; one at either end of a row
+                            // has already been folded into its neighbour by rowCells.
+                            Spacer(modifier = Modifier.fillMaxHeight())
                             continue
                         }
 
@@ -238,10 +251,11 @@ internal fun KeyboardRowsView(
                             alternates = alternates,
                             preferredCellWidthPx = preferredCellPx,
                             availableWidthPx = availableWidthPx,
-                            modifier = Modifier.weight(keyDef.weight).fillMaxHeight(),
+                            modifier = Modifier.fillMaxHeight(),
                             onKeyPress = onKeyPress,
                             onKeyRevoke = onKeyRevoke,
                             onScrub = onScrub,
+                            drawInset = cell.inset,
                         )
                     }
                 }
@@ -253,6 +267,150 @@ internal fun KeyboardRowsView(
             gridOrigin = gridOrigin.value,
             palette = palette,
         )
+    }
+}
+
+/**
+ * The part of a key's cell that is touchable but not painted, at each end.
+ *
+ * [startDp] and [endDp] come off first: the panel margin, a fixed distance. The fractions are
+ * then taken of what remains, because an absorbed half-key spacer is a share of the row rather
+ * than a distance. Applied below the gesture modifier, so it shrinks only what is drawn.
+ */
+@Immutable
+internal data class KeyDrawInset(
+    val startFraction: Float = 0f,
+    val endFraction: Float = 0f,
+    val startDp: Dp = 0.dp,
+    val endDp: Dp = 0.dp,
+) {
+    companion object {
+        val None = KeyDrawInset()
+    }
+}
+
+/** Draws the content inside [inset] while reporting the full cell as this node's size. */
+internal fun Modifier.drawInset(inset: KeyDrawInset): Modifier =
+    if (inset == KeyDrawInset.None) {
+        this
+    } else {
+        layout { measurable, constraints ->
+            if (!constraints.hasBoundedWidth) {
+                val placeable = measurable.measure(constraints)
+                return@layout layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            }
+            val full = constraints.maxWidth
+            val fixedStart = inset.startDp.roundToPx()
+            val fixedEnd = inset.endDp.roundToPx()
+            val flex = (full - fixedStart - fixedEnd).coerceAtLeast(0)
+            val start = fixedStart + (flex * inset.startFraction).roundToInt()
+            val end = fixedEnd + (flex * inset.endFraction).roundToInt()
+            val inner = (full - start - end).coerceAtLeast(0)
+            val placeable =
+                measurable.measure(constraints.copy(minWidth = inner, maxWidth = inner))
+            layout(full, placeable.height) { placeable.placeRelative(start, 0) }
+        }
+    }
+
+/** One cell of a key row: the key, the share of the row it occupies, and what is not drawn. */
+@Immutable
+internal data class RowCell(
+    val key: KeyDefinition,
+    val weight: Float,
+    val inset: KeyDrawInset,
+)
+
+/** A row's cells, wrapped for the same stability reason as [KeyboardRows]. */
+@Immutable
+internal data class RowCells(
+    val cells: List<RowCell>,
+)
+
+/**
+ * Turns a layout row into touch cells that tile the full width with no holes.
+ *
+ * Two kinds of space used to belong to no key, and a tap on either typed nothing at all
+ * (roadmap 4R.1, measured on device: 18dp left of `a`, 15dp right of `l`, and the outer edge of
+ * every row):
+ *  - The home row's half-key stagger is a spacer at each end. An end spacer is folded into the
+ *    key beside it: the key's cell grows by the spacer's weight and the key is drawn inset by
+ *    the same share, so it looks exactly as before and owns the space.
+ *  - The panel margin, [edgeInset], is given to the first and last cell of every row the same
+ *    way. [KeyRowLayout] makes those cells wider by that distance.
+ *
+ * Interior spacers are left alone. Pure, so the arithmetic is testable without composing.
+ */
+internal fun rowCells(
+    row: List<KeyDefinition>,
+    edgeInset: Dp = 0.dp,
+): List<RowCell> {
+    val keys = row.toMutableList()
+    val isSpacer = { k: KeyDefinition -> k.output == KeyboardLayouts.SPACER }
+    var leading = 0f
+    var trailing = 0f
+    if (keys.size > 1 && isSpacer(keys.first()) && !isSpacer(keys[1])) {
+        leading = keys.removeAt(0).weight
+    }
+    if (keys.size > 1 && isSpacer(keys.last()) && !isSpacer(keys[keys.lastIndex - 1])) {
+        trailing = keys.removeAt(keys.lastIndex).weight
+    }
+    return keys.mapIndexed { i, key ->
+        if (isSpacer(key)) return@mapIndexed RowCell(key, key.weight, KeyDrawInset.None)
+        val lead = if (i == 0) leading else 0f
+        val trail = if (i == keys.lastIndex) trailing else 0f
+        val weight = key.weight + lead + trail
+        val inset =
+            KeyDrawInset(
+                startFraction = lead / weight,
+                endFraction = trail / weight,
+                startDp = if (i == 0) edgeInset else 0.dp,
+                endDp = if (i == keys.lastIndex) edgeInset else 0.dp,
+            )
+        RowCell(key, weight, inset)
+    }
+}
+
+/**
+ * Lays out one row of [cells] across the full width.
+ *
+ * Weights share the width left after [edgeInset] at each end, and that inset is then added to
+ * the first and last cell, so every key lands on exactly the pixel it did when the margin was
+ * padding around the grid. Cell edges are cumulative rather than per-cell rounded, so the row
+ * tiles with no gap between neighbours for a tap to fall into.
+ */
+@Composable
+private fun KeyRowLayout(
+    cells: RowCells,
+    edgeInset: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val width = constraints.maxWidth
+        val height =
+            if (constraints.hasBoundedHeight) constraints.maxHeight else constraints.minHeight
+        val edge = edgeInset.roundToPx()
+        val inner = (width - 2 * edge).coerceAtLeast(0)
+        val total = cells.cells.sumOf { it.weight.toDouble() }.takeIf { it > 0.0 } ?: 1.0
+        var cumulative = 0.0
+        var left = 0
+        val placed =
+            measurables.mapIndexed { i, measurable ->
+                cumulative += cells.cells[i].weight
+                val right =
+                    if (i == measurables.lastIndex) {
+                        width
+                    } else {
+                        edge + (inner * cumulative / total).roundToInt()
+                    }
+                val cellLeft = left
+                left = right
+                val cellWidth = (right - cellLeft).coerceAtLeast(0)
+                cellLeft to measurable.measure(Constraints.fixed(cellWidth, height))
+            }
+        layout(width, height) {
+            placed.forEach { (x, placeable) -> placeable.placeRelative(x, 0) }
+        }
     }
 }
 
