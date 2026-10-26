@@ -97,6 +97,35 @@ object KeyboardLayouts {
     val shiftedNumberRow: List<KeyDefinition> =
         digitShiftPairs.map { (_, shifted) -> key(shifted) }
 
+    /** The digit row to draw above the letters in [mode]. See [showsShiftedDigits]. */
+    fun numberRowFor(
+        mode: KeyboardMode,
+        autoCapitalizeArmed: Boolean,
+    ): List<KeyDefinition> =
+        if (showsShiftedDigits(mode, autoCapitalizeArmed)) shiftedNumberRow else numberRow
+
+    /**
+     * Whether the digit row shows its shifted symbols.
+     *
+     * Only when the *user* armed shift. Auto-capitalize arms the same [KeyboardMode.LETTERS_UPPER]
+     * at every sentence start, and letting that swap the row meant a sentence could not begin
+     * with a number: `1` typed `!`, `3` typed `#`, on every line. Capitals are for letters.
+     *
+     * The two are told apart without a second flag. While auto-capitalize is armed, upper case
+     * can only have come from it -- a shift tap at that moment turns shift *off*
+     * ([nextShiftMode]) -- so `LETTERS_UPPER` plus [autoCapitalizeArmed] always means automatic.
+     * Caps lock is always deliberate and keeps the shifted row.
+     */
+    fun showsShiftedDigits(
+        mode: KeyboardMode,
+        autoCapitalizeArmed: Boolean,
+    ): Boolean =
+        when (mode) {
+            KeyboardMode.LETTERS_CAPS_LOCK -> true
+            KeyboardMode.LETTERS_UPPER -> !autoCapitalizeArmed
+            else -> false
+        }
+
     private val topRow =
         listOf(
             key("q", "%"),

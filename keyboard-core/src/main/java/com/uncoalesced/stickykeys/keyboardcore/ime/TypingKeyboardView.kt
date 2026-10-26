@@ -73,9 +73,10 @@ fun TypingKeyboardView(
     // changes. Rebuilding this list on every recomposition handed the key grid a fresh List
     // each keystroke, which is enough on its own to stop it skipping.
     val fieldKind by typingViewModel.fieldKind.collectAsState()
+    val shouldAutoCapitalize by typingViewModel.shouldAutoCapitalize.collectAsState()
 
     val keyRows =
-        remember(activeLayoutConfig, mode, showNumberRow, fieldKind) {
+        remember(activeLayoutConfig, mode, showNumberRow, fieldKind, shouldAutoCapitalize) {
             if (fieldKind == FieldKind.PIN) {
                 return@remember KeyboardRows(KeyboardLayouts.pinRows)
             }
@@ -111,8 +112,8 @@ fun TypingKeyboardView(
                 // reference and every hardware keyboard. Substituted rather than transformed,
                 // so the symbols are real keys: pressing one consumes a one-shot shift through
                 // the same branch as any other key, with no special case for the digit row.
-                val digits =
-                    if (isUpper) KeyboardLayouts.shiftedNumberRow else KeyboardLayouts.numberRow
+                // Automatic sentence-start shift is the exception; see showsShiftedDigits.
+                val digits = KeyboardLayouts.numberRowFor(mode, shouldAutoCapitalize)
                 KeyboardRows(
                     if (showNumberRow) listOf(digits) + letters else letters,
                 )
@@ -129,7 +130,6 @@ fun TypingKeyboardView(
     val undoState by typingViewModel.undoState.collectAsState()
     val incognito by typingViewModel.incognito.collectAsState()
     val privateMode by typingViewModel.privateMode.collectAsState()
-    val shouldAutoCapitalize by typingViewModel.shouldAutoCapitalize.collectAsState()
     val activeTheme by typingViewModel.activeTheme.collectAsState()
     val context = LocalContext.current
 

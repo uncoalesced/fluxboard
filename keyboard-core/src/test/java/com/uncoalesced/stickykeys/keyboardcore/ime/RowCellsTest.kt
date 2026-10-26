@@ -4,6 +4,7 @@ package com.uncoalesced.stickykeys.keyboardcore.ime
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyDefinition
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -86,5 +87,33 @@ class RowCellsTest {
 
         assertEquals(3, rowCells(row).size)
         assertEquals(KeyboardLayouts.SPACER, rowCells(row)[1].key.output)
+    }
+
+    // --- roadmap 4R.2: the number row and automatic sentence-start shift ------------------
+
+    @Test
+    fun `automatic sentence-start shift leaves the digits as digits`() {
+        assertFalse(KeyboardLayouts.showsShiftedDigits(KeyboardMode.LETTERS_UPPER, true))
+        assertEquals(
+            KeyboardLayouts.numberRow,
+            KeyboardLayouts.numberRowFor(KeyboardMode.LETTERS_UPPER, autoCapitalizeArmed = true),
+        )
+    }
+
+    @Test
+    fun `shift the user armed still shows the shifted symbols`() {
+        assertTrue(KeyboardLayouts.showsShiftedDigits(KeyboardMode.LETTERS_UPPER, false))
+        assertEquals(
+            KeyboardLayouts.shiftedNumberRow,
+            KeyboardLayouts.numberRowFor(KeyboardMode.LETTERS_UPPER, autoCapitalizeArmed = false),
+        )
+    }
+
+    @Test
+    fun `caps lock is always deliberate and lower case never shifts`() {
+        assertTrue(KeyboardLayouts.showsShiftedDigits(KeyboardMode.LETTERS_CAPS_LOCK, true))
+        assertTrue(KeyboardLayouts.showsShiftedDigits(KeyboardMode.LETTERS_CAPS_LOCK, false))
+        assertFalse(KeyboardLayouts.showsShiftedDigits(KeyboardMode.LETTERS_LOWER, true))
+        assertFalse(KeyboardLayouts.showsShiftedDigits(KeyboardMode.LETTERS_LOWER, false))
     }
 }
