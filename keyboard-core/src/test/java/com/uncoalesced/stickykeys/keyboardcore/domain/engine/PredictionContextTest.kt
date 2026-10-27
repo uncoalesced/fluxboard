@@ -121,20 +121,34 @@ class PredictionContextTest {
     @Test
     fun `context decides which correction wins, not whether one fires`() =
         runBlocking {
-            // "thw" corrects to "the" on frequency alone. Give a competing real correction
-            // maximum contextual weight and it should take over.
-            val baseline = engineWith(emptyMap()).getAutoCorrection("thw")
-            assertEquals("the", baseline)
+            // "tuen" is one adjacent key from both "then" and "turn" and corrects to "then"
+            // on frequency alone. Give the other equally close correction maximum contextual
+            // weight and it should take over.
+            val baseline = engineWith(emptyMap()).getAutoCorrection("tuen")
+            assertEquals("then", baseline)
 
+            val contextual =
+                engineWith(mapOf("to" to listOf("turn" to 255)))
+                    .getAutoCorrection("tuen", previousWord = "to")
+
+            assertEquals(
+                "a contextually-favoured candidate should win among corrections",
+                "turn",
+                contextual,
+            )
+        }
+
+    @Test
+    fun `context cannot reach for a correction that needs more editing`() =
+        runBlocking {
+            // The 4R.3 case: "at thier" became "at the", two deletions beating one
+            // transposition because "the" follows "at" so often. Context may reorder
+            // corrections, but not trade a close one for a distant one.
             val contextual =
                 engineWith(mapOf("saw" to listOf("two" to 255)))
                     .getAutoCorrection("thw", previousWord = "saw")
 
-            assertEquals(
-                "a contextually-favoured candidate should win among corrections",
-                "two",
-                contextual,
-            )
+            assertEquals("the", contextual)
         }
 
     @Test

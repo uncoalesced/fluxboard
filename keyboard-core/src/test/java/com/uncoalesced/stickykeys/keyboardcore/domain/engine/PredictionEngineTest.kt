@@ -127,10 +127,12 @@ class PredictionEngineTest {
                 )
             }
 
-            // "helo" is one edit from both "hello" and "help"; which wins is a frequency
-            // call, not a correctness one. What matters is that it is corrected at all --
-            // as a dictionary terminal it used to be left alone.
-            listOf("helo", "wrod").forEach { typo ->
+            // "wrod" must be corrected at all -- as a dictionary terminal it used to be left
+            // alone. "helo" used to be checked here too; it is now deliberately left alone,
+            // because "help" and "hello" are both plausible and mean different things (4R.3,
+            // AutocorrectParityTest).
+            assertNull(engine.getAutoCorrection("helo"))
+            listOf("wrod").forEach { typo ->
                 val correction = engine.getAutoCorrection(typo)
                 assertNotNull("'$typo' should be corrected, not accepted as a word", correction)
                 assertNotEquals("'$typo' should not correct to itself", typo, correction)
