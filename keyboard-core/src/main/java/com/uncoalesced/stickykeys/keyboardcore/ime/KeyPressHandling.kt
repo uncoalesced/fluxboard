@@ -56,7 +56,17 @@ internal fun handleKeyPress(
             // gesture put it there. Anything else goes through sendDelete, which sizes
             // itself against the real text so a surrogate pair never loses half of
             // itself -- deleteBefore(1) would.
-            val charCount = viewModel.onDelete(controller.textBeforeCursor(WORD_CONTEXT_CHARS))
+            val textBefore = controller.textBeforeCursor(WORD_CONTEXT_CHARS)
+            // Straight after an autocorrect, backspace takes the correction back rather than
+            // eating the space: "The " returns to "teh" with the caret at its end (roadmap
+            // 4R.3). Same one round-trip the undo chip uses, minus the trailing space.
+            val revert = viewModel.autocorrectToRevert(textBefore)
+            if (revert != null) {
+                controller.replaceTextBeforeCursor(revert.corrected.length + 1, revert.original)
+                viewModel.onAutocorrectReverted(revert.original)
+                return
+            }
+            val charCount = viewModel.onDelete(textBefore)
             if (charCount > 1) controller.deleteBefore(charCount) else controller.sendDelete()
         }
         "ENTER" -> {
@@ -126,7 +136,9 @@ internal fun handleKeyPress(
             // committed so the word is still the last thing before the caret. A field that
             // filtered the keystrokes out reports nothing here, which is exactly right: it
             // has no word to correct and none to learn.
-            val typedWord = currentWordText(controller)
+            val textBefore = controller.textBeforeCursor(WORD_CONTEXT_CHARS)
+            val typedWord = wordUnderCaret(textBefore)
+            val clauseStart = startsClause(textBefore)
 
             // Two quick spaces become a full stop. Decided from the text rather than from the
             // taps alone: the pure decision reads what is actually before the caret, so it
@@ -173,7 +185,7 @@ internal fun handleKeyPress(
             }
 
             coroutineScope.launch {
-                val corrected = viewModel.getAutoCorrectionFor(typedWord)
+                val corrected = viewModel.getAutoCorrectionFor(typedWord, clauseStart)
                 // Only rewrite if nothing else touched the text meanwhile -- otherwise
                 // the replace would eat characters the user typed during the lookup.
                 if (corrected != null && viewModel.isCurrent(token)) {
@@ -181,7 +193,7 @@ internal fun handleKeyPress(
                     controller.replaceTextBeforeCursor(typedWord.length + 1, "$corrected ")
                     viewModel.onAutoCorrected(typedWord, corrected)
                 } else {
-                    viewModel.onWordAccepted(typedWord)
+                    viewModel.onWordAccepted(typedWord, offerCorrections = true)
                 }
             }
         }
@@ -192,7 +204,9 @@ internal fun handleKeyPress(
                 controller.commitText(keyLabel)
             } else {
                 // Editor-derived, same as the space bar and for the same reason.
-                val typedWord = currentWordText(controller)
+                val textBefore = controller.textBeforeCursor(WORD_CONTEXT_CHARS)
+                val typedWord = wordUnderCaret(textBefore)
+                val clauseStart = startsClause(textBefore)
                 // Committed first and synchronously, for the same reason the space bar is:
                 // waiting on the correction lookup here would let a following key land before
                 // this one and invert what the user typed.
@@ -204,7 +218,7 @@ internal fun handleKeyPress(
                     // who ends sentences with punctuation -- which is everyone -- saw it work
                     // on some words and not others with no discernible pattern.
                     coroutineScope.launch {
-                        val corrected = viewModel.getAutoCorrectionFor(typedWord)
+                        val corrected = viewModel.getAutoCorrectionFor(typedWord, clauseStart)
                         if (corrected != null && viewModel.isCurrent(token)) {
                             // Replace "<typed><punctuation>" in one round-trip, so the
                             // punctuation the user just saw appear never flickers.

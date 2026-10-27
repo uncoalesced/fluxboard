@@ -194,10 +194,17 @@ internal fun rememberSuggestionTapHandler(
         { suggestion: String ->
             // After a glide the strip holds the readings that lost, and the text already
             // contains the winner plus its space -- so the span to replace is what the
-            // glide wrote, not the word under the caret, which is empty there.
-            val glided = typingViewModel.consumeGlideCommit()
+            // glide wrote, not the word under the caret, which is empty there. A word
+            // autocorrect declined to rewrite is the same shape: the strip offers its
+            // corrections and the text ends in the word as typed plus its space.
+            val committed =
+                typingViewModel.consumeGlideCommit() ?: typingViewModel.consumeOfferedWord()
             val span =
-                if (glided != null) glided.length + 1 else currentWordSpan(keyboardController)
+                if (committed != null) {
+                    committed.length + 1
+                } else {
+                    currentWordSpan(keyboardController)
+                }
             keyboardController.replaceTextBeforeCursor(span, "$suggestion ")
             typingViewModel.onSuggestionSelected(suggestion)
         }
