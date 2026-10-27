@@ -361,6 +361,14 @@ private class FakeController(
 
     override fun commitText(text: String) = Unit
 
+    override fun textAfterCursor(maxChars: Int): String = ""
+
+    override fun replaceTextAroundCursor(
+        before: Int,
+        after: Int,
+        replacement: String,
+    ) = Unit
+
     override fun replaceTextBeforeCursor(
         charCount: Int,
         replacement: String,

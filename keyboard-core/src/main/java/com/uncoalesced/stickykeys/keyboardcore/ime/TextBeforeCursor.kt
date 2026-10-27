@@ -25,6 +25,28 @@ internal fun wordUnderCaret(textBeforeCursor: String): String =
         .dropWhile { it == '\'' }
 
 /**
+ * The rest of the word the caret is inside, given the text after it: "o" for a caret placed
+ * in "hel|o there". The mirror of [wordUnderCaret], with the same letters-and-apostrophes rule,
+ * minus a trailing apostrophe, which is a closing quote rather than part of the word.
+ */
+internal fun wordAfterCaret(textAfterCursor: String): String =
+    textAfterCursor
+        .takeWhile { it.isLetter() || it == '\'' }
+        .dropLastWhile { it == '\'' }
+
+/**
+ * What a tapped suggestion writes in place of the word around the caret.
+ *
+ * Normally the word plus a space, as at the end of a line. When the replaced word is followed
+ * by more text that already starts with a space, the space is left out: replacing the "helo"
+ * in "helo there" with "hello " would leave "hello  there".
+ */
+internal fun suggestionReplacement(
+    suggestion: String,
+    textAfterWord: String,
+): String = if (textAfterWord.firstOrNull()?.isWhitespace() == true) suggestion else "$suggestion "
+
+/**
  * Whether the word at the end of [textBeforeCursor] opens a clause: it is the first thing in
  * the field, or the last thing before it (spaces aside) is a comma, a colon or semicolon, a
  * sentence end, an opening bracket or a line break.

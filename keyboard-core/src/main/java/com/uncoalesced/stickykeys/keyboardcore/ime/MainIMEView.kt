@@ -57,6 +57,14 @@ internal fun rememberInterceptingController(
             override fun textBeforeCursor(maxChars: Int): String =
                 delegate.textBeforeCursor(maxChars)
 
+            override fun textAfterCursor(maxChars: Int): String = delegate.textAfterCursor(maxChars)
+
+            override fun replaceTextAroundCursor(
+                before: Int,
+                after: Int,
+                replacement: String,
+            ) = delegate.replaceTextAroundCursor(before, after, replacement)
+
             override fun replaceTextBeforeCursor(
                 charCount: Int,
                 replacement: String,

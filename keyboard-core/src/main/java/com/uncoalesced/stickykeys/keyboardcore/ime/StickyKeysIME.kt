@@ -326,7 +326,12 @@ class StickyKeysIME :
         selStart = newSelStart
         selEnd = newSelEnd
         if (external) {
-            typingViewModel().onEditorContextChanged(textBeforeCursor(WORD_CONTEXT_CHARS))
+            // The text after the caret too, so a caret placed inside a word knows the whole
+            // word rather than only the part before it. Still only on an external move.
+            typingViewModel().onEditorContextChanged(
+                textBeforeCursor(WORD_CONTEXT_CHARS),
+                textAfterCursor(WORD_CONTEXT_CHARS),
+            )
         }
         // No getCursorCapsMode() call here on purpose -- see onStartInputView.
     }
@@ -435,6 +440,28 @@ class StickyKeysIME :
 
     override fun textBeforeCursor(maxChars: Int): String =
         currentInputConnection?.getTextBeforeCursor(maxChars, 0)?.toString() ?: ""
+
+    override fun textAfterCursor(maxChars: Int): String =
+        currentInputConnection?.getTextAfterCursor(maxChars, 0)?.toString() ?: ""
+
+    override fun replaceTextAroundCursor(
+        before: Int,
+        after: Int,
+        replacement: String,
+    ) {
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        try {
+            if (before > 0 || after > 0) {
+                ic.deleteSurroundingText(before, after)
+            }
+            ic.commitText(replacement, 1)
+        } finally {
+            ic.endBatchEdit()
+        }
+        val caret = minOf(selStart, selEnd)
+        predictCaret((caret - before).coerceAtLeast(0) + replacement.length)
+    }
 
     /**
      * Records where this keyboard's own edit should have left the caret.
