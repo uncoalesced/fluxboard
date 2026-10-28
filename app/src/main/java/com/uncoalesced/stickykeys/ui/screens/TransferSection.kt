@@ -13,6 +13,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -40,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -353,7 +356,16 @@ fun ServerProgressView(
                     Image(
                         bitmap = uiState.bitmap.asImageBitmap(),
                         contentDescription = stringResource(R.string.desc_pairing_qr_code),
-                        modifier = Modifier.size(300.dp),
+                        // On a white tile with a margin. The bitmap's light modules are
+                        // transparent, so on the card it drew dark-on-dark with no quiet
+                        // zone, which is hard to read for a person and harder for a scanner.
+                        // White is the one colour here that is not a palette choice: it is
+                        // what QR readers expect behind the code.
+                        modifier =
+                            Modifier
+                                .size(280.dp)
+                                .background(Color.White, RoundedCornerShape(12.dp))
+                                .padding(16.dp),
                     )
                 }
                 Spacer(modifier = Modifier.height(32.dp))

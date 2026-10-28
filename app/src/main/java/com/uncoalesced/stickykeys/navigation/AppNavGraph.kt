@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -185,6 +186,13 @@ fun AppNavGraph(
                     // drawn to be. Consuming here fixes every one of them at the shared
                     // boundary instead of per screen.
                     .consumeWindowInsets(innerPadding)
+                    // The content area shrinks above the keyboard instead of the whole window
+                    // panning up under the status bar. With the search field now below the
+                    // typing stats it sits low enough for the IME to cover it, and a pan
+                    // pushed the screen's heading off the top. Paired with adjustResize in
+                    // the manifest; what the dock already reserved is subtracted, so the
+                    // padding is only the part of the IME above the dock.
+                    .imePadding()
                     .dockSwipe(
                         enabled = currentTopLevel != null,
                         key = currentTopLevel ?: "",
