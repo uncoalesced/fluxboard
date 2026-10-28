@@ -249,7 +249,11 @@ fun StickersLibraryScreen(
                                         }
                             }.coerceAtLeast(0),
                         edgePadding = StickyKeysTheme.spacing.sm,
-                        containerColor = StickyKeysTheme.colors.surfaceVariant,
+                        // On the ground with ink labels. The tab text used to inherit the accent
+                        // text tone over a #4B4B4B strip, 3.27, under what a label needs; the
+                        // accent stays on the indicator line, which is a fill.
+                        containerColor = StickyKeysTheme.colors.background,
+                        contentColor = StickyKeysTheme.colors.onBackground,
                     ) {
                         Tab(
                             selected = current.currentTab is TabFilter.All,

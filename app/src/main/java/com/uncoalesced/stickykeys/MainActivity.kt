@@ -8,10 +8,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.uncoalesced.stickykeys.data.local.AppPreferences
 import com.uncoalesced.stickykeys.data.local.ThemeMode
@@ -70,6 +72,15 @@ class MainActivity : ComponentActivity() {
                     ThemeMode.LIGHT -> false
                     ThemeMode.DARK -> true
                 }
+            // Status and navigation bar icons follow the app's theme rather than the
+            // system's. On the Porcelain ground the system's white icons were invisible
+            // whenever the app was set to light while the phone was dark.
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
+            }
             StickyKeysTheme(darkTheme = darkTheme) {
                 // Every button in the app gets the same press haptic as a key, driven by the
                 // same enable switch and strength slider. Installed once here rather than at
