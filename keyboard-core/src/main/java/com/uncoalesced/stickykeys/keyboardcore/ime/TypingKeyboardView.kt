@@ -397,7 +397,7 @@ fun TypingKeyboardView(
                                                 span,
                                                 undo.original + " ",
                                             )
-                                            typingViewModel.onUndoApplied()
+                                            typingViewModel.onUndoApplied(undo.original)
                                         },
                                     )
                                 } else {

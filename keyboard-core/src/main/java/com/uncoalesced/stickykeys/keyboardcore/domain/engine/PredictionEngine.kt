@@ -21,6 +21,18 @@ private const val PERSONAL_WEIGHT = 5f
 private const val BASE_WEIGHT = 1f
 private const val MAX_SUGGESTIONS = 3
 
+/** Score a learned word starts from as a correction target; see personalCorrectionTargets. */
+private const val PERSONAL_TARGET_BASE = 128f
+
+/** The top of the base dictionary's frequency scale. */
+private const val MAX_FREQUENCY = 255f
+
+/**
+ * Most personal words scored per correction. Each costs one small edit-distance table, and
+ * past this many the commonest words already decide the outcome.
+ */
+private const val MAX_PERSONAL_TARGETS = 500
+
 /**
  * Trie nodes a single prefix completion walk may visit.
  *
@@ -392,12 +404,37 @@ class PredictionEngine
             return results.sortedByDescending { it.score }.take(limit)
         }
 
+        /**
+         * The correction to apply to [typedWord], or null to leave it alone. [startsClause] is
+         * true when the word follows a comma, a sentence end or similar; it only affects the
+         * contractions whose bare form is also a word (see ContractionRules).
+         */
         suspend fun getAutoCorrection(
             typedWord: String,
             previousWord: String? = null,
+            startsClause: Boolean = false,
         ): String? =
             withContext(Dispatchers.IO) {
-                val normalized = typedWord.lowercase().trim()
+                val trimmed = typedWord.trim()
+                val normalized = trimmed.lowercase()
+
+                // The pronoun is the one word whose correct form never depends on what was
+                // typed, so it is settled before every rule below -- including the length
+                // floor, which it would otherwise never get past.
+                // An "I" that is already right returns null, not itself: a non-null answer is
+                // applied and counted as a correction, with an undo chip for nothing.
+                if (normalized == "i") return@withContext if (trimmed == "I") null else "I"
+
+                // Ahead of the personal-dictionary veto on purpose. Every bare form here has
+                // been accepted and learned on every space press since the keyboard shipped,
+                // so nearly every existing user already holds "im" and "ill" at frequency 2
+                // or more, and the veto would make this pass unreachable for exactly the
+                // people who type them. The rules are narrow enough to be applied regardless;
+                // see ContractionRules.
+                contractionFor(trimmed, previousWord, startsClause)?.let {
+                    return@withContext spellingCorrector.matchCase(trimmed, it)
+                }
+
                 // Too short to safely autocorrect.
                 if (normalized.length < 3) return@withContext null
 
@@ -410,12 +447,79 @@ class PredictionEngine
                 val corrected =
                     spellingCorrector.restoreApostrophe(normalized)
                         ?: spellingCorrector.splitOnMispressedSpace(normalized)
-                        ?: spellingCorrector.nearestWord(normalized, previousWord)
+                        ?: spellingCorrector.nearestWord(
+                            normalized,
+                            previousWord,
+                            personalCorrectionTargets(),
+                        )
                         ?: return@withContext null
 
                 // Restore the shape the user typed. Auto-capitalize means the first word of
                 // every message arrives with a capital, so returning the dictionary's lowercase
                 // form would silently un-capitalize the start of most sentences it fixed.
-                return@withContext spellingCorrector.matchCase(typedWord.trim(), corrected)
+                return@withContext spellingCorrector.matchCase(trimmed, corrected)
             }
+
+        /**
+         * Corrections to offer in the strip for a word [getAutoCorrection] left alone.
+         *
+         * Empty wherever autocorrect would have nothing to say anyway: short words, words the
+         * user has made their own, and anything that is already a dictionary word. Case
+         * follows what was typed, as it does for an applied correction.
+         */
+        suspend fun getCorrectionOffers(typedWord: String): List<String> =
+            withContext(Dispatchers.IO) {
+                val trimmed = typedWord.trim()
+                val normalized = trimmed.lowercase()
+                if (normalized.length < 3) return@withContext emptyList()
+                val personalEntry = personalDao.getWord(normalized)
+                if (personalEntry != null && personalEntry.frequency >= 2) {
+                    return@withContext emptyList()
+                }
+                try {
+                    spellingCorrector
+                        .offersFor(normalized, personalCorrectionTargets())
+                        .map { spellingCorrector.matchCase(trimmed, it) }
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            }
+
+        /**
+         * Records that the user deliberately kept [word] by undoing a correction of it.
+         *
+         * Stronger than [learnWord]: it lifts the word straight to the two-strike threshold,
+         * so the same correction is not applied again the next time it is typed. Undoing is
+         * the clearest signal a keyboard gets that a word is real, and making the user undo
+         * the same correction twice before it stops would teach them the undo does nothing.
+         */
+        suspend fun keepWord(word: String) =
+            withContext(Dispatchers.IO) {
+                val normalized = word.lowercase().trim()
+                if (normalized.isBlank() || normalized.length > 30) return@withContext
+                if (normalized.any { it.isWhitespace() }) return@withContext
+                val existing = personalDao.getWord(normalized)
+                val frequency = maxOf((existing?.frequency ?: 0) + 1, 2).coerceAtMost(255)
+                personalDao.insertOrUpdate(
+                    PersonalWordEntity(normalized, frequency, System.currentTimeMillis()),
+                )
+            }
+
+        /**
+         * The user's own words as correction targets, scored on the base dictionary's scale.
+         *
+         * Only words past the two-strike rule, the same bar [getSuggestions] uses, so a typo
+         * learned once never becomes something other typos correct to. A word used twice is
+         * scored as a mid-frequency dictionary word and climbs with use: the base scale says
+         * nothing about a word it does not contain, and the user has already said twice that
+         * this one is real.
+         */
+        private fun personalCorrectionTargets(): List<Pair<String, Float>> =
+            personalDao
+                .getFrequentWords(minFrequency = 2, limit = MAX_PERSONAL_TARGETS)
+                .map {
+                    it.word to
+                        (PERSONAL_TARGET_BASE + it.frequency * PERSONAL_WEIGHT)
+                            .coerceAtMost(MAX_FREQUENCY)
+                }
     }

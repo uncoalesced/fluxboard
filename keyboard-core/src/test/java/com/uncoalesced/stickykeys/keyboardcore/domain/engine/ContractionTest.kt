@@ -100,12 +100,13 @@ class ContractionTest {
      * "its" and "it's" are both correct and mean different things, so neither may be
      * corrected into the other -- this is the same never-correct-a-valid-word rule the
      * engine applies everywhere, checked here because the contraction work is exactly what
-     * could have broken it.
+     * could have broken it. "cant" left this list in 4R.3: it is now applied as "can't",
+     * see ContractionRules.
      */
     @Test
     fun `a contraction and its homograph both survive`() =
         runBlocking {
-            for (word in listOf("its", "it's", "were", "we're", "cant", "can't")) {
+            for (word in listOf("its", "it's", "were", "we're", "can't")) {
                 assertNull("$word must stand on its own", engine.getAutoCorrection(word))
             }
         }
@@ -152,18 +153,24 @@ class ContractionTest {
      * The safety half, and the reason offering was chosen over replacing.
      *
      * Each of these is a word somebody meant to type. If any of them ever starts returning
-     * a correction, "I am ill" becomes "I am I'll" and the feature has done more damage
-     * than the gap it filled.
+     * a correction, "there were three" becomes "there we're three" and the feature has done
+     * more damage than the gap it filled. "ill" is checked where it is the adjective; at the
+     * start of a sentence it is now applied as "I'll" (4R.3, see ContractionRules), and
+     * "wont" is applied everywhere.
      */
     @Test
     fun `an ambiguous contraction is never auto-applied`() =
         runBlocking {
-            for (word in listOf("ill", "well", "shell", "wont", "hell", "id")) {
+            for (word in listOf("well", "shell", "hell", "id")) {
                 assertNull(
                     "$word is a real word and must never be corrected to a contraction",
                     engine.getAutoCorrection(word),
                 )
             }
+            assertNull(
+                "ill after \"am\" is the adjective and must stay",
+                engine.getAutoCorrection("ill", previousWord = "am"),
+            )
         }
 
     /** A bare form that is not a word still corrects outright, as it always has. */
@@ -219,19 +226,21 @@ class ContractionTest {
         }
 
     /**
-     * "im" cannot autocorrect, and the strip is the only route to "I'm".
+     * "im" is the one two-letter word autocorrect rewrites, and it is still offered too.
      *
      * Autocorrect refuses anything under three characters outright, which is a deliberate
      * and much older rule: at two letters almost every word is one edit from several
      * others, so correcting them confidently is how a keyboard rewrites what somebody
-     * meant. The offer path has no such floor, because offering costs the user nothing.
+     * meant. "im" is a named exception rather than a correction (4R.3, see
+     * ContractionRules): nobody types it meaning anything but "I'm".
      */
     @Test
-    fun `two letter bare forms are offered even though they cannot be corrected`() =
+    fun `two letter bare forms are offered and only im is corrected`() =
         runBlocking {
+            assertEquals("I'm", engine.getAutoCorrection("im"))
             assertNull(
-                "autocorrect must not touch a two-letter word",
-                engine.getAutoCorrection("im"),
+                "autocorrect must not touch any other two-letter word",
+                engine.getAutoCorrection("ot"),
             )
             assertTrue(
                 "typing \"im\" should still offer \"I'm\"",

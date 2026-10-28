@@ -39,6 +39,24 @@ private const val MAX_EDIT_COST = COST_SUBSTITUTE * 3
 /** A correction has to be at least this credible after its edit penalty to be applied. */
 private const val MIN_CORRECTION_SCORE = 20f
 
+/**
+ * The furthest a correction may be from what was typed, in cost units per typed letter.
+ *
+ * One unit per letter is half an adjacent slip per letter, so a short word gets about one
+ * slip and a long one proportionally more. Measured on the shipped dictionary: every
+ * correction the test suite pins sits at or under this ("definately" costs 4 over 10
+ * letters, the worst ratio is "teh"/"adn" at 3 over 3), while "zorbly" to "only" costs 8
+ * over 6 letters.
+ */
+private const val MAX_COST_PER_LETTER = 1
+
+/**
+ * How close a dropped-repeated-letter reading has to score to the winner to make a word
+ * ambiguous. "hello" scores 0.73 of "help" for "helo"; no correction the test suite pins
+ * has a doubled reading at all, so the margin on that side is not yet measured.
+ */
+private const val DOUBLED_READING_RATIO = 0.6f
+
 /** Shortest run-on worth trying to split: two three-letter words plus the junk key. */
 private const val MIN_SPLIT_LENGTH = 7
 
@@ -62,17 +80,121 @@ internal class SpellingCorrector(
     private val dictionary: () -> ByteBuffer?,
     private val languageModel: LanguageModel,
 ) {
-    /** The best single-word correction, or null when nothing beats what was typed. */
+    /**
+     * The best single-word correction, or null when nothing beats what was typed or the
+     * winner is not trustworthy enough to apply.
+     *
+     * [personalWords] are words the user has made their own, each with a score on the same
+     * scale as a base-dictionary frequency. They compete as candidates alongside the base
+     * dictionary, which is what lets a near miss of a learned word ("zorbli") reach it.
+     */
     internal fun nearestWord(
         normalized: String,
         previousWord: String? = null,
+        personalWords: List<Pair<String, Float>> = emptyList(),
     ): String? {
+        // "alot" is "a lot" with the space missed, and also one key from "slot". Two
+        // readings that far apart in meaning are not a typo to fix silently.
+        if (isArticleRunOn(normalized)) return null
+
         // Search the base trie for candidates within [MAX_EDIT_COST]. The typed word
         // itself competes as its own zero-cost candidate, so a correction only fires
         // when a nearby word beats what the user actually typed under the
         // cost-penalized score. This deliberately replaces an absolute
         // is-in-dictionary veto, which let junk dictionary entries (e.g. a terminal
         // "thw") suppress obvious corrections like "thw" to "the".
+        val base = candidatesFor(normalized) ?: return null
+        val eligible = withPersonalWords(normalized, base, personalWords)
+
+        // Whether a correction fires at all is settled first, and without context.
+        //
+        // This ordering is the whole safety argument. The typed word competes as its own
+        // zero-cost candidate, and "it won, so leave it alone" is what stops a correctly
+        // spelled word being rewritten. Fold context into that decision and a strong
+        // enough follower can outscore a word the user typed perfectly -- which is
+        // real-word correction, the one thing this engine has always refused to do.
+        val plainBest =
+            eligible.maxByOrNull { it.first.score / penaltyFor(it.second) } ?: return null
+        // The typed word won: it is credible enough as-is, leave it alone.
+        if (plainBest.first.word == normalized) return null
+        // Correction must itself clear a minimum credibility bar.
+        if (plainBest.first.score / penaltyFor(plainBest.second) <= MIN_CORRECTION_SCORE) {
+            return null
+        }
+
+        // Restraint (roadmap 4R.3). A wrong correction costs the user a rewrite, a missed one
+        // costs a typo, so a winner that only *beat* the alternatives is not enough.
+        //
+        // First, the winner has to be close. Frequency can carry a candidate several edits
+        // away past the bar above -- "zorbly" became "only" -- and a word that far from
+        // anything is far more likely a word the dictionary does not know than a typo of a
+        // common one. Leaving it alone is also what lets it be learned.
+        if (plainBest.second > normalized.length * MAX_COST_PER_LETTER) return null
+        // Second, a dropped repeated letter is as ordinary a slip as a mispressed key, so
+        // when that reading is real and competitive the word is ambiguous: "helo" is one key
+        // from "help" and one tap short of "hello".
+        if (hasCompetingDoubledReading(normalized, plainBest)) return null
+
+        // Only now does the sentence get a say, and only over *which* correction wins.
+        // Every candidate here clears the same bar the unconditional winner just cleared,
+        // so context reorders real corrections and can promote nothing else. With no
+        // previous word every boost is zero and this necessarily re-elects [plainBest],
+        // which is what keeps the contextless path byte-identical.
+        //
+        // Context also may not reach for a candidate that needs more editing than the plain
+        // winner. That is how "at thier" became "at the": two deletions outranked one
+        // transposition because "the" follows "at" so often.
+        val best =
+            eligible
+                .filter { it.second <= plainBest.second }
+                .filter { it.first.score / penaltyFor(it.second) > MIN_CORRECTION_SCORE }
+                .maxByOrNull {
+                    (it.first.score + languageModel.boostFor(previousWord, it.first.word)) /
+                        penaltyFor(it.second)
+                }
+                ?: return null
+        // Context defended the typed word against a correction that would otherwise have
+        // fired. Fewer corrections is always the safe direction, so this is allowed to.
+        if (best.first.word == normalized) return null
+        return best.first.word
+    }
+
+    /**
+     * What to offer in the strip for a word autocorrect left alone, best first.
+     *
+     * The other half of restraint: a correction that is not certain enough to apply is still
+     * worth one tap. Empty for a dictionary word, which needs no offer, and the same closeness
+     * limit as [nearestWord] applies, so a word nothing is near gets nothing. A run-on with
+     * "a" or "i" offers the split itself first, since that is the likeliest reading.
+     */
+    internal fun offersFor(
+        normalized: String,
+        personalWords: List<Pair<String, Float>> = emptyList(),
+        limit: Int = 3,
+    ): List<String> {
+        if (frequencyOf(normalized) != null) return emptyList()
+        val split =
+            if (isArticleRunOn(normalized)) {
+                listOf(normalized.take(1) + " " + normalized.substring(1))
+            } else {
+                emptyList()
+            }
+        val base = candidatesFor(normalized) ?: return split
+        val near =
+            withPersonalWords(normalized, base, personalWords)
+                .filter { it.first.word != normalized }
+                .filter { it.second <= normalized.length * MAX_COST_PER_LETTER }
+                .sortedByDescending { it.first.score / penaltyFor(it.second) }
+                .map { it.first.word }
+        return (split + near).distinct().take(limit)
+    }
+
+    /**
+     * Every base-dictionary word within [MAX_EDIT_COST] of [normalized] that is common enough to
+     * be worth correcting to, paired with its weighted edit cost. The typed word itself is among
+     * them at cost 0 when it is a dictionary word. Null when the dictionary cannot be read.
+     */
+    internal fun candidatesFor(normalized: String): List<Pair<Suggestion, Int>>? {
         val candidates = mutableListOf<Pair<Suggestion, Int>>()
         val buf = dictionary() ?: return null
 
@@ -93,42 +215,63 @@ internal class SpellingCorrector(
         } catch (e: Exception) {
             return null
         }
+        return candidates.filter { it.first.score > 10f } // minimum frequency
+    }
 
-        val eligible = candidates.filter { it.first.score > 10f } // minimum frequency
-
-        // Whether a correction fires at all is settled first, and without context.
-        //
-        // This ordering is the whole safety argument. The typed word competes as its own
-        // zero-cost candidate, and "it won, so leave it alone" is what stops a correctly
-        // spelled word being rewritten. Fold context into that decision and a strong
-        // enough follower can outscore a word the user typed perfectly -- which is
-        // real-word correction, the one thing this engine has always refused to do.
-        val plainBest =
-            eligible.maxByOrNull { it.first.score / penaltyFor(it.second) } ?: return null
-        // The typed word won: it is credible enough as-is, leave it alone.
-        if (plainBest.first.word == normalized) return null
-        // Correction must itself clear a minimum credibility bar.
-        if (plainBest.first.score / penaltyFor(plainBest.second) <= MIN_CORRECTION_SCORE) {
-            return null
+    /**
+     * [base] plus every personal word within [MAX_EDIT_COST] of [normalized]. A word in both
+     * keeps the higher of its two scores rather than appearing twice.
+     */
+    private fun withPersonalWords(
+        normalized: String,
+        base: List<Pair<Suggestion, Int>>,
+        personalWords: List<Pair<String, Float>>,
+    ): List<Pair<Suggestion, Int>> {
+        if (personalWords.isEmpty()) return base
+        val merged = base.associateBy { it.first.word }.toMutableMap()
+        for ((word, score) in personalWords) {
+            val cost = weightedEditCost(normalized, word)
+            if (cost > MAX_EDIT_COST) continue
+            val existing = merged[word]
+            if (existing == null || existing.first.score < score) {
+                merged[word] = Suggestion(word, score) to cost
+            }
         }
+        return merged.values.toList()
+    }
 
-        // Only now does the sentence get a say, and only over *which* correction wins.
-        // Every candidate here clears the same bar the unconditional winner just cleared,
-        // so context reorders real corrections and can promote nothing else. With no
-        // previous word every boost is zero and this necessarily re-elects [plainBest],
-        // which is what keeps the contextless path byte-identical.
-        val best =
-            eligible
-                .filter { it.first.score / penaltyFor(it.second) > MIN_CORRECTION_SCORE }
-                .maxByOrNull {
-                    (it.first.score + languageModel.boostFor(previousWord, it.first.word)) /
-                        penaltyFor(it.second)
-                }
-                ?: return null
-        // Context defended the typed word against a correction that would otherwise have
-        // fired. Fewer corrections is always the safe direction, so this is allowed to.
-        if (best.first.word == normalized) return null
-        return best.first.word
+    /**
+     * Whether [normalized] reads as "a" or "i" run into a common word: "alot", "ilike".
+     *
+     * Only for a word that is not itself in the dictionary, so "atone", "aside" and "item"
+     * are untouched. A missed space and a misspelling are both plausible here and they point
+     * at words with different meanings, which is the case autocorrect should stay out of.
+     */
+    private fun isArticleRunOn(normalized: String): Boolean {
+        if (normalized.length < 3) return false
+        if (normalized[0] != 'a' && normalized[0] != 'i') return false
+        if (frequencyOf(normalized) != null) return false
+        val rest = frequencyOf(normalized.substring(1)) ?: return false
+        return rest >= MIN_SPLIT_FREQUENCY
+    }
+
+    /**
+     * Whether doubling one letter of [normalized] gives a real word other than [winner] that
+     * scores within [DOUBLED_READING_RATIO] of it, as a dropped repeated letter would cost.
+     */
+    private fun hasCompetingDoubledReading(
+        normalized: String,
+        winner: Pair<Suggestion, Int>,
+    ): Boolean {
+        val winnerScore = winner.first.score / penaltyFor(winner.second)
+        for (i in normalized.indices) {
+            val head = normalized.substring(0, i + 1)
+            val doubled = head + normalized[i] + normalized.substring(i + 1)
+            if (doubled == winner.first.word) continue
+            val freq = frequencyOf(doubled) ?: continue
+            if (freq / penaltyFor(COST_GAP) >= winnerScore * DOUBLED_READING_RATIO) return true
+        }
+        return false
     }
 
     /**
@@ -367,4 +510,44 @@ internal class SpellingCorrector(
         val buf = dictionary() ?: return null
         return trieFrequencyOf(buf, word)
     }
+}
+
+/**
+ * The weighted edit cost from [typed] to [candidate], on the same scale and with the same
+ * transposition rule the trie walk uses.
+ *
+ * The trie walk computes this one row per node so it can prune; personal words are not in
+ * the trie, and there are few enough of them to score each one directly. Keeping both on one
+ * set of constants is what lets a learned word and a dictionary word compete fairly.
+ */
+internal fun weightedEditCost(
+    typed: String,
+    candidate: String,
+): Int {
+    val rows = Array(candidate.length + 1) { IntArray(typed.length + 1) }
+    for (i in 0..typed.length) rows[0][i] = i * COST_GAP
+    for (j in 1..candidate.length) {
+        rows[j][0] = j * COST_GAP
+        val c = candidate[j - 1]
+        for (i in 1..typed.length) {
+            val t = typed[i - 1]
+            val substitution =
+                when {
+                    t == c -> 0
+                    KeyProximity.areAdjacent(t, c) -> COST_ADJACENT_SUBSTITUTE
+                    else -> COST_SUBSTITUTE
+                }
+            var cost =
+                minOf(
+                    rows[j][i - 1] + COST_GAP,
+                    rows[j - 1][i] + COST_GAP,
+                    rows[j - 1][i - 1] + substitution,
+                )
+            if (i >= 2 && j >= 2 && typed[i - 1] == candidate[j - 2] && typed[i - 2] == c) {
+                cost = minOf(cost, rows[j - 2][i - 2] + COST_TRANSPOSE)
+            }
+            rows[j][i] = cost
+        }
+    }
+    return rows[candidate.length][typed.length]
 }

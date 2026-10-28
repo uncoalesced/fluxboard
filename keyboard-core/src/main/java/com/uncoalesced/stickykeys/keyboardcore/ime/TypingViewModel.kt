@@ -649,10 +649,22 @@ class TypingViewModel
             return ++generation
         }
 
-        /** Learns a word the user kept as-is (no correction applied). */
-        fun onWordAccepted(word: String) {
+        /**
+         * Learns a word the user kept as-is (no correction applied).
+         *
+         * [offerCorrections] is true only when a space ended the word, because only then does
+         * the text end in exactly "word " -- the span a tapped offer replaces.
+         */
+        fun onWordAccepted(
+            word: String,
+            offerCorrections: Boolean = false,
+        ) {
             if (word.isNotBlank()) {
                 learn(word)
+                if (offerCorrections && !_fieldKind.value.isSensitive) {
+                    offerCorrectionsOrPredict(word)
+                    return
+                }
                 // The word just became the context, so ask what usually follows it. This is the
                 // exact moment issue #17 describes: a word finished, space pressed, and a strip
                 // that had nothing to say because the completion path short-circuits on an empty
@@ -665,14 +677,61 @@ class TypingViewModel
             }
         }
 
-        /** Autocorrect lookup against an explicit word, so it cannot race [currentWord]. */
-        suspend fun getAutoCorrectionFor(word: String): String? {
+        /**
+         * Puts the corrections autocorrect declined for [word] in the strip, or the ordinary
+         * next-word predictions when there are none.
+         *
+         * Restraint (roadmap 4R.3) means "helo" is no longer rewritten to "help", but the user
+         * should still be one tap from either "help" or "hello". A tap replaces "helo " the way
+         * a tapped glide alternative replaces the glided word; see [consumeOfferedWord].
+         */
+        private fun offerCorrectionsOrPredict(word: String) {
+            val token = generation
+            viewModelScope.launch {
+                val offers = predictionEngine.getCorrectionOffers(word)
+                if (token != generation) return@launch
+                if (offers.isEmpty()) {
+                    updateSuggestions()
+                    return@launch
+                }
+                _suggestions.value = offers.take(MAX_STRIP_SUGGESTIONS)
+                lastOfferedWord = word
+                lastOfferedGeneration = generation
+            }
+        }
+
+        private var lastOfferedWord: String? = null
+        private var lastOfferedGeneration = -1
+
+        /**
+         * The word the strip is currently offering corrections for, if the text has not moved
+         * since. Same contract as [consumeGlideCommit]: the caller replaces "word " with the
+         * tapped offer, and any edit in between invalidates it through the generation token.
+         *
+         * Deliberately separate from the glide state. A backspace straight after a glide
+         * removes the whole word, because one gesture put it there; a backspace after a typed
+         * word that merely has offers showing must stay an ordinary one-character delete.
+         */
+        fun consumeOfferedWord(): String? {
+            val word = lastOfferedWord ?: return null
+            lastOfferedWord = null
+            return if (lastOfferedGeneration == generation) word else null
+        }
+
+        /**
+         * Autocorrect lookup against an explicit word, so it cannot race [currentWord].
+         * [startsClause] is read from the editor by the caller; see `startsClause`.
+         */
+        suspend fun getAutoCorrectionFor(
+            word: String,
+            startsClause: Boolean = false,
+        ): String? {
             // Never on a secret, for two separate reasons: the lookup itself puts the password
             // through the dictionary, and a correction that fired would silently rewrite what
             // the user typed into a field where they cannot see it to check.
             if (_fieldKind.value.isSensitive) return null
             if (word.isBlank() || !keyboardPreferences.autoCorrectEnabled.value) return null
-            return predictionEngine.getAutoCorrection(word, previousWord)
+            return predictionEngine.getAutoCorrection(word, previousWord, startsClause)
         }
 
         fun onAutoCorrected(
@@ -687,10 +746,62 @@ class TypingViewModel
             learn(corrected)
         }
 
-        fun onUndoApplied() {
+        /**
+         * The undo chip put [original] back.
+         *
+         * Undoing a correction is the user saying the word is real, so it is kept: see
+         * [PredictionEngine.keepWord]. Without this the correction learned the replacement and
+         * nothing learned the original, so undoing "zorbly" -> "only" taught the dictionary
+         * "only" and the same correction fired again on the next "zorbly" (roadmap 4R.3).
+         */
+        fun onUndoApplied(original: String) {
             usageLog.onAutocorrectUndone()
             typingStats.recordAutocorrectUndone()
             _undoState.value = null
+            keep(original)
+        }
+
+        /**
+         * The correction a backspace pressed now should take back, or null for an ordinary
+         * delete.
+         *
+         * Only straight after the correction, while the text still ends in exactly what the
+         * space path wrote ("corrected "). Anything typed, deleted or moved since clears the
+         * undo state or changes that ending, so a later backspace is never mistaken for one.
+         */
+        fun autocorrectToRevert(textBeforeCursor: String): UndoAction? {
+            val undo = _undoState.value ?: return null
+            return if (textBeforeCursor.endsWith(undo.corrected + " ")) undo else null
+        }
+
+        /**
+         * A backspace took back a correction: the caller replaced "corrected " with [original],
+         * with the caret at the end of it, so the user can keep editing the word they typed.
+         *
+         * Kept, like an undo from the chip, so pressing space again does not re-apply the same
+         * correction. The word under the caret is [original] again, and the strip follows it.
+         */
+        fun onAutocorrectReverted(original: String) {
+            usageLog.onBackspace()
+            typingStats.recordBackspace()
+            usageLog.onAutocorrectUndone()
+            typingStats.recordAutocorrectUndone()
+            _undoState.value = null
+            backspacedWord = null
+            currentWord = original
+            generation++
+            atSentenceStart = false
+            publishAutoCapitalize()
+            keep(original)
+            updateSuggestions()
+        }
+
+        /** [PredictionEngine.keepWord] behind the same incognito gate as [learn]. */
+        private fun keep(word: String) {
+            if (word.isBlank() || incognitoState.active.value) return
+            viewModelScope.launch {
+                predictionEngine.keepWord(word)
+            }
         }
 
         /**

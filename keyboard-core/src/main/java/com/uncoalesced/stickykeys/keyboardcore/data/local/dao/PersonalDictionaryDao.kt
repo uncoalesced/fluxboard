@@ -17,6 +17,15 @@ interface PersonalDictionaryDao {
         limit: Int,
     ): List<PersonalWordEntity>
 
+    /** The words used at least [minFrequency] times, commonest first. */
+    @Query(
+        "SELECT * FROM personal_dictionary WHERE frequency >= :minFrequency ORDER BY frequency DESC LIMIT :limit",
+    )
+    fun getFrequentWords(
+        minFrequency: Int,
+        limit: Int,
+    ): List<PersonalWordEntity>
+
     @Query("SELECT * FROM personal_dictionary WHERE word = :word LIMIT 1")
     fun getWord(word: String): PersonalWordEntity?
 

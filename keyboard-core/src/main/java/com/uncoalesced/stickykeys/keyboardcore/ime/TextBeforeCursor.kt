@@ -25,6 +25,22 @@ internal fun wordUnderCaret(textBeforeCursor: String): String =
         .dropWhile { it == '\'' }
 
 /**
+ * Whether the word at the end of [textBeforeCursor] opens a clause: it is the first thing in
+ * the field, or the last thing before it (spaces aside) is a comma, a colon or semicolon, a
+ * sentence end, an opening bracket or a line break.
+ *
+ * Used to tell "ill" the contraction from "ill" the adjective. "Okay, ill call" and
+ * "(ill be late)" open a clause, where the adjective cannot stand; "I am ill" does not.
+ */
+internal fun startsClause(textBeforeCursor: String): Boolean {
+    val word = wordUnderCaret(textBeforeCursor)
+    val before = textBeforeCursor.dropLast(word.length).trimEnd(' ', '\t')
+    return before.isEmpty() || before.last() in CLAUSE_OPENERS
+}
+
+private const val CLAUSE_OPENERS = ",;:.!?(\n"
+
+/**
  * How many characters a word-wise backspace should remove, given the text before the caret.
  *
  * Trailing whitespace first, then the run of non-whitespace before it -- so a caret just after
