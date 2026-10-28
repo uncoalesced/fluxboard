@@ -43,8 +43,9 @@ import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_COLOR_ANIM_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_ELEVATION_SINK
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_SCALE
-import com.uncoalesced.stickykeys.keyboardcore.theme.PressSpring
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.motionMs
+import com.uncoalesced.stickykeys.keyboardcore.theme.pressAnimationSpec
 import com.uncoalesced.stickykeys.keyboardcore.theme.pressedFill
 
 /**
@@ -119,13 +120,13 @@ internal fun KeyboardKey(
             pressTarget,
             // Down has to be immediate or the feedback arrives after the character does.
             // Release keeps the tween so the key fades back rather than snapping.
-            animationSpec = tween(if (pressed.value) 0 else PRESS_COLOR_ANIM_MS),
+            animationSpec = tween(if (pressed.value) 0 else motionMs(PRESS_COLOR_ANIM_MS)),
             label = "key-background",
         )
     val animatedForeground by
         animateColorAsState(
             foreground,
-            animationSpec = tween(PRESS_COLOR_ANIM_MS),
+            animationSpec = tween(motionMs(PRESS_COLOR_ANIM_MS)),
             label = "key-foreground",
         )
 
@@ -136,7 +137,7 @@ internal fun KeyboardKey(
     val pressScale by
         animateFloatAsState(
             targetValue = if (pressed.value) PRESS_SCALE else 1f,
-            animationSpec = PressSpring,
+            animationSpec = pressAnimationSpec(),
             label = "key-scale",
         )
     // Driven off the theme's own haze radius rather than a constant, so this compresses the
@@ -152,7 +153,7 @@ internal fun KeyboardKey(
                 } else {
                     restingElevation
                 },
-            animationSpec = tween(if (pressed.value) 0 else PRESS_COLOR_ANIM_MS),
+            animationSpec = tween(if (pressed.value) 0 else motionMs(PRESS_COLOR_ANIM_MS)),
             label = "key-elevation",
         )
 

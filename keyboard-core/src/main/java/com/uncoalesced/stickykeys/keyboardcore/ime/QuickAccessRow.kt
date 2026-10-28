@@ -38,9 +38,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.R
+import com.uncoalesced.stickykeys.keyboardcore.theme.CHEVRON_TURN_MS
+import com.uncoalesced.stickykeys.keyboardcore.theme.MotionEaseOut
 import com.uncoalesced.stickykeys.keyboardcore.theme.PANEL_FADE_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysColors
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.motionMs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -104,7 +107,13 @@ internal fun QuickAccessToggle(
     modifier: Modifier = Modifier,
 ) {
     // One asset rotated, rather than an up and a down drawable that can drift apart.
-    val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "quick-chevron")
+    // A short ease-out tween rather than the default spring: a chevron that turns over should
+    // land, not settle. A rotation is a draw-time transform and never changes measurement.
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(motionMs(CHEVRON_TURN_MS), easing = MotionEaseOut),
+        label = "quick-chevron",
+    )
     Box(
         modifier =
             modifier
@@ -170,8 +179,8 @@ internal fun QuickAccessRow(
         // One resize, then a fade over it. The window reaches its final size in a single layout
         // pass and the icons arrive over the space that is already there, so the motion the eye
         // follows costs nothing to draw.
-        enter = fadeIn(tween(PANEL_FADE_MS)),
-        exit = fadeOut(tween(PANEL_FADE_MS)),
+        enter = fadeIn(tween(motionMs(PANEL_FADE_MS), easing = MotionEaseOut)),
+        exit = fadeOut(tween(motionMs(PANEL_FADE_MS), easing = MotionEaseOut)),
         modifier = modifier,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

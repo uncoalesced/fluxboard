@@ -2,6 +2,9 @@
 package com.uncoalesced.stickykeys.ui.screens
 
 import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -10,32 +13,28 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,11 +56,13 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
 import com.uncoalesced.stickykeys.R
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.transfer.migration.MigrationClient
 import com.uncoalesced.stickykeys.transfer.migration.MigrationClientState
 import com.uncoalesced.stickykeys.transfer.migration.MigrationServer
 import com.uncoalesced.stickykeys.transfer.migration.MigrationServerState
 import com.uncoalesced.stickykeys.transfer.pairing.PairingManager
+import com.uncoalesced.stickykeys.ui.components.brandCheckboxColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -137,12 +139,30 @@ class DevicePairingViewModel
         }
     }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Moving stickers to another phone, drawn inline at the foot of Settings.
+ *
+ * This was a screen of its own, first a dock tab and then a pushed route with an app bar. It is
+ * something done about once per phone, so it now lives where the rest of the one-off actions
+ * are, and the graph's top level is just the three dock screens.
+ *
+ * Leaving Settings stops whatever transfer is in flight, which the old back arrow also did. The
+ * reset is tied to this section leaving composition, not to the activity stopping: launching
+ * the QR scanner stops the activity, and so does the screen switching off, and neither should
+ * kill a transfer. A configuration change is skipped for the same reason.
+ */
 @Composable
-fun DevicePairingScreen(
+fun TransferSection(
+    modifier: Modifier = Modifier,
     viewModel: DevicePairingViewModel = hiltViewModel(),
-    onBack: () -> Unit,
 ) {
+    val activity = LocalContext.current.findActivity()
+    DisposableEffect(viewModel) {
+        onDispose {
+            if (activity?.isChangingConfigurations != true) viewModel.reset()
+        }
+    }
+
     val state by viewModel.uiState.collectAsState()
     val serverState by viewModel.migrationServer.state.collectAsState()
     val clientState by viewModel.migrationClient.state.collectAsState()
@@ -247,86 +267,80 @@ fun DevicePairingScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.text_device_pairing)) },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        viewModel.reset()
-                        onBack()
-                    }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.desc_back),
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        // Top-aligned, not centred.
-        //
-        // `Arrangement.Center` on a `fillMaxSize()` column centres the content in the whole
-        // remaining window, which on a tall phone leaves a screen's worth of empty space
-        // between the app bar and the first line of text -- the page reads as broken rather
-        // than as deliberately airy, and the buttons end up under the thumb only by accident.
-        // The idle state here is three short controls; they belong under the heading.
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top,
-        ) {
-            // Determine what to show based on client and server states
-            when {
-                clientState !is MigrationClientState.Idle -> {
-                    ClientProgressView(clientState, viewModel::reset)
-                }
-                serverState !is MigrationServerState.Idle -> {
-                    ServerProgressView(serverState, state, viewModel::reset)
-                }
-                else -> {
-                    // Idle state
-                    Text(
-                        text = "Migrate your stickers to another device over your local network.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(bottom = 24.dp),
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Top,
+    ) {
+        when {
+            clientState !is MigrationClientState.Idle -> {
+                ClientProgressView(clientState, viewModel::reset)
+            }
+            serverState !is MigrationServerState.Idle -> {
+                ServerProgressView(serverState, state, viewModel::reset)
+            }
+            else -> {
+                Text(
+                    text = stringResource(R.string.text_transfer_row_summary),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = includeClipboard,
+                        onCheckedChange = { includeClipboard = it },
+                        colors = brandCheckboxColors(),
                     )
+                    Text(
+                        stringResource(R.string.text_include_clipboard_history_sensitive),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Checkbox(
-                            checked = includeClipboard,
-                            onCheckedChange = { includeClipboard = it },
-                        )
-                        Text(stringResource(R.string.text_include_clipboard_history_sensitive))
-                    }
-
+                // Side by side rather than stacked: two equal choices, and a 56dp pair of
+                // full-width buttons was most of a screen for a section that is used once.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Button(
                         onClick = { viewModel.startSenderFlow(includeClipboard) },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        // The one primary action here, so the accent fill with a black label
+                        // (5.18), as the brand kit draws an accent button.
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = StickyKeysTheme.colors.primary,
+                                contentColor = StickyKeysTheme.colors.onPrimary,
+                            ),
+                        modifier = Modifier.weight(1f).height(48.dp),
                     ) {
-                        Text(stringResource(R.string.text_i_am_the_sender_show_qr))
+                        Text(stringResource(R.string.text_transfer_send))
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
                     OutlinedButton(
                         onClick = { beginScan() },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        modifier = Modifier.weight(1f).height(48.dp),
                     ) {
-                        Text(stringResource(R.string.text_i_am_the_receiver_scan_qr))
+                        Text(stringResource(R.string.text_transfer_receive))
                     }
                 }
             }
         }
     }
+}
+
+/** The hosting activity, unwrapping any ContextWrapper the theme or Hilt put around it. */
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
 }
 
 @Composable
@@ -353,7 +367,16 @@ fun ServerProgressView(
                     Image(
                         bitmap = uiState.bitmap.asImageBitmap(),
                         contentDescription = stringResource(R.string.desc_pairing_qr_code),
-                        modifier = Modifier.size(300.dp),
+                        // On a white tile with a margin. The bitmap's light modules are
+                        // transparent, so on the card it drew dark-on-dark with no quiet
+                        // zone, which is hard to read for a person and harder for a scanner.
+                        // White is the one colour here that is not a palette choice: it is
+                        // what QR readers expect behind the code.
+                        modifier =
+                            Modifier
+                                .size(280.dp)
+                                .background(Color.White, RoundedCornerShape(12.dp))
+                                .padding(16.dp),
                     )
                 }
                 Spacer(modifier = Modifier.height(32.dp))

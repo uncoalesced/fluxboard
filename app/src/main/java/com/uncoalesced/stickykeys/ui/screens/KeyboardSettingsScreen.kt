@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -17,15 +16,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -43,11 +46,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -55,6 +59,11 @@ import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.ScreenHeading
+import com.uncoalesced.stickykeys.ui.components.SettingsGroup
+import com.uncoalesced.stickykeys.ui.components.brandSliderColors
+import com.uncoalesced.stickykeys.ui.components.brandSwitchColors
+import java.text.NumberFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,6 +165,10 @@ fun KeyboardSettingsScreen(
             // test against whichever labels the caller passes. No fuzzy matching, no
             // indexing -- the whole screen is under 30 items, so a linear scan per
             // recomposition costs nothing worth optimizing for.
+            val keyboardIcon = ImageVector.vectorResource(R.drawable.ic_nav_keyboard)
+            val tuneIcon = ImageVector.vectorResource(R.drawable.ic_tune)
+            val themeIcon = ImageVector.vectorResource(R.drawable.ic_theme_mode)
+
             fun matches(vararg labels: String) =
                 searchQuery.isBlank() || labels.any { it.contains(searchQuery, ignoreCase = true) }
 
@@ -166,45 +179,53 @@ fun KeyboardSettingsScreen(
                         .padding(16.dp)
                         .verticalScroll(rememberScrollState()),
             ) {
-                Text(
-                    text = "Keyboard Settings",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 16.dp),
+                ScreenHeading(
+                    text = "Keyboard",
+                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
                 )
 
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search settings") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                )
-
-                // Hides itself once the keyboard is both enabled and selected.
+                // Hides itself once the keyboard is both enabled and selected. Above the
+                // stats, because until it is gone there is nothing to count.
                 com.uncoalesced.stickykeys.ui.components
                     .KeyboardSetupCard()
 
-                // One-time nudge, due only after the keyboard is enabled and the user has
-                // been into a customiser. Shows itself at most once, ever.
-                com.uncoalesced.stickykeys.ui.components
-                    .DefaultKeyboardPrompt(viewModel.appPreferences)
-
                 // YOUR TYPING
                 //
-                // First on the screen rather than last. Everything below it is a control the
-                // user came here to change; this is the one group they came here to *read*,
-                // and at the bottom of a long scroll it was reached by accident or not at
-                // all. Present in every build, unlike the diagnostics group at the foot of
-                // the screen -- this is the user's own data rather than a tester artefact,
-                // and it never leaves the device. There is no share action here on purpose.
-                if (matches("Your typing", "speed", "accuracy", "stats")) {
-                    SettingsGroup(title = "Your typing") {
-                        StatRow("Keys typed", stats.keystrokes.toString())
-                        // Counted at the word boundary, not derived by dividing keystrokes by
-                        // five the way the WPM figure below it is. A glide is one word and a
-                        // handful of keystrokes; the two numbers are allowed to disagree.
-                        StatRow("Words typed", stats.words.toString())
+                // First on the screen, above even the search field. Everything below it is a
+                // control the user came here to change; this is the one group they came here
+                // to *read*, and at the bottom of a long scroll it was reached by accident or
+                // not at all. Present in every build, unlike the diagnostics group at the
+                // foot of the screen -- this is the user's own data rather than a tester
+                // artefact, and it never leaves the device. There is no share action here on
+                // purpose.
+                //
+                // Not filtered by the search, unlike every group below. It sits above the
+                // search field now, and hiding it as the user types would pull the field up
+                // out from under their thumb on the first keystroke.
+                run {
+                    SettingsGroup(
+                        title = "Your typing",
+                        icon = ImageVector.vectorResource(R.drawable.ic_stats),
+                    ) {
+                        // The two counts as figures rather than rows: they are what the panel
+                        // is for, and side by side they read as a pair. Words are counted at
+                        // the word boundary, not derived by dividing keystrokes by five the
+                        // way the speed below is, so a glide is one word and several keys and
+                        // the two numbers are allowed to disagree.
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        ) {
+                            StatFigure(
+                                label = "Keys typed",
+                                value = stats.keystrokes,
+                                modifier = Modifier.weight(1f),
+                            )
+                            StatFigure(
+                                label = "Words typed",
+                                value = stats.words,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                         StatRow(
                             "Speed",
                             stats.wordsPerMinute?.let { "$it words a minute" }
@@ -246,9 +267,26 @@ fun KeyboardSettingsScreen(
                     }
                 }
 
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search settings") },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
+                    },
+                    singleLine = true,
+                    shape = StickyKeysTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                )
+
+                // One-time nudge, due only after the keyboard is enabled and the user has
+                // been into a customiser. Shows itself at most once, ever.
+                com.uncoalesced.stickykeys.ui.components
+                    .DefaultKeyboardPrompt(viewModel.appPreferences)
+
                 // TYPING
                 if (matches(labelAutoCap, labelAutoCorrect, labelGlideTyping, labelDoubleSpace)) {
-                    SettingsGroup(title = "Typing") {
+                    SettingsGroup(title = "Typing", icon = keyboardIcon) {
                         if (matches(labelAutoCap)) {
                             SettingsSwitchRow(
                                 title = labelAutoCap,
@@ -284,7 +322,7 @@ fun KeyboardSettingsScreen(
 
                 // SIZE & FEEL
                 if (matches(labelHeight, labelKeySize, labelVibration, labelBottomPadding)) {
-                    SettingsGroup(title = "Size & feel") {
+                    SettingsGroup(title = "Size & feel", icon = tuneIcon) {
                         if (matches(labelHeight, summaryHeight)) {
                             SettingsSliderRow(
                                 title = labelHeight,
@@ -377,7 +415,7 @@ fun KeyboardSettingsScreen(
 
                 // APPEARANCE
                 if (matches(labelTheme, labelLayout, labelNumberRow, labelKeyHints)) {
-                    SettingsGroup(title = "Appearance") {
+                    SettingsGroup(title = "Appearance", icon = themeIcon) {
                         var themeDropdownExpanded by remember { mutableStateOf(false) }
                         var layoutDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -515,7 +553,7 @@ fun KeyboardSettingsScreen(
 
                 // PRIVACY
                 if (matches(labelPrivateMode, labelClearClipboard)) {
-                    SettingsGroup(title = "Privacy") {
+                    SettingsGroup(title = "Privacy", icon = Icons.Outlined.Lock) {
                         if (matches(labelPrivateMode, summaryPrivateMode)) {
                             SettingsSwitchRow(
                                 title = labelPrivateMode,
@@ -585,7 +623,7 @@ fun KeyboardSettingsScreen(
                 // layout does to the renderer, throwing both away returns the user to a
                 // keyboard that is known to draw.
                 if (matches(labelResetAppearance, summaryResetAppearance)) {
-                    SettingsGroup(title = "If something breaks") {
+                    SettingsGroup(title = "If something breaks", icon = Icons.Outlined.Refresh) {
                         Text(
                             summaryResetAppearance,
                             style = MaterialTheme.typography.bodySmall,
@@ -640,7 +678,7 @@ fun KeyboardSettingsScreen(
                 // compile-time false there, so this whole block folds away rather than
                 // showing a control for a file that is never written.
                 if (viewModel.usageLoggingEnabled) {
-                    SettingsGroup(title = "Diagnostics") {
+                    SettingsGroup(title = "Diagnostics", icon = Icons.Outlined.Info) {
                         Text(
                             "This build keeps a local file of session lengths and key counts. " +
                                 "No typed text is recorded, and nothing is ever sent anywhere " +
@@ -694,45 +732,29 @@ fun KeyboardSettingsScreen(
 }
 
 /**
- * The grouping unit for 2c's restructure: an 11px uppercase label over a rounded card.
+ * One headline count: a large number over a small label.
  *
- * Deliberately not exported beyond this file -- nothing else uses it yet, and a settings
- * screen elsewhere reaching for the same look is a real future use, not a speculative one,
- * so promoting it to a shared component is better done when that use actually shows up.
+ * The number is in the body colour, not the accent. Watermelon is a fill under this palette and
+ * measures 3.12 on the card, so a number in it would be decoration rather than a reading.
  */
 @Composable
-private fun SettingsGroup(
-    title: String,
+private fun StatFigure(
+    label: String,
+    value: Long,
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+    Column(modifier = modifier) {
         Text(
-            text = title.uppercase(),
-            fontSize = 11.sp,
-            letterSpacing = 0.6.sp,
-            style = MaterialTheme.typography.labelSmall,
-            // The accent rather than muted grey. The palette has an accent and this screen
-            // was not using it anywhere except a switch thumb, so a long settings page read
-            // as one undifferentiated grey column and the section headings did not separate
-            // it into sections. Fern measures 8.19 against this background, which is the
-            // highest contrast in the palette, so the smallest text on the screen is also
-            // the most legible rather than the least.
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            text = NumberFormat.getIntegerInstance().format(value),
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
         )
-        Card(
-            shape = StickyKeysTheme.shapes.large,
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                content = content,
-            )
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -777,7 +799,7 @@ private fun WeekBars(counts: List<Long>) {
                         .weight(1f)
                         .fillMaxHeight(fraction)
                         .background(
-                            MaterialTheme.colorScheme.primary,
+                            StickyKeysTheme.colors.primary,
                             StickyKeysTheme.shapes.small,
                         ),
             )
@@ -807,7 +829,11 @@ private fun SettingsSwitchRow(
                 )
             }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = brandSwitchColors(),
+        )
     }
 }
 
@@ -857,6 +883,7 @@ private fun SettingsSliderRow(
         }
         Slider(
             value = value,
+            colors = brandSliderColors(),
             onValueChange = onValueChange,
             valueRange = valueRange,
             steps = steps,

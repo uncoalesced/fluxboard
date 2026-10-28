@@ -160,7 +160,7 @@ fun VideoTrimScreen(
                     }) {
                         Text(
                             stringResource(R.string.text_next),
-                            color = StickyKeysTheme.colors.primary,
+                            color = StickyKeysTheme.colors.accentText,
                         )
                     }
                 },

@@ -6,7 +6,6 @@
     <string name="text_manage_categories">Manage Categories</string>
     <string name="text_add_rename_or_delete_your_sticker_categories">Add, rename, or delete your sticker categories</string>
     <string name="text_default_export_format">Default Export Format</string>
-    <string name="text_device_pairing">Device Pairing</string>
     <string name="text_styles">Styles</string>
     <string name="text_library_empty_title">No stickers yet</string>
     <string name="text_library_empty_body">Make one from a photo, a screenshot or a video clip using the buttons below.</string>
@@ -20,8 +19,9 @@
     <string name="desc_back">Back</string>
     <string name="desc_delete_category">Delete category</string>
     <string name="text_include_clipboard_history_sensitive">Include Clipboard History (Sensitive)</string>
-    <string name="text_i_am_the_sender_show_qr">I am the Sender (Show QR)</string>
-    <string name="text_i_am_the_receiver_scan_qr">I am the Receiver (Scan QR)</string>
+    <string name="text_stickers_group">Stickers</string>
+    <string name="text_transfer_send">Send</string>
+    <string name="text_transfer_receive">Receive</string>
     <string name="text_scan_this_code_on_the_receiving_device">Scan this code on the receiving device</string>
     <string name="text_warning_sending_clipboard_history">Warning: Sending clipboard history</string>
     <string name="text_cancel">Cancel</string>

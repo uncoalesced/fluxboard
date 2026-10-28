@@ -177,6 +177,12 @@ class TypingViewModel
         val inputSession: StateFlow<Int> = _inputSession
 
         /**
+         * The symbols page the `?123` key opens on. Outlives [inputSession] on purpose: the page
+         * showing resets with the session, the user's choice of page does not.
+         */
+        internal val symbolsPageMemory = SymbolsPageMemory()
+
+        /**
          * What kind of input is in front of the user, after the manual switch is folded in.
          *
          * Drives the digits-only PIN grid and, together with [incognito], everything that must

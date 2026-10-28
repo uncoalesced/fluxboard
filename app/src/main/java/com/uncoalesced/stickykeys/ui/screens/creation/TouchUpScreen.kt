@@ -138,7 +138,7 @@ fun TouchUpScreen(
                     }) {
                         Text(
                             stringResource(R.string.text_next),
-                            color = StickyKeysTheme.colors.primary,
+                            color = StickyKeysTheme.colors.accentText,
                         )
                     }
                 },
