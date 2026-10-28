@@ -113,7 +113,21 @@ class TypingViewModel
         val doubleSpacePeriodEnabled: StateFlow<Boolean> =
             keyboardPreferences.doubleSpacePeriodEnabled
 
+        /**
+         * The part of the current word after the caret, when the caret was placed inside one.
+         *
+         * Set only from the editor, in [onEditorContextChanged]: tapping into "hel|o" makes this
+         * "o", so suggestions and a tapped replacement cover "helo" rather than "hel". Letters
+         * typed at the caret extend [currentWord] and leave this alone, which matches the text.
+         * Cleared whenever the current word ends, through [currentWord]'s setter.
+         */
+        private var wordTail = ""
+
         private var currentWord = ""
+            set(value) {
+                field = value
+                if (value.isEmpty()) wordTail = ""
+            }
 
         /**
          * The word a run of backspaces is eating, kept so it can be offered back.
@@ -602,6 +616,15 @@ class TypingViewModel
             // is decidable from here, which is the whole of 4G.7.
             atSentenceStart = startsNewSentence(textBeforeCursor.dropLast(1))
             publishAutoCapitalize()
+            // Deleting the space or mark after a word puts the caret back at that word's end,
+            // and it is the word being edited again: "helo |" then backspace then "w" is
+            // "helow", so the strip should complete "helo", not start from nothing. Read from
+            // the text this call was already given, so it costs no extra read.
+            val resumed = wordUnderCaret(textBeforeCursor.dropLast(1))
+            if (resumed.isNotEmpty() && textBeforeCursor.isNotEmpty()) {
+                currentWord = resumed
+                updateSuggestions()
+            }
             return 1
         }
 
@@ -858,8 +881,14 @@ class TypingViewModel
          * paste, or a selection replaced by the host, it describes text that is no longer
          * there, and the suggestion strip sizes a deletion from its length.
          */
-        fun onEditorContextChanged(textBeforeCursor: String) {
+        fun onEditorContextChanged(
+            textBeforeCursor: String,
+            textAfterCursor: String = "",
+        ) {
             currentWord = wordUnderCaret(textBeforeCursor)
+            // After the assignment above, whose setter clears the tail for an empty word. A
+            // caret at the very start of a word ("|helo") still has a whole word to offer for.
+            wordTail = wordAfterCaret(textAfterCursor)
             // Re-derived from the editor for the same reason [currentWord] is: after a caret
             // tap or a paste, whatever this keyboard last learned describes a sentence the
             // caret is no longer in, and ranking the next word off it is worse than having no
@@ -913,9 +942,17 @@ class TypingViewModel
             // with predictions for a word the user has already started typing past.
             val token = generation
             val prefix = currentWord
+            val tail = wordTail
             viewModelScope.launch {
                 val results =
-                    if (prefix.isBlank()) {
+                    if (tail.isNotEmpty()) {
+                        // The caret is inside a word, so what is offered is a replacement for
+                        // the whole of it: corrections if it is misspelled, else completions.
+                        val whole = prefix + tail
+                        predictionEngine
+                            .getCorrectionOffers(whole)
+                            .ifEmpty { predictionEngine.getSuggestions(whole, previousWord) }
+                    } else if (prefix.isBlank()) {
                         // Nothing typed: predict rather than complete. Suppressed at a sentence
                         // boundary, where the previous word is on the far side of a full stop --
                         // the corpus counts that pair because they were adjacent, not because

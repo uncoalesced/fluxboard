@@ -34,8 +34,8 @@ import com.uncoalesced.stickykeys.keyboardcore.ime.TypingViewModel
  * Drives the real [TypingKeyboardView] against a local text field instead of an editor.
  *
  * The third implementor of [KeyboardController]; the other two are the IME service itself
- * and the mode-intercepting wrapper inside `MainIMEView`. Adding a method to the interface
- * means editing all three.
+ * and the mode-intercepting wrapper inside `MainIMEView`, plus two fakes in keyboard-core's
+ * tests. Adding a method to the interface means editing all five.
  *
  * Editing operations are honest about what they cannot do here: there is no host editor and
  * no system clipboard involvement in a styling preview, so the movement keys walk the local
@@ -68,6 +68,25 @@ private class PreviewKeyboardController(
         val current = state.value
         val cursor = current.selection.start.coerceIn(0, current.text.length)
         return current.text.substring((cursor - maxChars).coerceAtLeast(0), cursor)
+    }
+
+    override fun textAfterCursor(maxChars: Int): String {
+        val current = state.value
+        val cursor = current.selection.end.coerceIn(0, current.text.length)
+        return current.text.substring(cursor, (cursor + maxChars).coerceAtMost(current.text.length))
+    }
+
+    override fun replaceTextAroundCursor(
+        before: Int,
+        after: Int,
+        replacement: String,
+    ) {
+        val current = state.value
+        val cursor = current.selection.start.coerceIn(0, current.text.length)
+        val from = (cursor - before).coerceAtLeast(0)
+        val to = (cursor + after).coerceAtMost(current.text.length)
+        val updated = current.text.replaceRange(from, to, replacement)
+        state.value = TextFieldValue(updated, TextRange(from + replacement.length))
     }
 
     override fun deleteBefore(charCount: Int) {

@@ -25,6 +25,24 @@ interface KeyboardController {
     fun textBeforeCursor(maxChars: Int): String
 
     /**
+     * Up to [maxChars] characters immediately after the cursor. The mirror of
+     * [textBeforeCursor], under the same rule: never per keystroke. Read when the caret lands
+     * inside a word, so the rest of that word is known, and when a suggestion replaces it.
+     */
+    fun textAfterCursor(maxChars: Int): String
+
+    /**
+     * Replaces [before] characters before the cursor and [after] characters after it with
+     * [replacement], in one batch edit, leaving the caret after [replacement]. The whole-word
+     * form of [replaceTextBeforeCursor], for a word the caret is in the middle of.
+     */
+    fun replaceTextAroundCursor(
+        before: Int,
+        after: Int,
+        replacement: String,
+    )
+
+    /**
      * Atomically replaces [charCount] characters immediately before the cursor with
      * [replacement], in a single InputConnection round-trip. Preferred over looping
      * [sendDelete]: one IPC instead of two per character, and the host editor cannot

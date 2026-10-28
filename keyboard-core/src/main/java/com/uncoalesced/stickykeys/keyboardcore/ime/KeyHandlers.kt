@@ -199,13 +199,20 @@ internal fun rememberSuggestionTapHandler(
             // corrections and the text ends in the word as typed plus its space.
             val committed =
                 typingViewModel.consumeGlideCommit() ?: typingViewModel.consumeOfferedWord()
-            val span =
-                if (committed != null) {
-                    committed.length + 1
-                } else {
-                    currentWordSpan(keyboardController)
-                }
-            keyboardController.replaceTextBeforeCursor(span, "$suggestion ")
+            if (committed != null) {
+                keyboardController.replaceTextBeforeCursor(committed.length + 1, "$suggestion ")
+            } else {
+                // The caret may be inside the word ("hel|o"), so the word after it goes too --
+                // replacing only the part before the caret left "help o". Both halves are read
+                // from the editor at the moment of the tap.
+                val after = keyboardController.textAfterCursor(WORD_CONTEXT_CHARS)
+                val tail = wordAfterCaret(after)
+                keyboardController.replaceTextAroundCursor(
+                    currentWordSpan(keyboardController),
+                    tail.length,
+                    suggestionReplacement(suggestion, after.drop(tail.length)),
+                )
+            }
             typingViewModel.onSuggestionSelected(suggestion)
         }
     }

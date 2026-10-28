@@ -266,6 +266,14 @@ private class NoOpController : KeyboardController {
 
     override fun textBeforeCursor(maxChars: Int): String = ""
 
+    override fun textAfterCursor(maxChars: Int): String = ""
+
+    override fun replaceTextAroundCursor(
+        before: Int,
+        after: Int,
+        replacement: String,
+    ) = Unit
+
     override fun replaceTextBeforeCursor(
         charCount: Int,
         replacement: String,
