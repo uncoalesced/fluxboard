@@ -2,24 +2,49 @@
 package com.uncoalesced.stickykeys.keyboardcore.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.uncoalesced.stickykeys.keyboardcore.R
+
+/**
+ * One entry of a variable font: the file holds every weight, and the variation setting picks
+ * which one this [Font] draws. minSdk is 26, which is where variable font axes start working.
+ */
+@OptIn(ExperimentalTextApi::class)
+private fun variable(
+    resId: Int,
+    weight: FontWeight,
+): Font {
+    val axes = FontVariation.Settings(FontVariation.weight(weight.weight))
+    return Font(resId, weight, variationSettings = axes)
+}
 
 /**
  * The two type families, defined once.
  *
- * The brand calls for JetBrains Mono (headings, labels, numerals) and IBM Plex Sans (body). Both
- * are OFL, but neither is bundled yet, so these are the system monospace and sans faces. To
- * switch, add the TTFs under `res/font` with their licence file and change these two lines to
- * `FontFamily(Font(R.font.x, FontWeight.Normal), ...)`; nothing else needs to move.
+ * JetBrains Mono (headings, labels, numerals) and IBM Plex Sans (body), both SIL OFL 1.1, bundled
+ * as variable fonts under `res/font` (licences in `docs/licenses/`). Only the weights the app
+ * draws are declared; a request for another weight snaps to the nearest declared one.
  */
-val FluxMono: FontFamily = FontFamily.Monospace
+val FluxMono: FontFamily =
+    FontFamily(
+        variable(R.font.jetbrains_mono, FontWeight.Normal),
+        variable(R.font.jetbrains_mono, FontWeight.SemiBold),
+    )
 
 /** See [FluxMono]. */
-val FluxSans: FontFamily = FontFamily.SansSerif
+val FluxSans: FontFamily =
+    FontFamily(
+        variable(R.font.ibm_plex_sans, FontWeight.Normal),
+        variable(R.font.ibm_plex_sans, FontWeight.Medium),
+        variable(R.font.ibm_plex_sans, FontWeight.SemiBold),
+    )
 
 /** Headings sit slightly tight, as the brand kit specifies: -0.01em. */
 private val HeadingTracking = (-0.01).em
