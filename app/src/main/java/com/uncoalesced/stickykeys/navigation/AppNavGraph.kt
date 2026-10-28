@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -46,6 +45,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.DOCK_COLLAPSED_WEIGHT
 import com.uncoalesced.stickykeys.keyboardcore.theme.DOCK_EXPANDED_WEIGHT
 import com.uncoalesced.stickykeys.keyboardcore.theme.DOCK_EXPAND_MS
@@ -55,11 +55,9 @@ import com.uncoalesced.stickykeys.keyboardcore.theme.SCREEN_FADE_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.keyboardcore.theme.motionMs
 import com.uncoalesced.stickykeys.ui.screens.AppSettingsScreen
-import com.uncoalesced.stickykeys.ui.screens.DevicePairingScreen
 import com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.StickersLibraryScreen
 import kotlin.math.abs
-import com.uncoalesced.stickykeys.keyboardcore.R as KeyboardCoreR
 
 /** One bottom-bar destination. */
 private data class NavEntry(
@@ -98,25 +96,31 @@ fun AppNavGraph(
     }
 
     // The icons used to be Text(title.first()), so "Styles" and "Settings" both rendered a
-    // bare "S" and the bar carried no usable signal at all.
+    // bare "S" and the bar carried no usable signal at all. All three are now outlined at the
+    // same 2dp weight; the filled brand mark beside two outlined glyphs read as a different
+    // icon set.
     //
-    // Three tabs, not four. Transfer was the fourth and is now a row at the foot of
-    // Settings: it is something you do about once, when moving to a new phone, and it held a
-    // quarter of the dock permanently for that. Its route still exists and is still reached
-    // by pushing it, which is also what makes its app bar and back arrow correct instead of
-    // the odd one out beside three tabs that have no header at all.
-    val screens =
-        listOf(
-            NavEntry("stickers", "Styles", Icons.Outlined.Star),
-            NavEntry(
-                "keyboard",
-                "Keyboard",
-                // Non-transitive R: this drawable belongs to keyboard-core, so it is not on
-                // the app module's own R class.
-                ImageVector.vectorResource(KeyboardCoreR.drawable.ic_keyboard_flux),
-            ),
-            NavEntry("settings", "Settings", Icons.Outlined.Settings),
+    // Three tabs, not four. Transfer was the fourth and is now a section at the foot of
+    // Settings rather than a screen of its own: it is something you do about once, when
+    // moving to a new phone, and it held a quarter of the dock permanently for that.
+    val titles =
+        mapOf(
+            TopLevelDestinations.STICKERS to "Styles",
+            TopLevelDestinations.KEYBOARD to "Keyboard",
+            TopLevelDestinations.SETTINGS to "Settings",
         )
+    val stickersIcon = ImageVector.vectorResource(R.drawable.ic_nav_stickers)
+    val keyboardIcon = ImageVector.vectorResource(R.drawable.ic_nav_keyboard)
+    val icons =
+        mapOf(
+            TopLevelDestinations.STICKERS to stickersIcon,
+            TopLevelDestinations.KEYBOARD to keyboardIcon,
+            TopLevelDestinations.SETTINGS to Icons.Outlined.Settings,
+        )
+    val screens =
+        TopLevelDestinations.dockOrder.map { route ->
+            NavEntry(route, titles.getValue(route), icons.getValue(route))
+        }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -130,12 +134,12 @@ fun AppNavGraph(
         }
     }
 
-    // Where the swipe gesture is allowed to go, in the order the dock shows them. A detail
-    // route pushed on top of a tab is deliberately not in this list: swiping out of the crop
-    // or edit screen would discard work in progress.
-    val dockIndex =
-        screens.indexOfFirst { entry ->
-            currentDestination?.hierarchy?.any { it.route == entry.route } == true
+    // Which top-level screen is showing, if any. A detail route pushed on top of a tab is
+    // deliberately not top-level: swiping out of the crop or edit screen would discard work
+    // in progress, so the gesture is off there.
+    val currentTopLevel =
+        TopLevelDestinations.dockOrder.firstOrNull { route ->
+            currentDestination?.hierarchy?.any { it.route == route } == true
         }
 
     Scaffold(
@@ -168,32 +172,30 @@ fun AppNavGraph(
             //
             // This is also the back-stack root every dock tap pops to, so it decides where
             // the system back button lands, not merely what is drawn first.
-            startDestination = "keyboard",
+            startDestination = TopLevelDestinations.START,
             modifier =
                 Modifier
                     .padding(innerPadding)
                     // Padding alone is half the job. `Scaffold` hands its content the insets
                     // it wants applied but does not mark them as spent, so a screen that
                     // nests its own `Scaffold` or `TopAppBar` -- twelve of them do, every
-                    // detail route in the app plus device pairing -- reads the full status
-                    // bar height again and adds a second copy of it inside an area that has
-                    // already been padded for it. The result is a header roughly a status
-                    // bar taller than it was drawn to be, worst on device pairing because
-                    // that one sits in the dock beside three tabs that have no app bar at
-                    // all to compare it against. Consuming here fixes every one of them at
-                    // the shared boundary instead of per screen.
+                    // detail route in the app -- reads the full status bar height again and
+                    // adds a second copy of it inside an area that has already been padded
+                    // for it. The result is a header roughly a status bar taller than it was
+                    // drawn to be. Consuming here fixes every one of them at the shared
+                    // boundary instead of per screen.
                     .consumeWindowInsets(innerPadding)
                     .dockSwipe(
-                        enabled = dockIndex >= 0,
-                        key = dockIndex,
+                        enabled = currentTopLevel != null,
+                        key = currentTopLevel ?: "",
                         onSwipe = { direction ->
-                            screens.getOrNull(dockIndex + direction)?.let {
-                                goToDockRoute(it.route)
-                            }
+                            TopLevelDestinations
+                                .swipeTarget(currentTopLevel, direction)
+                                ?.let(goToDockRoute)
                         },
                     ),
         ) {
-            composable("stickers") {
+            composable(TopLevelDestinations.STICKERS) {
                 StickersLibraryScreen(
                     onImagePicked = { uri ->
                         val encodedUri = java.net.URLEncoder.encode(uri, "UTF-8")
@@ -208,7 +210,7 @@ fun AppNavGraph(
                     },
                 )
             }
-            composable("keyboard") {
+            composable(TopLevelDestinations.KEYBOARD) {
                 KeyboardSettingsScreen(
                     onNavigateToThemeEditor = { navController.navigate("theme_editor") },
                     onNavigateToLayoutEditor = { navController.navigate("layout_editor") },
@@ -234,15 +236,11 @@ fun AppNavGraph(
                 )
             }
 
-            composable("transfer") {
-                DevicePairingScreen(
-                    onBack = { navController.popBackStack() },
-                )
-            }
-            composable("settings") {
+            // No "transfer" route any more. The pairing controls are a section of Settings, so
+            // the graph's top level is exactly the three dock screens.
+            composable(TopLevelDestinations.SETTINGS) {
                 AppSettingsScreen(
                     onNavigateToManageCategories = { navController.navigate("manage_categories") },
-                    onNavigateToTransfer = { navController.navigate("transfer") },
                 )
             }
 
@@ -344,7 +342,7 @@ fun AppNavGraph(
 /**
  * The bottom dock: icon-only pills at rest, the active one expanding to show its name.
  *
- * Four destinations, not the five the reference image happened to draw. The reference is
+ * Three destinations, not the five the reference image happened to draw. The reference is
  * generic placeholder content and its icon count is not a requirement; inventing a fifth
  * screen to match it would be building the app around a mockup.
  *
@@ -448,14 +446,14 @@ private const val DOCK_INACTIVE_ALPHA = 0.6f
  * A horizontal fling that moves between the dock's own destinations.
  *
  * Deliberately a gesture over the existing [NavHost] rather than a `HorizontalPager` holding
- * the four screens. A pager would track the finger, which is nicer, but the four dock
+ * the three screens. A pager would track the finger, which is nicer, but the three dock
  * destinations are also the pager's only legal pages -- every other route is pushed on top of
  * one of them -- so it would mean lifting them out of the graph and losing the `saveState` /
  * `restoreState` behaviour that keeps each tab's scroll position across a switch. That is a
  * large change to the navigation of the whole app in exchange for a nicer transition.
  *
  * ponytail: no live tracking, the page changes on lift. Move to HorizontalPager if the
- * four dock screens ever stop being the only top-level routes.
+ * three dock screens ever stop being the only top-level routes.
  *
  * Children see the pointer first, so a horizontal drag a slider or a scrolling row has already
  * claimed is consumed before this ever sees it -- which is what stops the Height and Key Size

@@ -16,10 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -35,9 +38,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -46,6 +52,8 @@ import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.data.local.AppPreferences
 import com.uncoalesced.stickykeys.data.local.ThemeMode
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.SettingsGroup
+import com.uncoalesced.stickykeys.ui.components.SettingsNavRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,7 +93,6 @@ class AppSettingsViewModel
 fun AppSettingsScreen(
     viewModel: AppSettingsViewModel = hiltViewModel(),
     onNavigateToManageCategories: () -> Unit,
-    onNavigateToTransfer: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -121,7 +128,7 @@ fun AppSettingsScreen(
                 // it is the transparent mark (so no black box on the light palette), and the
                 // 108dp canvas padding just reads as margin at this size.
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Image(
@@ -155,7 +162,7 @@ fun AppSettingsScreen(
                     // it, and what follows is the part a tester needs: things will break, and
                     // reporting them is the point of their having it.
                     Surface(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                         color = MaterialTheme.colorScheme.tertiaryContainer,
                         shape = MaterialTheme.shapes.medium,
                     ) {
@@ -175,152 +182,104 @@ fun AppSettingsScreen(
                     }
                 }
 
-                // Category Management Entry
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToManageCategories() }
-                            .padding(vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                // App theme. The light palette existed in the design tokens from the start
+                // but nothing ever selected it -- the app was hardcoded dark.
+                SettingsGroup(
+                    title = stringResource(R.string.text_app_theme),
+                    icon = ImageVector.vectorResource(R.drawable.ic_theme_mode),
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.text_manage_categories),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(
+                    val currentThemeMode by viewModel.themeMode.collectAsState()
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    ) {
+                        val options =
+                            listOf(
+                                ThemeMode.SYSTEM to stringResource(R.string.text_theme_system),
+                                ThemeMode.LIGHT to stringResource(R.string.text_theme_light),
+                                ThemeMode.DARK to stringResource(R.string.text_theme_dark),
+                            )
+                        options.forEachIndexed { index, (mode, label) ->
+                            SegmentedButton(
+                                selected = currentThemeMode == mode,
+                                onClick = { viewModel.setThemeMode(mode) },
+                                shape =
+                                    SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = options.size,
+                                    ),
+                            ) {
+                                Text(label)
+                            }
+                        }
+                    }
+                }
+
+                SettingsGroup(
+                    title = stringResource(R.string.text_stickers_group),
+                    icon = ImageVector.vectorResource(R.drawable.ic_nav_stickers),
+                ) {
+                    SettingsNavRow(
+                        title = stringResource(R.string.text_manage_categories),
+                        summary =
                             stringResource(
                                 R.string.text_add_rename_or_delete_your_sticker_categories,
                             ),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
+                        onClick = onNavigateToManageCategories,
+                    )
                     Text(
-                        text = "→",
-                        style = MaterialTheme.typography.titleLarge,
+                        stringResource(R.string.text_default_export_format),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                     )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // App theme. The light palette existed in the design tokens from the start
-                // but nothing ever selected it -- the app was hardcoded dark.
-                Text(
-                    stringResource(R.string.text_app_theme),
-                    style = MaterialTheme.typography.titleMedium,
-                    // Accented like every other section heading in the app, so a
-                    // long settings page reads as sections rather than one column.
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                val currentThemeMode by viewModel.themeMode.collectAsState()
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    val options =
-                        listOf(
-                            ThemeMode.SYSTEM to stringResource(R.string.text_theme_system),
-                            ThemeMode.LIGHT to stringResource(R.string.text_theme_light),
-                            ThemeMode.DARK to stringResource(R.string.text_theme_dark),
-                        )
-                    options.forEachIndexed { index, (mode, label) ->
-                        SegmentedButton(
-                            selected = currentThemeMode == mode,
-                            onClick = { viewModel.setThemeMode(mode) },
-                            shape =
-                                SegmentedButtonDefaults.itemShape(
-                                    index = index,
-                                    count = options.size,
-                                ),
-                        ) {
-                            Text(label)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Default Export Format
-                Text(
-                    stringResource(R.string.text_default_export_format),
-                    style = MaterialTheme.typography.titleMedium,
-                    // Accented like every other section heading in the app, so a
-                    // long settings page reads as sections rather than one column.
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                ExposedDropdownMenuBox(
-                    expanded = formatDropdownExpanded,
-                    onExpandedChange = { formatDropdownExpanded = !formatDropdownExpanded },
-                ) {
-                    OutlinedTextField(
-                        value = currentFormatLabel,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(
-                                expanded = formatDropdownExpanded,
-                            )
-                        },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                    )
-                    ExposedDropdownMenu(
+                    ExposedDropdownMenuBox(
                         expanded = formatDropdownExpanded,
-                        onDismissRequest = { formatDropdownExpanded = false },
+                        onExpandedChange = { formatDropdownExpanded = !formatDropdownExpanded },
                     ) {
-                        exportFormats.forEach { (format, label) ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    viewModel.setDefaultExportFormat(format)
-                                    formatDropdownExpanded = false
-                                },
-                            )
+                        OutlinedTextField(
+                            value = currentFormatLabel,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = formatDropdownExpanded,
+                                )
+                            },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                        )
+                        ExposedDropdownMenu(
+                            expanded = formatDropdownExpanded,
+                            onDismissRequest = { formatDropdownExpanded = false },
+                        ) {
+                            exportFormats.forEach { (format, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        viewModel.setDefaultExportFormat(format)
+                                        formatDropdownExpanded = false
+                                    },
+                                )
+                            }
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "This format is used when converting videos to stickers.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Transfer, which used to be a dock tab of its own.
-                //
-                // It is a thing you do roughly once, when moving to a new phone, and it held
-                // a quarter of the dock permanently for that. Here it costs one row and the
-                // dock drops to three tabs. The screen itself is unchanged and still a
-                // pushed route, which is also what makes its app bar and back arrow correct
-                // rather than the odd one out among the tabs.
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToTransfer() }
-                            .padding(vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.text_transfer_to_a_new_device),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(
-                            stringResource(R.string.text_transfer_row_summary),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
                     Text(
-                        text = "→",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = "This format is used when converting videos to stickers.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 12.dp),
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                // Transfer, which used to be a dock tab and then a screen of its own. The
+                // controls are here now, in full, rather than a row that opened them.
+                SettingsGroup(
+                    title = stringResource(R.string.text_transfer_to_a_new_device),
+                    icon = ImageVector.vectorResource(R.drawable.ic_transfer),
+                ) {
+                    TransferSection()
+                }
 
                 // About
                 //
@@ -328,29 +287,25 @@ fun AppSettingsScreen(
                 // uncoalesced site is not live, and shipping a link that 404s in an alpha
                 // testers are actively poking at is worse than pointing somewhere real, so
                 // SITE_URL holds the profile until there is a site. One line to change then.
-                Text(
-                    stringResource(R.string.text_about),
-                    style = MaterialTheme.typography.titleMedium,
-                    // Accented like every other section heading in the app, so a
-                    // long settings page reads as sections rather than one column.
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                LinkRow(
-                    label = stringResource(R.string.text_source_code),
-                    url = REPO_URL,
-                )
-                LinkRow(
-                    label = stringResource(R.string.text_uncoalesced),
-                    url = SITE_URL,
-                )
+                SettingsGroup(
+                    title = stringResource(R.string.text_about),
+                    icon = Icons.Outlined.Info,
+                ) {
+                    LinkRow(
+                        label = stringResource(R.string.text_source_code),
+                        url = REPO_URL,
+                    )
+                    LinkRow(
+                        label = stringResource(R.string.text_uncoalesced),
+                        url = SITE_URL,
+                    )
+                }
                 Text(
                     text = "${stringResource(R.string.app_name)} ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(start = 4.dp, bottom = 24.dp),
                 )
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -373,7 +328,7 @@ private fun LinkRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable {
+                .clickable(role = Role.Button) {
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                     }
@@ -381,13 +336,19 @@ private fun LinkRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(label, style = MaterialTheme.typography.titleMedium)
             Text(
                 url,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Icon(
+            painter = painterResource(R.drawable.ic_open_external),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
