@@ -16,6 +16,12 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
+## [v1.0.0-stable] - Unreleased
+
+The version string in the build is already `v1.0.0-stable` (versionCode 16), so
+development builds show no pre-release badge. The release itself, with its tag and
+signed APK, has not been made. Nothing under this heading has shipped.
+
 ## [v0.1.7.5-BETA] - 2026-08-29
 
 ### Added
