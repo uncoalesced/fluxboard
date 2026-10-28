@@ -354,10 +354,9 @@ fun AppNavGraph(
  * generic placeholder content and its icon count is not a requirement; inventing a fifth
  * screen to match it would be building the app around a mockup.
  *
- * Colours come from the roles Color.kt already assigns rather than new ones: Fern is documented
- * there as the accent for active states and selection. The label is onPrimary, which is
- * near-black -- Cream on Fern measures 2.15 and cannot be read, and that pairing is the exact
- * mistake the palette's own header warns about.
+ * The selected item is the accent as a fill, with a black label: 5.18 against Watermelon,
+ * where Porcelain would manage 4.03 and pass only as large text. Corners are the brand's 10dp
+ * rather than a full pill, matching every card in the app.
  */
 @Composable
 private fun PillDock(
@@ -394,7 +393,7 @@ private fun PillDock(
                     Modifier
                         .weight(weight)
                         .height(DOCK_ITEM_HEIGHT)
-                        .background(fill, StickyKeysTheme.shapes.pill)
+                        .background(fill, StickyKeysTheme.shapes.medium)
                         .clickable(
                             role = Role.Tab,
                             onClick = { onSelect(entry.route) },

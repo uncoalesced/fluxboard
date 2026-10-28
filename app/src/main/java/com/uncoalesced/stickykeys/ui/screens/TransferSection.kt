@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -55,11 +56,13 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
 import com.uncoalesced.stickykeys.R
+import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.transfer.migration.MigrationClient
 import com.uncoalesced.stickykeys.transfer.migration.MigrationClientState
 import com.uncoalesced.stickykeys.transfer.migration.MigrationServer
 import com.uncoalesced.stickykeys.transfer.migration.MigrationServerState
 import com.uncoalesced.stickykeys.transfer.pairing.PairingManager
+import com.uncoalesced.stickykeys.ui.components.brandCheckboxColors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -291,6 +294,7 @@ fun TransferSection(
                     Checkbox(
                         checked = includeClipboard,
                         onCheckedChange = { includeClipboard = it },
+                        colors = brandCheckboxColors(),
                     )
                     Text(
                         stringResource(R.string.text_include_clipboard_history_sensitive),
@@ -306,6 +310,13 @@ fun TransferSection(
                 ) {
                     Button(
                         onClick = { viewModel.startSenderFlow(includeClipboard) },
+                        // The one primary action here, so the accent fill with a black label
+                        // (5.18), as the brand kit draws an accent button.
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = StickyKeysTheme.colors.primary,
+                                contentColor = StickyKeysTheme.colors.onPrimary,
+                            ),
                         modifier = Modifier.weight(1f).height(48.dp),
                     ) {
                         Text(stringResource(R.string.text_transfer_send))

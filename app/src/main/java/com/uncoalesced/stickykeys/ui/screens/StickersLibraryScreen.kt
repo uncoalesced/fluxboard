@@ -29,7 +29,6 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -66,6 +65,7 @@ import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.ScreenHeading
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -219,15 +219,9 @@ fun StickersLibraryScreen(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(
-                            text = stringResource(R.string.text_styles),
-                            // Same size as the Keyboard tab's heading, so moving between
-                            // tabs does not change the weight of the first thing read.
-                            style = MaterialTheme.typography.headlineMedium,
-                            // The accent, matching the section headings on the other two
-                            // tabs. The palette has one and the app was barely using it.
-                            color = StickyKeysTheme.colors.primary,
-                        )
+                        // The same heading the Keyboard tab opens with, so moving between
+                        // tabs does not change the weight of the first thing read.
+                        ScreenHeading(text = stringResource(R.string.text_styles))
                         if (current.stickers.isNotEmpty()) {
                             Text(
                                 text =

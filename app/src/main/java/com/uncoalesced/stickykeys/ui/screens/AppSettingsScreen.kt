@@ -4,6 +4,7 @@ package com.uncoalesced.stickykeys.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
@@ -51,7 +53,9 @@ import com.uncoalesced.stickykeys.BuildConfig
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.data.local.AppPreferences
 import com.uncoalesced.stickykeys.data.local.ThemeMode
+import com.uncoalesced.stickykeys.keyboardcore.theme.Graphite
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.ScreenHeading
 import com.uncoalesced.stickykeys.ui.components.SettingsGroup
 import com.uncoalesced.stickykeys.ui.components.SettingsNavRow
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -131,18 +135,22 @@ fun AppSettingsScreen(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // The launcher icon as the brand kit draws it: the mark on a Graphite tile
+                    // with 22% corners. The foreground layer is the mark alone on a 108dp
+                    // canvas, so the tile is drawn here rather than shipping a second asset.
                     Image(
                         painter = painterResource(R.drawable.ic_launcher_foreground),
                         contentDescription = null,
-                        modifier = Modifier.size(72.dp),
+                        modifier =
+                            Modifier
+                                .size(64.dp)
+                                .background(Graphite, RoundedCornerShape(22)),
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = stringResource(R.string.app_name),
-                                style = MaterialTheme.typography.headlineMedium,
-                            )
+                            // The wordmark: lowercase, mono, with the accent square after it.
+                            ScreenHeading(text = stringResource(R.string.app_name).lowercase())
                             if (IS_PRERELEASE) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 PrereleaseBadge()

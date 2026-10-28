@@ -3,72 +3,57 @@ package com.uncoalesced.stickykeys.keyboardcore.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- Brand palette (confirmed, "sticky6" board) -----------------------------
-// Dark mode is the DEFAULT experience (see StickyKeysTheme). These five values
-// are the source of truth; everything below maps them into semantic slots.
+// --- Brand palette: Watermelon on Graphite and Porcelain ----------------------
+// Replaces the earlier "sticky6" board. One accent hue, two grounds, and the
+// neutrals each theme needs. Source: the FluxBoard brand kit (DESIGN.md and
+// Colour/tokens.json in the design folder).
 //
-// Indigo #394053  darkest neutral -- the muted/special-key surface
-// Iris   #4E4A59  neutral surface -- ordinary key fill
-// Taupe  #6E6362  warm neutral -- secondary
-// Sage   #839073  muted accent -- the locked/latched state
-// Fern   #7CAE7A  the accent -- active states, selection, the accent key
+// Contrast, measured with the WCAG relative-luminance formula, not estimated:
 //
-// Contrast measured against the dark base (#000000), not estimated:
-//   Fern 8.19  Sage 6.20  Taupe 3.62  Iris 2.45  Indigo 2.03
+//   Watermelon on dark bg #262626      3.73   fills, icons, focus only
+//   Watermelon on surface #333333      3.12   fills, icons only
+//   Watermelon on Porcelain            4.03   fills, icons only
+//   Tint #F47790 on dark bg            5.68   accent text, dark mode
+//   Tint on surface #333333            4.75   accent text on a card, dark mode
+//   Shade #AD2F4A on Porcelain         6.36   accent text, light mode
+//   Shade on light surface #F1F3F0     5.73   accent text on a card, light mode
+//   Black on Watermelon                5.18   label on an accent fill (both modes)
+//   Porcelain on Watermelon            4.03   large or bold text only, so not used
+//   Black on Tint                      7.89   label on a dark-mode accent-text fill
+//   Porcelain on Shade                 6.36   label on a light-mode accent-text fill
+//   Porcelain on #262626 / #333333    15.05 / 12.57   body text, dark
+//   Muted #B4B5B3 on #262626 / #333333 7.35 / 6.14    secondary text, dark
+//   Graphite on Porcelain / #F1F3F0   12.57 / 11.32   body text, light
+//   Muted #5C5E5C on Porcelain / #F1F3F0 6.51 / 5.86  secondary text, light
 //
-// Fern takes the accent role sticky3's yellow used to hold. It is the highest
-// contrast of the five and the only one that reads as an accent rather than a
-// neutral -- but it is NOT a like-for-like replacement: the old yellow measured
-// 15.37 against black, so every accent on this board is roughly half as loud as
-// it used to be. That is a property of the palette, flagged rather than hidden.
-//
-// The one forced consequence: Cream on Fern is 2.15, which is unreadable. Text
-// on the accent is therefore near-black now (8.19) where it used to be Cream.
-val Indigo = Color(0xFF394053)
-val Iris = Color(0xFF4E4A59)
-val Taupe = Color(0xFF6E6362)
-val Sage = Color(0xFF839073)
-val Fern = Color(0xFF7CAE7A)
+// The rule that follows from the first three lines: Watermelon is never a text
+// colour. Anything that is read uses the accent-text tone for its mode.
 
-/**
- * The foreground, which sticky6 does not supply.
- *
- * Every one of the five is a mid-tone, so a legible light foreground has to come
- * from outside the board. Cream is carried over from sticky3 for exactly that
- * reason: 8.68 on Indigo, 7.20 on Iris, 17.9 on the black base.
- */
-val Cream = Color(0xFFE9EDDE)
+/** Surfaces on dark, light-mode ink, the icon ground. */
+val Graphite = Color(0xFF333333)
 
-/** Kept for the light palette's foreground and for [OnBrandYellow]. */
-val Ink = Color(0xFF3D3B30)
+/** Light ground and dark-mode ink. */
+val Porcelain = Color(0xFFFDFFFC)
 
-/**
- * The dark-mode base.
- *
- * Pure black rather than [Ink]. Ink is a warm near-black that reads as washed-out grey next
- * to the keys drawn on it, and on the OLED panels this app's audience mostly carries it
- * costs power for a colour nobody asked for. Ink is kept, still named, and still used for
- * `OnBrandYellow` and the light palette's foreground -- this changes the base surface only,
- * not the brand.
- */
-val TrueBlack = Color(0xFF000000)
+/** The accent, as a fill: selected state, switches, sliders, indicators, the lifted key. */
+val Watermelon = Color(0xFFEF2D56)
 
-/**
- * Highlight accent. Intentionally NOT wired into [StickyKeysColors]' interactive
- * slots so it can never become a default button/active color. Reference it
- * directly, sparingly (a single call-to-action, a "new"/unread indicator).
- * Always pair with [OnBrandYellow] for text -- Cream on Yellow fails contrast.
- */
-val BrandYellow = Color(0xFFE7E247)
-val OnBrandYellow = Ink // Ink-on-Yellow = 8.23:1 (Cream-on-Yellow would be 1.15:1)
+/** Pressed accent, and the accent text colour in light mode. */
+val WatermelonShade = Color(0xFFAD2F4A)
 
-// Derived tones (not new brand colors -- tonal variants for elevation/contrast):
-// FernDeep exists only because the light palette needs an accent that white text
-// can sit on: white on Fern is 2.15, white on FernDeep is 6.21. Same role BlueDark
-// played for sticky3's Blue, and derived the same way.
-val FernDeep = Color(0xFF3F6B3D)
-val CreamSurface = Color(0xFFF3F5EC) // light-preset elevated surface
-val CreamSurfaceVariant = Color(0xFFDCE0D2) // light-preset muted surface
+/** Accent text in dark mode, and a secondary highlight. */
+val WatermelonTint = Color(0xFFF47790)
+
+// Theme neutrals. Not brand colours, the grounds and lines each mode needs.
+val DarkBackground = Color(0xFF262626)
+val DarkBorder = Color(0xFF4B4B4B)
+val DarkInkMuted = Color(0xFFB4B5B3)
+val LightSurface = Color(0xFFF1F3F0)
+val LightBorder = Color(0xFFDFE0DE)
+val LightInkMuted = Color(0xFF5C5E5C)
+
+/** Label colour on an accent fill. 5.18 on Watermelon, where Porcelain manages 4.03. */
+val OnAccent = Color(0xFF000000)
 
 val ErrorRed = Color(0xFFEF4444)
 val ErrorRedDark = Color(0xFFDC2626)
@@ -77,6 +62,13 @@ val ErrorRedDark = Color(0xFFDC2626)
  * Plain Kotlin data class for StickyKeys colors.
  * This can be used outside of a Compose context if needed,
  * and is wrapped by ProvidableCompositionLocal for Compose UI.
+ *
+ * [primary] is the accent *fill*. [accentText] is the accent as text, which is a different
+ * colour under this palette because the fill does not reach 4.5:1 on either ground.
+ * [onAccentText] is the label colour when [accentText] is itself used as a fill, which is what
+ * Material's own buttons do with their primary slot. [outline] is the 1dp border on flat
+ * surfaces. All three default to the older single-accent behaviour, so a saved keyboard theme
+ * written before they existed loads exactly as it did.
  */
 data class StickyKeysColors(
     val primary: Color,
@@ -93,54 +85,53 @@ data class StickyKeysColors(
     val onSurfaceVariant: Color,
     val onError: Color,
     val isLight: Boolean,
+    val accentText: Color = primary,
+    val onAccentText: Color = onPrimary,
+    val outline: Color = secondary,
 )
 
-// Contrast against the dark base (WCAG AA, measured not estimated):
-//   Cream on TrueBlack 17.9  Cream on Iris 7.20  Cream on Indigo 8.68
-//     -> text is legible on every surface this palette draws
-//   onPrimary is near-black, not Cream: Cream on Fern is 2.15 and unreadable,
-//     black on Fern is 8.19. This is the one slot sticky6 forced to change sign.
-//   Fern vs TrueBlack 8.19, Sage vs TrueBlack 6.20 -> the accent and the latched
-//     state are distinguishable from each other and from the base, which is what
-//     makes caps lock visible.
 fun darkStickyKeysColors() =
     StickyKeysColors(
-        primary = Fern,
-        primaryVariant = Sage,
-        secondary = Taupe,
-        background = TrueBlack,
-        surface = Iris,
-        surfaceVariant = Indigo,
+        primary = Watermelon,
+        // Pressed or latched accent. Black glyphs on it measure 3.28, which is enough for
+        // the shift icon it carries but is why no text is ever drawn on it.
+        primaryVariant = WatermelonShade,
+        secondary = DarkBorder,
+        background = DarkBackground,
+        surface = Graphite,
+        // Special keys and the suggestion strip: one step up from the key fill.
+        surfaceVariant = DarkBorder,
         error = ErrorRedDark,
-        // Near-black rather than Cream. See the note above -- this is not a
-        // stylistic preference, Cream on Fern cannot be read.
-        onPrimary = TrueBlack,
-        onSecondary = Cream,
-        onBackground = Cream,
-        onSurface = Cream,
-        onSurfaceVariant = Cream,
+        onPrimary = OnAccent,
+        onSecondary = Porcelain,
+        onBackground = Porcelain,
+        onSurface = Porcelain,
+        // Muted ink: 6.14 on a card, 4.24 on a special key, where it draws icons.
+        onSurfaceVariant = DarkInkMuted,
         onError = Color.White,
         isLight = false,
+        accentText = WatermelonTint,
+        onAccentText = OnAccent,
+        outline = DarkBorder,
     )
 
 fun lightStickyKeysColors() =
     StickyKeysColors(
-        // FernDeep rather than Fern: the light palette puts white on the accent,
-        // and white on Fern is 2.15 against 6.21 on FernDeep.
-        primary = FernDeep,
-        primaryVariant = Sage,
-        secondary = Taupe,
-        background = Cream,
-        surface = CreamSurface,
-        surfaceVariant = CreamSurfaceVariant,
+        primary = Watermelon,
+        primaryVariant = WatermelonShade,
+        secondary = LightBorder,
+        background = Porcelain,
+        surface = LightSurface,
+        surfaceVariant = LightBorder,
         error = ErrorRed,
-        onPrimary = Color.White,
-        onSecondary = Cream,
-        // Indigo is sticky6's darkest tone and reads 8.68 on Cream, so the light
-        // palette's foreground comes from the board rather than from Ink.
-        onBackground = Indigo,
-        onSurface = Indigo,
-        onSurfaceVariant = Indigo,
+        onPrimary = OnAccent,
+        onSecondary = Graphite,
+        onBackground = Graphite,
+        onSurface = Graphite,
+        onSurfaceVariant = LightInkMuted,
         onError = Color.White,
         isLight = true,
+        accentText = WatermelonShade,
+        onAccentText = Porcelain,
+        outline = LightBorder,
     )

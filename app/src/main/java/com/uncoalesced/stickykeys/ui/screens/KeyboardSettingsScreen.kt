@@ -59,7 +59,10 @@ import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.ScreenHeading
 import com.uncoalesced.stickykeys.ui.components.SettingsGroup
+import com.uncoalesced.stickykeys.ui.components.brandSliderColors
+import com.uncoalesced.stickykeys.ui.components.brandSwitchColors
 import java.text.NumberFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -176,10 +179,8 @@ fun KeyboardSettingsScreen(
                         .padding(16.dp)
                         .verticalScroll(rememberScrollState()),
             ) {
-                Text(
+                ScreenHeading(
                     text = "Keyboard",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
                 )
 
@@ -274,7 +275,7 @@ fun KeyboardSettingsScreen(
                         Icon(imageVector = Icons.Outlined.Search, contentDescription = null)
                     },
                     singleLine = true,
-                    shape = StickyKeysTheme.shapes.pill,
+                    shape = StickyKeysTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                 )
 
@@ -733,9 +734,8 @@ fun KeyboardSettingsScreen(
 /**
  * One headline count: a large number over a small label.
  *
- * The number is in the body colour, not the accent. Fern is already the section label above it,
- * and a large accent number beside a small accent label would make the two compete for the same
- * attention.
+ * The number is in the body colour, not the accent. Watermelon is a fill under this palette and
+ * measures 3.12 on the card, so a number in it would be decoration rather than a reading.
  */
 @Composable
 private fun StatFigure(
@@ -799,7 +799,7 @@ private fun WeekBars(counts: List<Long>) {
                         .weight(1f)
                         .fillMaxHeight(fraction)
                         .background(
-                            MaterialTheme.colorScheme.primary,
+                            StickyKeysTheme.colors.primary,
                             StickyKeysTheme.shapes.small,
                         ),
             )
@@ -829,7 +829,11 @@ private fun SettingsSwitchRow(
                 )
             }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = brandSwitchColors(),
+        )
     }
 }
 
@@ -879,6 +883,7 @@ private fun SettingsSliderRow(
         }
         Slider(
             value = value,
+            colors = brandSliderColors(),
             onValueChange = onValueChange,
             valueRange = valueRange,
             steps = steps,

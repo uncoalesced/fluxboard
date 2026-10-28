@@ -78,7 +78,7 @@ class FieldTypeHarnessActivity : Activity() {
     private fun label(text: String): TextView =
         TextView(this).apply {
             this.text = text
-            setTextColor(Color.parseColor("#7CAE7A"))
+            setTextColor(Color.parseColor("#F47790"))
             gravity = Gravity.START
             setPadding(0, PAD, 0, 0)
         }
