@@ -28,8 +28,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_COLOR_ANIM_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_SCALE
-import com.uncoalesced.stickykeys.keyboardcore.theme.PressSpring
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.motionMs
+import com.uncoalesced.stickykeys.keyboardcore.theme.pressAnimationSpec
 import com.uncoalesced.stickykeys.keyboardcore.theme.pressedFill
 
 /**
@@ -58,7 +59,7 @@ internal fun StripChip(
     val scale by
         animateFloatAsState(
             targetValue = if (pressed) PRESS_SCALE else 1f,
-            animationSpec = PressSpring,
+            animationSpec = pressAnimationSpec(),
             label = "chip-scale",
         )
     val resting = StickyKeysTheme.colors.surfaceVariant
@@ -66,7 +67,7 @@ internal fun StripChip(
     val background by
         animateColorAsState(
             if (pressed) pressedFill(resting, accent) else resting,
-            animationSpec = tween(if (pressed) 0 else PRESS_COLOR_ANIM_MS),
+            animationSpec = tween(if (pressed) 0 else motionMs(PRESS_COLOR_ANIM_MS)),
             label = "chip-background",
         )
     Text(

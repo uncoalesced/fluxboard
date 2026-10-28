@@ -48,9 +48,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.uncoalesced.stickykeys.keyboardcore.theme.DOCK_COLLAPSED_WEIGHT
 import com.uncoalesced.stickykeys.keyboardcore.theme.DOCK_EXPANDED_WEIGHT
-import com.uncoalesced.stickykeys.keyboardcore.theme.ExpandSpring
+import com.uncoalesced.stickykeys.keyboardcore.theme.DOCK_EXPAND_MS
+import com.uncoalesced.stickykeys.keyboardcore.theme.MotionEaseOut
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_COLOR_ANIM_MS
+import com.uncoalesced.stickykeys.keyboardcore.theme.SCREEN_FADE_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.motionMs
 import com.uncoalesced.stickykeys.ui.screens.AppSettingsScreen
 import com.uncoalesced.stickykeys.ui.screens.DevicePairingScreen
 import com.uncoalesced.stickykeys.ui.screens.KeyboardSettingsScreen
@@ -149,8 +152,16 @@ fun AppNavGraph(
             )
         },
     ) { innerPadding ->
+        val screenFadeMs = motionMs(SCREEN_FADE_MS)
         NavHost(
             navController = navController,
+            // A short crossfade in place of the library's 700ms default, and no slide: the
+            // dock order is not a spatial order a slide would be honest about, and a fade
+            // cannot move anything under the user's thumb. Zero under reduced motion.
+            enterTransition = { fadeIn(tween(screenFadeMs, easing = MotionEaseOut)) },
+            exitTransition = { fadeOut(tween(screenFadeMs, easing = MotionEaseOut)) },
+            popEnterTransition = { fadeIn(tween(screenFadeMs, easing = MotionEaseOut)) },
+            popExitTransition = { fadeOut(tween(screenFadeMs, easing = MotionEaseOut)) },
             // The keyboard, not the sticker library. The keyboard is the app's flagship and
             // the reason almost every launch happens -- landing on Styles meant the common
             // case cost a tap and the first screen described the smaller half of the app.
@@ -363,13 +374,13 @@ private fun PillDock(
             val selected = isSelected(entry.route)
             val weight by animateFloatAsState(
                 targetValue = if (selected) DOCK_EXPANDED_WEIGHT else DOCK_COLLAPSED_WEIGHT,
-                animationSpec = ExpandSpring,
+                animationSpec = tween(motionMs(DOCK_EXPAND_MS), easing = MotionEaseOut),
                 label = "dock-weight",
             )
             val fill by animateColorAsState(
                 targetValue =
                     if (selected) StickyKeysTheme.colors.primary else Color.Transparent,
-                animationSpec = tween(PRESS_COLOR_ANIM_MS),
+                animationSpec = tween(motionMs(PRESS_COLOR_ANIM_MS)),
                 label = "dock-fill",
             )
             Row(
@@ -402,10 +413,17 @@ private fun PillDock(
                         },
                     modifier = Modifier.size(22.dp),
                 )
+                // Same length and curve as the pill's width change, so the label arrives with
+                // the space it needs instead of a default spring racing the tween beside it.
+                val labelMs = motionMs(DOCK_EXPAND_MS)
                 AnimatedVisibility(
                     visible = selected,
-                    enter = fadeIn() + expandHorizontally(),
-                    exit = fadeOut() + shrinkHorizontally(),
+                    enter =
+                        fadeIn(tween(labelMs, easing = MotionEaseOut)) +
+                            expandHorizontally(tween(labelMs, easing = MotionEaseOut)),
+                    exit =
+                        fadeOut(tween(labelMs, easing = MotionEaseOut)) +
+                            shrinkHorizontally(tween(labelMs, easing = MotionEaseOut)),
                 ) {
                     Text(
                         text = entry.title,

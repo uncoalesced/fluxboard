@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,7 +18,9 @@ import com.uncoalesced.stickykeys.data.local.ThemeMode
 import com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
 import com.uncoalesced.stickykeys.keyboardcore.haptics.ProvideHapticIndication
 import com.uncoalesced.stickykeys.keyboardcore.ime.EXTRA_INITIAL_ROUTE
+import com.uncoalesced.stickykeys.keyboardcore.theme.LocalAnimatorScale
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.rememberSystemAnimatorScale
 import com.uncoalesced.stickykeys.navigation.AppNavGraph
 import com.uncoalesced.stickykeys.stickercore.capture.ScreenshotObserver
 import dagger.hilt.android.AndroidEntryPoint
@@ -72,11 +75,17 @@ class MainActivity : ComponentActivity() {
                 // same enable switch and strength slider. Installed once here rather than at
                 // ninety call sites, so screens added later inherit it.
                 ProvideHapticIndication(hapticsManager) {
-                    AppNavGraph(
-                        initialImageUri = sharedImageUri,
-                        initialRoute = initialRoute,
-                        onInitialRouteHandled = { initialRoute = null },
-                    )
+                    // The system animator scale, read once for the whole app, so every
+                    // transition can drop to zero when the user has turned animations off.
+                    CompositionLocalProvider(
+                        LocalAnimatorScale provides rememberSystemAnimatorScale(),
+                    ) {
+                        AppNavGraph(
+                            initialImageUri = sharedImageUri,
+                            initialRoute = initialRoute,
+                            onInitialRouteHandled = { initialRoute = null },
+                        )
+                    }
                 }
             }
         }
