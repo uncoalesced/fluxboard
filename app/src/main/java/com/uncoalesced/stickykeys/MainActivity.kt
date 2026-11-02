@@ -7,17 +7,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.uncoalesced.stickykeys.data.local.AppPreferences
 import com.uncoalesced.stickykeys.data.local.ThemeMode
 import com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
 import com.uncoalesced.stickykeys.keyboardcore.haptics.ProvideHapticIndication
 import com.uncoalesced.stickykeys.keyboardcore.ime.EXTRA_INITIAL_ROUTE
+import com.uncoalesced.stickykeys.keyboardcore.theme.LocalAnimatorScale
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.rememberSystemAnimatorScale
 import com.uncoalesced.stickykeys.navigation.AppNavGraph
 import com.uncoalesced.stickykeys.stickercore.capture.ScreenshotObserver
 import dagger.hilt.android.AndroidEntryPoint
@@ -67,16 +72,31 @@ class MainActivity : ComponentActivity() {
                     ThemeMode.LIGHT -> false
                     ThemeMode.DARK -> true
                 }
+            // Status and navigation bar icons follow the app's theme rather than the
+            // system's. On the Porcelain ground the system's white icons were invisible
+            // whenever the app was set to light while the phone was dark.
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkTheme
+                    isAppearanceLightNavigationBars = !darkTheme
+                }
+            }
             StickyKeysTheme(darkTheme = darkTheme) {
                 // Every button in the app gets the same press haptic as a key, driven by the
                 // same enable switch and strength slider. Installed once here rather than at
                 // ninety call sites, so screens added later inherit it.
                 ProvideHapticIndication(hapticsManager) {
-                    AppNavGraph(
-                        initialImageUri = sharedImageUri,
-                        initialRoute = initialRoute,
-                        onInitialRouteHandled = { initialRoute = null },
-                    )
+                    // The system animator scale, read once for the whole app, so every
+                    // transition can drop to zero when the user has turned animations off.
+                    CompositionLocalProvider(
+                        LocalAnimatorScale provides rememberSystemAnimatorScale(),
+                    ) {
+                        AppNavGraph(
+                            initialImageUri = sharedImageUri,
+                            initialRoute = initialRoute,
+                            onInitialRouteHandled = { initialRoute = null },
+                        )
+                    }
                 }
             }
         }

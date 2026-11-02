@@ -2,6 +2,8 @@
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,8 +30,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.theme.KeyStyle
+import com.uncoalesced.stickykeys.keyboardcore.theme.LocalAnimatorScale
+import com.uncoalesced.stickykeys.keyboardcore.theme.MotionEaseOut
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.keyboardcore.theme.TypeScale
+import com.uncoalesced.stickykeys.keyboardcore.theme.motionMs
+import com.uncoalesced.stickykeys.keyboardcore.theme.rememberSystemAnimatorScale
 import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 
@@ -156,7 +162,14 @@ fun MainIMEView(
             )
         }
 
-    CompositionLocalProvider(LocalImePanelMetrics provides panelMetrics) {
+    // Read once here and handed down as a static local, so the ~80 keys below it look the value
+    // up rather than each asking the system for it.
+    val animatorScale = rememberSystemAnimatorScale()
+
+    CompositionLocalProvider(
+        LocalImePanelMetrics provides panelMetrics,
+        LocalAnimatorScale provides animatorScale,
+    ) {
         StickyKeysTheme(
             darkTheme = activeTheme?.isLight?.not() ?: true,
             typeScale = activeTheme?.typeScale ?: TypeScale.MEDIUM,
@@ -210,11 +223,22 @@ fun MainIMEView(
                     // The three modes are the same height, so a crossfade reads as the surface changing
                     // contents rather than the window jumping. Sliding would fight the IME window, which
                     // is anchored to the bottom of the screen; a fade is the honest motion here.
+                    val modeFadeMs = motionMs(MODE_TRANSITION_MS)
                     AnimatedContent(
                         targetState = currentAppMode,
+                        // No size animation, and that is the important half of this spec. The
+                        // modes share the panel height, but the typing view also carries the
+                        // quick-access rows above the panel, so with those open it is taller
+                        // than the emoji picker. The default SizeTransform animated that
+                        // difference, which in a WRAP_CONTENT IME window means resizing the
+                        // window and relaying out the host app on every frame of the switch.
+                        // Snapping makes it at most one resize, under a fade.
                         transitionSpec = {
-                            (fadeIn(animationSpec = tween(MODE_TRANSITION_MS)))
-                                .togetherWith(fadeOut(animationSpec = tween(MODE_TRANSITION_MS)))
+                            val fadeMs = modeFadeMs
+                            fadeIn(animationSpec = tween(fadeMs, easing = MotionEaseOut))
+                                .togetherWith(
+                                    fadeOut(animationSpec = tween(fadeMs, easing = MotionEaseOut)),
+                                ).using(SizeTransform(clip = false) { _, _ -> snap() })
                         },
                         label = "ime-mode",
                     ) { targetMode ->

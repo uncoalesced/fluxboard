@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Engineered by uncoalesced -->
 <resources>
-    <!-- Light window chrome; values-night/themes.xml carries the Ink dark equivalent.
-         Previously there was only one style, hardcoded to the dark Ink base, so a user
-         on the light palette saw a dark flash before Compose drew. -->
+    <!-- Light window chrome: Porcelain, matching the light palette's ground in Color.kt.
+         values-night/themes.xml carries the dark equivalent. -->
     <style name="Theme.StickyKeys" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#FFE9EDDE</item>
-        <item name="android:statusBarColor">#FFE9EDDE</item>
-        <item name="android:navigationBarColor">#FFE9EDDE</item>
+        <item name="android:windowBackground">#FFFDFFFC</item>
+        <item name="android:statusBarColor">#FFFDFFFC</item>
+        <item name="android:navigationBarColor">#FFFDFFFC</item>
     </style>
 </resources>

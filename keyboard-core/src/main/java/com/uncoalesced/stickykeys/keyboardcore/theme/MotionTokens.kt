@@ -1,10 +1,20 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.theme
 
+import android.provider.Settings
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
 
 /*
  * The keyboard's motion language, in one place.
@@ -70,31 +80,91 @@ internal const val PRESS_ELEVATION_SINK = 0.4f
  * Held as one instance because it reaches every key: a spec allocated per recomposition would
  * be ~80 objects per repaint for a value that never varies.
  *
- * [Spring.DampingRatioMediumBouncy] on a six-percent scale change overshoots by well under one
- * percent, which is why it is safe on a key this small -- but it was chosen without a device in
- * hand, so it is the first thing to damp further if the board feels rubbery in the hand.
+ * Critically damped. It used to be [Spring.DampingRatioMediumBouncy], which overshot by under one
+ * percent on a key; the overshoot was invisible as movement and only made the board feel
+ * slightly rubbery. Nothing in this keyboard bounces now: a key settles, it does not wobble.
  */
 internal val PressSpring =
     spring<Float>(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
+        dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessHigh,
     )
 
 /**
- * The spring an expanding pill uses, in the app's bottom dock.
- *
- * Lower stiffness and no bounce, unlike [PressSpring]. A press is a small, felt event and wants
- * to read as something that moved; a dock item growing to three times its width is a layout
- * change, and overshoot there reads as the bar wobbling rather than as physicality. Here rather
- * than beside the dock so the motion language stays one definition -- this file is the reason
- * the key grid and the suggestion strip cannot drift apart, and the dock is now in the same
- * arrangement.
+ * The press animation for the current motion setting: [PressSpring], or an instant snap when
+ * the system animator scale is zero. Reads a static composition local, so calling it from every
+ * key costs a lookup and never a recomposition.
  */
-val ExpandSpring =
-    spring<Float>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMediumLow,
-    )
+@Composable
+@ReadOnlyComposable
+internal fun pressAnimationSpec(): AnimationSpec<Float> =
+    if (isReducedMotion(LocalAnimatorScale.current)) snap() else PressSpring
+
+/**
+ * Decelerating curve shared by every transition here. Ease-out, because the thing that moved is
+ * already arriving when the eye finds it, and no overshoot, because an overshoot on a layout
+ * change reads as the surface wobbling.
+ */
+val MotionEaseOut: Easing = CubicBezierEasing(0f, 0f, 0.2f, 1f)
+
+/** Length of the dock pill's width change and label fade, in the app's bottom bar. */
+const val DOCK_EXPAND_MS = 200
+
+/** Fade length for moving between screens in the app. */
+const val SCREEN_FADE_MS = 180
+
+/** How long the quick-access chevron takes to turn over. */
+internal const val CHEVRON_TURN_MS = 160
+
+/**
+ * Upper bound on every transition in this file. A transition longer than this stops reading as
+ * feedback and starts reading as a wait; `MotionTokensTest` holds every constant under it.
+ */
+const val MAX_TRANSITION_MS = 200
+
+/**
+ * The system animator duration scale, as `Settings.Global.ANIMATOR_DURATION_SCALE` reports it.
+ *
+ * Static because it is provided once at a root (the IME view, the app's activity) and read by
+ * every key. A static local is a lookup for its readers, where a dynamic one would subscribe
+ * each of ~80 keys to a value that changes about never.
+ */
+val LocalAnimatorScale = staticCompositionLocalOf { 1f }
+
+/** True when the user has switched animations off ("Remove animations", or the scale at 0). */
+fun isReducedMotion(animatorScale: Float): Boolean = animatorScale <= 0f
+
+/**
+ * A transition's length under the given animator scale: unchanged normally, zero when the user
+ * has turned animation off. Pure so the rule is testable without a device.
+ */
+fun motionDurationMs(
+    baseMs: Int,
+    animatorScale: Float,
+): Int = if (isReducedMotion(animatorScale)) 0 else baseMs
+
+/** [motionDurationMs] for the scale provided by [LocalAnimatorScale]. */
+@Composable
+@ReadOnlyComposable
+fun motionMs(baseMs: Int): Int = motionDurationMs(baseMs, LocalAnimatorScale.current)
+
+/**
+ * Reads the system animator scale once per context. A missing or unreadable setting is the
+ * platform default of 1, which is what an unset value means on a stock device.
+ */
+@Composable
+fun rememberSystemAnimatorScale(): Float {
+    val context = LocalContext.current
+    return remember(context) {
+        runCatching {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            )
+        }.getOrDefault(1f)
+    }
+}
 
 /**
  * Share of the dock a collapsed and an expanded item each take.

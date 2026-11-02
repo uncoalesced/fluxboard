@@ -42,6 +42,9 @@ class EmojiPickerViewModel
         private val _emojiGroups = MutableStateFlow<List<EmojiGroup>>(emptyList())
         val emojiGroups: StateFlow<List<EmojiGroup>> = _emojiGroups.asStateFlow()
 
+        /** The tab the user last picked by hand, which the emoji key reopens on. Null until then. */
+        private var rememberedTab: Int? = null
+
         private val _selectedTab = MutableStateFlow(RECENT_TAB)
         val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
 
@@ -115,18 +118,22 @@ class EmojiPickerViewModel
             // show that category's tab as selected while the grid still showed results.
             _searchQuery.value = ""
             _selectedTab.value = index
+            rememberedTab = index
         }
 
         /**
-         * Opens the picker where the emoji key should land it.
+         * Opens the picker where the emoji key should land it: the tab the user last picked,
+         * or Recent on a fresh install (issue #30, roadmap 4L.2).
          *
-         * Recent, unless there is nothing recent yet -- landing a first-time user on an empty
-         * grid would make the feature look broken on the one occasion it gets the most
-         * scrutiny. In that case the first real emoji group is the honest default.
+         * It used to open on Recent every time, overriding whatever tab was left selected, which
+         * was a documented choice and also the complaint: someone who works in Emoticons or a
+         * category had to tap back to it on every open. Only a tab chosen by hand is remembered,
+         * so the stickers key, which sets the tab itself, does not change where this one lands.
+         * See [tabOnOpen] for the empty-Recent fallback.
          */
         fun openAtDefaultTab() {
             refreshRecents()
-            _selectedTab.value = if (_recentEmoji.value.isEmpty()) FIRST_EMOJI_TAB else RECENT_TAB
+            _selectedTab.value = tabOnOpen(rememberedTab, _recentEmoji.value.isEmpty())
         }
 
         /**
@@ -161,6 +168,24 @@ class EmojiPickerViewModel
         }
 
         companion object {
+            /**
+             * The tab to open on, given the one the user last picked ([remembered], null if none)
+             * and whether Recent is empty.
+             *
+             * An empty Recent is never opened on, remembered or not: landing a first-time user on
+             * an empty grid would make the feature look broken on the one occasion it gets the
+             * most scrutiny, so that case falls through to the first real emoji group.
+             */
+            internal fun tabOnOpen(
+                remembered: Int?,
+                recentIsEmpty: Boolean,
+            ): Int =
+                when {
+                    remembered == null || (remembered == RECENT_TAB && recentIsEmpty) ->
+                        if (recentIsEmpty) FIRST_EMOJI_TAB else RECENT_TAB
+                    else -> remembered
+                }
+
             /**
              * Tab 0 is Recent, 1 is Stickers, 2 is Emoticons, and the Unicode groups follow.
              *

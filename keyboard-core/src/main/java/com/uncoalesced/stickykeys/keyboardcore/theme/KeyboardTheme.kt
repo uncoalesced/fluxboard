@@ -41,6 +41,9 @@ data class KeyboardTheme(
         colorsJson.put("onSurface", colorToHex(colors.onSurface))
         colorsJson.put("onSurfaceVariant", colorToHex(colors.onSurfaceVariant))
         colorsJson.put("onError", colorToHex(colors.onError))
+        colorsJson.put("accentText", colorToHex(colors.accentText))
+        colorsJson.put("onAccentText", colorToHex(colors.onAccentText))
+        colorsJson.put("outline", colorToHex(colors.outline))
 
         json.put("colors", colorsJson)
         json.put("keyStyle", keyStyle.toJson())
@@ -214,7 +217,15 @@ data class KeyboardTheme(
                     onSurfaceVariant = hexToColor(colorsJson.getString("onSurfaceVariant")),
                     onError = hexToColor(colorsJson.getString("onError")),
                     isLight = isLight,
-                )
+                ).let { base ->
+                    // Optional: absent from every theme saved before the accent was split into
+                    // a fill and a text tone, and those keep their single-accent behaviour.
+                    base.copy(
+                        accentText = colorsJson.optColor("accentText") ?: base.accentText,
+                        onAccentText = colorsJson.optColor("onAccentText") ?: base.onAccentText,
+                        outline = colorsJson.optColor("outline") ?: base.outline,
+                    )
+                }
 
             val typeScaleStr = json.optString("typeScale", "MEDIUM")
             val typeScale =
@@ -254,5 +265,8 @@ data class KeyboardTheme(
             String.format("#%08X", (0xFFFFFFFF and color.toArgb().toLong()))
 
         private fun hexToColor(hex: String): Color = Color(android.graphics.Color.parseColor(hex))
+
+        private fun JSONObject.optColor(key: String): Color? =
+            optString(key).takeIf { it.isNotEmpty() }?.let(::hexToColor)
     }
 }

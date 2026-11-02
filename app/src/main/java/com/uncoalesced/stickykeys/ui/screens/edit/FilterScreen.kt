@@ -198,7 +198,7 @@ fun FilterScreen(
                     }) {
                         Text(
                             stringResource(R.string.text_apply),
-                            color = StickyKeysTheme.colors.primary,
+                            color = StickyKeysTheme.colors.accentText,
                         )
                     }
                 },

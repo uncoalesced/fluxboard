@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engineered by uncoalesced -->
+<!-- Dock icon for the Keyboard screen. Outlined at a 2dp stroke so it sits beside the
+     Material outlined settings icon at the same weight. The filled brand mark stays in
+     keyboard-core for the system IME picker, where it is drawn on its own. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M4,6h16a1,1 0,0 1,1 1v10a1,1 0,0 1,-1 1h-16a1,1 0,0 1,-1 -1v-10a1,1 0,0 1,1 -1z"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M6,9h2v2h-2z M11,9h2v2h-2z M16,9h2v2h-2z M8,13h8v2h-8z" />
+</vector>

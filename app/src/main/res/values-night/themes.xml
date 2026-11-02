@@ -2,13 +2,13 @@
 <!-- Engineered by uncoalesced -->
 <resources>
     <!-- The pre-Compose window for dark mode. values/themes.xml carries the light
-         equivalent, so a user on the light palette no longer sees a dark flash before
-         Compose draws, and a user on dark no longer sees a light one. -->
+         equivalent, so a user on the light palette does not see a dark flash before
+         Compose draws, and a user on dark does not see a light one. -->
     <style name="Theme.StickyKeys" parent="android:Theme.Material.NoActionBar">
-        <!-- Pure black, matching the dark palette's background token. Kept in sync by hand:
-             this is the pre-Compose window, so it cannot read the Kotlin token. -->
-        <item name="android:windowBackground">#FF000000</item>
-        <item name="android:statusBarColor">#FF000000</item>
-        <item name="android:navigationBarColor">#FF000000</item>
+        <!-- The dark ground, #262626, matching DarkBackground in Color.kt. Kept in sync
+             by hand: this is the pre-Compose window, so it cannot read the Kotlin token. -->
+        <item name="android:windowBackground">#FF262626</item>
+        <item name="android:statusBarColor">#FF262626</item>
+        <item name="android:navigationBarColor">#FF262626</item>
     </style>
 </resources>

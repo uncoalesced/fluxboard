@@ -65,6 +65,7 @@ import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.ScreenHeading
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -218,13 +219,9 @@ fun StickersLibraryScreen(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(
-                            text = stringResource(R.string.text_styles),
-                            style = StickyKeysTheme.typography.titleLarge,
-                            // The accent, matching the section headings on the other two
-                            // tabs. The palette has one and the app was barely using it.
-                            color = StickyKeysTheme.colors.primary,
-                        )
+                        // The same heading the Keyboard tab opens with, so moving between
+                        // tabs does not change the weight of the first thing read.
+                        ScreenHeading(text = stringResource(R.string.text_styles))
                         if (current.stickers.isNotEmpty()) {
                             Text(
                                 text =
@@ -252,7 +249,11 @@ fun StickersLibraryScreen(
                                         }
                             }.coerceAtLeast(0),
                         edgePadding = StickyKeysTheme.spacing.sm,
-                        containerColor = StickyKeysTheme.colors.surfaceVariant,
+                        // On the ground with ink labels. The tab text used to inherit the accent
+                        // text tone over a #4B4B4B strip, 3.27, under what a label needs; the
+                        // accent stays on the indicator line, which is a fill.
+                        containerColor = StickyKeysTheme.colors.background,
+                        contentColor = StickyKeysTheme.colors.onBackground,
                     ) {
                         Tab(
                             selected = current.currentTab is TabFilter.All,

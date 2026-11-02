@@ -24,15 +24,17 @@ internal fun handleKeyPress(
             setMode(nextShiftMode(currentMode, viewModel.consumeShiftTapGap()))
         }
         "SYMBOLS_SHIFT" -> {
-            setMode(
+            val page =
                 if (currentMode == KeyboardMode.SYMBOLS) {
                     KeyboardMode.SYMBOLS_SHIFTED
                 } else {
                     KeyboardMode.SYMBOLS
-                },
-            )
+                }
+            viewModel.symbolsPageMemory.remember(page)
+            setMode(page)
         }
-        "SYMBOLS" -> setMode(KeyboardMode.SYMBOLS)
+        // Opens on the page the user last used, not always the first one (issue #30).
+        "SYMBOLS" -> setMode(viewModel.symbolsPageMemory.page)
         "ABC" -> setMode(KeyboardMode.LETTERS_LOWER)
         // One tap from either key straight into the unified picker: no menu, no intermediate
         // panel. They differ only in which tab the picker opens on.

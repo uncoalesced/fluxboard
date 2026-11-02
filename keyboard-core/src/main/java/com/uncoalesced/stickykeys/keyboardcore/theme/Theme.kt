@@ -1,11 +1,13 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.unit.dp
 
 val LocalStickyKeysColors =
     staticCompositionLocalOf<StickyKeysColors> {
@@ -84,65 +86,82 @@ fun StickyKeysTheme(
     val spacing = defaultStickyKeysSpacing
     val shapes = defaultStickyKeysShapes
 
-    // We still wrap in MaterialTheme just to provide basic defaults to underlying
-    // Material components (like Ripple, Dialog, Surface defaults), but we map them
-    // conceptually to our tokens to ensure a consistent look.
-    // Nine more M3 slots mapped below, on top of the eight already forwarded. Material
-    // components (dialogs, ripples, dropdown menus) read these directly and previously fell
-    // back to M3's own baseline purple the instant they touched a slot this block did not set
-    // -- visible as an inconsistency between FluxBoard's own drawn UI and anything routed
-    // through stock Material. None of these are new colors: StickyKeysColors already carries
-    // every value used here, this only widens how much of it Material sees.
+    // Material components (dialogs, buttons, text fields, menus) read these slots directly, so
+    // every one of them is mapped rather than left to M3's baseline purple.
     //
-    // outline is the one exception -- StickyKeysColors has no border/divider field, so it
-    // reads Taupe directly rather than adding one. Taupe is already documented in Color.kt as
-    // the "warm neutral," and outline (dividers, unfocused borders) never sits adjacent to
-    // secondary on screen, so reusing the same hex for both is safe.
+    // Material's `primary` is the accent *text* colour, not the Watermelon fill. Material draws
+    // text in its primary slot all over the place -- every TextButton label, every
+    // OutlinedButton label, a focused field's label -- and Watermelon is 3.12 to 3.73 against
+    // this app's grounds, under the 4.5 that normal-size text needs. Mapping the fill there would
+    // put sub-contrast text on every dialog. So Material buttons fill with the text tone (Tint in
+    // dark, 7.89 with a black label; Shade in light, 6.36 with a Porcelain label), and the places
+    // the brand reserves for the pure accent -- switches, sliders, the dock, indicators, the
+    // keyboard's own accent key -- ask for `StickyKeysTheme.colors.primary` explicitly.
+    //
+    // `tertiary` is the pure accent, for the one small piece of Material that wants a loud fill
+    // with a dark label (the pre-release badge): black on Watermelon is 5.18.
     val materialColors =
         if (darkTheme) {
             androidx.compose.material3.darkColorScheme(
-                primary = colors.primary,
-                background = colors.background,
-                surface = colors.surface,
-                error = colors.error,
-                onPrimary = colors.onPrimary,
-                onBackground = colors.onBackground,
-                onSurface = colors.onSurface,
-                onError = colors.onError,
+                primary = colors.accentText,
+                onPrimary = colors.onAccentText,
+                primaryContainer = colors.primaryVariant,
+                onPrimaryContainer = Porcelain,
                 secondary = colors.secondary,
                 onSecondary = colors.onSecondary,
-                primaryContainer = colors.primaryVariant,
-                onPrimaryContainer = colors.onSurface,
                 secondaryContainer = colors.surfaceVariant,
-                onSecondaryContainer = colors.onSurfaceVariant,
+                onSecondaryContainer = colors.onSurface,
+                tertiary = colors.primary,
+                onTertiary = colors.onPrimary,
+                tertiaryContainer = colors.surface,
+                onTertiaryContainer = colors.onSurface,
+                background = colors.background,
+                onBackground = colors.onBackground,
+                surface = colors.background,
+                onSurface = colors.onSurface,
                 surfaceVariant = colors.surfaceVariant,
                 onSurfaceVariant = colors.onSurfaceVariant,
+                surfaceContainerLowest = colors.background,
+                surfaceContainerLow = colors.surface,
                 surfaceContainer = colors.surface,
-                outline = Taupe,
+                surfaceContainerHigh = colors.surface,
+                surfaceContainerHighest = colors.surfaceVariant,
+                error = colors.error,
+                onError = colors.onError,
+                outline = colors.outline,
+                outlineVariant = colors.outline,
             )
         } else {
             androidx.compose.material3.lightColorScheme(
-                primary = colors.primary,
-                background = colors.background,
-                surface = colors.surface,
-                error = colors.error,
-                onPrimary = colors.onPrimary,
-                onBackground = colors.onBackground,
-                onSurface = colors.onSurface,
-                onError = colors.onError,
+                primary = colors.accentText,
+                onPrimary = colors.onAccentText,
+                primaryContainer = colors.primaryVariant,
+                onPrimaryContainer = Porcelain,
                 secondary = colors.secondary,
                 onSecondary = colors.onSecondary,
-                primaryContainer = colors.primaryVariant,
-                onPrimaryContainer = colors.onSurface,
                 secondaryContainer = colors.surfaceVariant,
-                onSecondaryContainer = colors.onSurfaceVariant,
+                onSecondaryContainer = colors.onSurface,
+                tertiary = colors.primary,
+                onTertiary = colors.onPrimary,
+                tertiaryContainer = colors.surface,
+                onTertiaryContainer = colors.onSurface,
+                background = colors.background,
+                onBackground = colors.onBackground,
+                surface = colors.background,
+                onSurface = colors.onSurface,
                 surfaceVariant = colors.surfaceVariant,
                 onSurfaceVariant = colors.onSurfaceVariant,
+                surfaceContainerLowest = colors.background,
+                surfaceContainerLow = colors.surface,
                 surfaceContainer = colors.surface,
-                outline = Taupe,
+                surfaceContainerHigh = colors.surface,
+                surfaceContainerHighest = colors.surfaceVariant,
+                error = colors.error,
+                onError = colors.onError,
+                outline = colors.outline,
+                outlineVariant = colors.outline,
             )
         }
-
     CompositionLocalProvider(
         LocalStickyKeysColors provides colors,
         LocalStickyKeysTypography provides typography,
@@ -152,6 +171,17 @@ fun StickyKeysTheme(
     ) {
         MaterialTheme(
             colorScheme = materialColors,
+            typography = fluxMaterialTypography(),
+            // Dialogs, menus, sheets and text fields take the brand's two radii instead of
+            // Material's 28dp dialog and 16dp sheet corners.
+            shapes =
+                androidx.compose.material3.Shapes(
+                    extraSmall = RoundedCornerShape(4.dp),
+                    small = RoundedCornerShape(4.dp),
+                    medium = RoundedCornerShape(10.dp),
+                    large = RoundedCornerShape(10.dp),
+                    extraLarge = RoundedCornerShape(10.dp),
+                ),
             content = content,
         )
     }

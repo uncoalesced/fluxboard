@@ -387,7 +387,7 @@ fun TypingKeyboardView(
                                         label = "Undo: ${undo.original}",
                                         description =
                                             "Undo autocorrect, restore ${undo.original}",
-                                        color = StickyKeysTheme.colors.primary,
+                                        color = StickyKeysTheme.colors.accentText,
                                         announce = true,
                                         onClick = {
                                             // Corrected -> original, one round-trip.

@@ -54,8 +54,19 @@ class MigrationServer
 
         private var serverSocket: ServerSocket? = null
 
+        /**
+         * Set by [stopServer] before it closes the socket. Closing the socket is how a blocked
+         * `accept()` is woken, so the exception that follows is the stop working, not a fault.
+         * Without this the catch below overwrote the Idle that [stopServer] had just set with
+         * "Socket closed", and the next visit to the transfer controls showed that error instead
+         * of the Send and Receive buttons.
+         */
+        @Volatile
+        private var stopRequested = false
+
         suspend fun startServer(includeClipboard: Boolean) =
             withContext(Dispatchers.IO) {
+                stopRequested = false
                 try {
                     packager.purgeScratchFiles()
                     serverSocket = ServerSocket(0)
@@ -123,12 +134,15 @@ class MigrationServer
 
                     _state.value = MigrationServerState.Success
                 } catch (e: Exception) {
-                    _state.value = MigrationServerState.Error(e.message ?: "Server Error")
+                    if (!stopRequested) {
+                        _state.value = MigrationServerState.Error(e.message ?: "Server Error")
+                    }
                     serverSocket?.close()
                 }
             }
 
         fun stopServer() {
+            stopRequested = true
             try {
                 serverSocket?.close()
             } catch (e: Exception) {

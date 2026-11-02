@@ -32,9 +32,10 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_COLOR_ANIM_MS
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_SCALE
-import com.uncoalesced.stickykeys.keyboardcore.theme.PressSpring
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysColors
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.keyboardcore.theme.motionMs
+import com.uncoalesced.stickykeys.keyboardcore.theme.pressAnimationSpec
 import com.uncoalesced.stickykeys.keyboardcore.theme.pressedFill
 
 /**
@@ -152,13 +153,13 @@ private fun EditChip(
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) PRESS_SCALE else 1f,
-        animationSpec = PressSpring,
+        animationSpec = pressAnimationSpec(),
         label = "edit-chip-scale",
     )
     val restingFill = if (active) palette.primary else palette.surfaceVariant
     val fill by animateColorAsState(
         targetValue = if (pressed) pressedFill(restingFill, palette.primary) else restingFill,
-        animationSpec = tween(PRESS_COLOR_ANIM_MS),
+        animationSpec = tween(motionMs(PRESS_COLOR_ANIM_MS)),
         label = "edit-chip-fill",
     )
     Box(

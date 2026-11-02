@@ -15,7 +15,7 @@ body:
     attributes:
       label: Version
       description: The exact string from the app's Settings tab.
-      placeholder: v0.1.5-BETA
+      placeholder: v1.0.0-stable
     validations:
       required: true
 
