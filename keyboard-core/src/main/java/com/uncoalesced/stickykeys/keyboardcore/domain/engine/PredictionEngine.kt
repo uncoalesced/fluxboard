@@ -265,12 +265,20 @@ class PredictionEngine
                 // one is ever promoted, and only when none made it on merit, so the ordinary
                 // case is untouched.
                 val bestContraction = contractionSuggestions.maxByOrNull { it.score }?.word
-                return@withContext when {
-                    bestContraction == null -> ranked
-                    ranked.contains(bestContraction) -> ranked
-                    ranked.size < MAX_SUGGESTIONS -> ranked + bestContraction
-                    else -> ranked.dropLast(1) + bestContraction
-                }
+                val strip =
+                    when {
+                        bestContraction == null -> ranked
+                        ranked.contains(bestContraction) -> ranked
+                        ranked.size < MAX_SUGGESTIONS -> ranked + bestContraction
+                        else -> ranked.dropLast(1) + bestContraction
+                    }
+
+                // 6. Give every entry the typed word's case. Tapping a strip entry replaces
+                // the word, so a lowercase entry under "Hel" un-capitalised the sentence:
+                // auto-capitalize made the capital and the tap threw it away. The
+                // correction offers have always done this; the completions never did.
+                val typed = prefix.trim()
+                return@withContext strip.map { spellingCorrector.matchCase(typed, it) }
             }
 
         /**
