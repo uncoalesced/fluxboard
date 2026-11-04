@@ -1,16 +1,17 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens
 
-import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.stickercore.domain.model.Category
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
+import com.uncoalesced.stickykeys.ui.components.attempt
 import com.uncoalesced.stickykeys.ui.components.decodeBitmap
+import com.uncoalesced.stickykeys.ui.components.encodeStickerImage
+import com.uncoalesced.stickykeys.ui.components.encodeStickerThumbnail
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -23,7 +24,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -87,6 +87,15 @@ class StickersViewModel
         private val _isBatchImporting = MutableStateFlow(false)
         val isBatchImporting: StateFlow<Boolean> = _isBatchImporting.asStateFlow()
 
+        private val _batchImportFailures = MutableStateFlow(0)
+
+        /** How many images the last batch could not import; 0 once acknowledged. */
+        val batchImportFailures: StateFlow<Int> = _batchImportFailures.asStateFlow()
+
+        fun clearBatchImportFailures() {
+            _batchImportFailures.value = 0
+        }
+
         fun batchImportStickers(
             uriStrings: List<String>,
             context: android.content.Context,
@@ -94,66 +103,18 @@ class StickersViewModel
             if (uriStrings.isEmpty()) return
             viewModelScope.launch(Dispatchers.IO) {
                 _isBatchImporting.value = true
-
-                uriStrings.forEach { uriStr ->
-                    try {
-                        val finalBmp = context.decodeBitmap(uriStr)
-                        if (finalBmp != null) {
+                val failures =
+                    uriStrings.count { uriStr ->
+                        attempt {
                             // Imported as-is. v1 has no automatic background removal --
                             // use the single-image flow and the manual eraser for cutouts.
-                            val stickerId = UUID.randomUUID().toString()
-                            val webpBytes =
-                                ByteArrayOutputStream()
-                                    .apply {
-                                        if (android.os.Build.VERSION.SDK_INT >=
-                                            android.os.Build.VERSION_CODES.R
-                                        ) {
-                                            finalBmp.compress(
-                                                Bitmap.CompressFormat.WEBP_LOSSLESS,
-                                                100,
-                                                this,
-                                            )
-                                        } else {
-                                            @Suppress("DEPRECATION")
-                                            finalBmp.compress(
-                                                Bitmap.CompressFormat.WEBP,
-                                                100,
-                                                this,
-                                            )
-                                        }
-                                    }.toByteArray()
-
-                            val thumbBytes =
-                                ByteArrayOutputStream()
-                                    .apply {
-                                        val thumbBmp =
-                                            Bitmap.createScaledBitmap(
-                                                finalBmp,
-                                                256,
-                                                256,
-                                                true,
-                                            )
-                                        if (android.os.Build.VERSION.SDK_INT >=
-                                            android.os.Build.VERSION_CODES.R
-                                        ) {
-                                            thumbBmp.compress(
-                                                Bitmap.CompressFormat.WEBP_LOSSY,
-                                                80,
-                                                this,
-                                            )
-                                        } else {
-                                            @Suppress("DEPRECATION")
-                                            thumbBmp.compress(
-                                                Bitmap.CompressFormat.WEBP,
-                                                80,
-                                                this,
-                                            )
-                                        }
-                                    }.toByteArray()
-
-                            val sticker =
+                            val bitmap =
+                                checkNotNull(context.decodeBitmap(uriStr)) {
+                                    "Cannot decode $uriStr"
+                                }
+                            repository.saveSticker(
                                 Sticker(
-                                    id = stickerId,
+                                    id = UUID.randomUUID().toString(),
                                     packId = null,
                                     categoryId = null,
                                     isFavourite = false,
@@ -161,15 +122,20 @@ class StickersViewModel
                                     mimeType = "image/webp",
                                     file = File(""),
                                     thumbnailFile = File(""),
-                                )
-                            repository.saveSticker(sticker, webpBytes, thumbBytes)
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                                ),
+                                encodeStickerImage(bitmap),
+                                encodeStickerThumbnail(bitmap),
+                            )
+                        }.isFailure
                     }
-                }
                 _isBatchImporting.value = false
+                _batchImportFailures.value = failures
             }
+        }
+
+        /** A database write that fails leaves the library as it was rather than crashing. */
+        private fun launchWrite(write: suspend () -> Unit) {
+            viewModelScope.launch { attempt { write() } }
         }
 
         fun selectTab(tab: TabFilter) {
@@ -178,7 +144,7 @@ class StickersViewModel
 
         fun addCategory(name: String) {
             if (name.isBlank()) return
-            viewModelScope.launch {
+            launchWrite {
                 val newCategory =
                     Category(
                         id = UUID.randomUUID().toString(),
@@ -190,7 +156,7 @@ class StickersViewModel
         }
 
         fun deleteCategory(id: String) {
-            viewModelScope.launch {
+            launchWrite {
                 repository.deleteCategory(id)
                 if (_selectedTab.value is TabFilter.CategoryFilter &&
                     (_selectedTab.value as TabFilter.CategoryFilter).category.id == id
@@ -201,7 +167,7 @@ class StickersViewModel
         }
 
         fun toggleFavourite(stickerId: String) {
-            viewModelScope.launch {
+            launchWrite {
                 repository.toggleFavourite(stickerId)
             }
         }
@@ -210,13 +176,13 @@ class StickersViewModel
             sticker: Sticker,
             categoryId: String?,
         ) {
-            viewModelScope.launch {
+            launchWrite {
                 repository.updateStickerMetadata(sticker.copy(categoryId = categoryId))
             }
         }
 
         fun deleteSticker(stickerId: String) {
-            viewModelScope.launch {
+            launchWrite {
                 repository.deleteSticker(stickerId)
             }
         }
