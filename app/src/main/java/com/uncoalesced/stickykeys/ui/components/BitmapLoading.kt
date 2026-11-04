@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.Dispatchers
@@ -101,6 +102,7 @@ fun Context.decodeBitmap(
     }.getOrNull()
 
 /** ImageDecoder applies EXIF orientation itself, and the size it reports is the upright one. */
+@RequiresApi(Build.VERSION_CODES.P)
 private fun Context.decodeWithImageDecoder(uri: Uri): Bitmap =
     ImageDecoder.decodeBitmap(ImageDecoder.createSource(contentResolver, uri)) { decoder, info, _ ->
         val (width, height) = scaledSizeFor(info.size.width, info.size.height)
