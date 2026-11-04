@@ -13,6 +13,14 @@ import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 
 /**
+ * The FileProvider authority for [packageName].
+ *
+ * The manifest declares `${applicationId}.fileprovider`, so a hardcoded id names a provider that
+ * does not exist under the benchmark build's ".benchmark" suffix.
+ */
+internal fun stickerProviderAuthority(packageName: String): String = "$packageName.fileprovider"
+
+/**
  * Commits a sticker into the focused editor through `commitContent`, and refuses taps that
  * arrive too close together.
  *
@@ -49,7 +57,7 @@ internal class StickerCommit(
         val uri =
             FileProvider.getUriForFile(
                 service,
-                "com.uncoalesced.stickykeys.fileprovider",
+                stickerProviderAuthority(service.packageName),
                 file,
             )
 
