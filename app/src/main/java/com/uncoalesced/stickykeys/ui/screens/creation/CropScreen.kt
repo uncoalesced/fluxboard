@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -50,6 +49,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.decodeBitmap
+import com.uncoalesced.stickykeys.ui.components.scaledSizeFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,13 +76,14 @@ fun CropScreen(
                 val bmp =
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                         val source = ImageDecoder.createSource(context.contentResolver, uri)
-                        ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                            val (width, height) = scaledSizeFor(info.size.width, info.size.height)
+                            decoder.setTargetSize(width, height)
                             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                             decoder.isMutableRequired = true
                         }
                     } else {
-                        @Suppress("DEPRECATION")
-                        MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                        context.decodeBitmap(uriString)
                     }
                 bitmap = bmp
             } catch (e: Exception) {
