@@ -108,7 +108,9 @@ fun CropScreen(
         return
     }
 
-    var scale by remember { mutableFloatStateOf(1f) }
+    val source = bitmap!!
+    // Relative to the whole-image fit, so 1 is always "all of it" whatever the photo's size.
+    var zoom by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -128,18 +130,26 @@ fun CropScreen(
                 actions = {
                     TextButton(onClick = {
                         if (isSegmenting) return@TextButton
+                        val viewWidth = containerSize.width.toFloat()
+                        val viewHeight = containerSize.height.toFloat()
+                        val rect =
+                            cropRectFor(
+                                viewWidth,
+                                viewHeight,
+                                source.width,
+                                source.height,
+                                cropFitScale(viewWidth, viewHeight, source.width, source.height) *
+                                    zoom,
+                                offset.x,
+                                offset.y,
+                            )
                         isSegmenting = true
                         coroutineScope.launch {
                             // v1 has no automatic segmentation: save the crop and hand
                             // straight to the manual eraser.
                             val croppedUri =
                                 withContext(Dispatchers.IO) {
-                                    val cacheFile =
-                                        File(context.cacheDir, "crop_${UUID.randomUUID()}.png")
-                                    FileOutputStream(cacheFile).use { out ->
-                                        bitmap!!.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                    }
-                                    Uri.fromFile(cacheFile).toString()
+                                    writeCrop(context.cacheDir, source, rect)
                                 }
                             isSegmenting = false
                             onCropComplete(croppedUri)
@@ -161,27 +171,40 @@ fun CropScreen(
                     .padding(paddingValues)
                     .background(Color.Black)
                     .onSizeChanged { containerSize = it }
-                    .pointerInput(Unit) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(0.5f, 5f)
-                            offset += pan
+                    .pointerInput(source) {
+                        detectTransformGestures { _, pan, gestureZoom, _ ->
+                            zoom = (zoom * gestureZoom).coerceIn(1f, CROP_MAX_ZOOM)
+                            val viewWidth = containerSize.width.toFloat()
+                            val viewHeight = containerSize.height.toFloat()
+                            val total =
+                                cropFitScale(viewWidth, viewHeight, source.width, source.height) *
+                                    zoom
+                            val box = cropBoxSide(viewWidth, viewHeight)
+                            offset =
+                                Offset(
+                                    clampCropOffset(offset.x + pan.x, total * source.width, box),
+                                    clampCropOffset(offset.y + pan.y, total * source.height, box),
+                                )
                         }
                     },
             contentAlignment = Alignment.Center,
         ) {
-            val imgBitmap = bitmap!!.asImageBitmap()
+            val imgBitmap = source.asImageBitmap()
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val cropSize = size.width * 0.8f
+                val cropSize = cropBoxSide(size.width, size.height)
                 val cropOffset = Offset((size.width - cropSize) / 2, (size.height - cropSize) / 2)
+                val total =
+                    cropFitScale(size.width, size.height, source.width, source.height) * zoom
 
-                // Draw image with transformations
+                // The transform cropRectFor inverts: keep the two in step.
                 withTransform({
-                    translate(offset.x, offset.y)
-                    scale(scale, scale)
+                    translate(size.width / 2 + offset.x, size.height / 2 + offset.y)
+                    scale(total, total, pivot = Offset.Zero)
                 }) {
-                    val x = (size.width - imgBitmap.width) / 2
-                    val y = (size.height - imgBitmap.height) / 2
-                    drawImage(imgBitmap, topLeft = Offset(x, y))
+                    drawImage(
+                        imgBitmap,
+                        topLeft = Offset(-imgBitmap.width / 2f, -imgBitmap.height / 2f),
+                    )
                 }
 
                 // Draw overlay mask
@@ -205,4 +228,24 @@ fun CropScreen(
             }
         }
     }
+}
+
+/**
+ * Writes the region of [source] under the crop box to the cache and returns its URI. A null
+ * [rect] means the view was never measured, and then the only honest result is the whole image.
+ */
+private fun writeCrop(
+    cacheDir: File,
+    source: Bitmap,
+    rect: CropRect?,
+): String {
+    val cropped =
+        rect?.let { Bitmap.createBitmap(source, it.left, it.top, it.width, it.height) } ?: source
+    val cacheFile = File(cacheDir, "crop_${UUID.randomUUID()}.png")
+    FileOutputStream(cacheFile).use { out ->
+        cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
+    }
+    // createBitmap hands back source itself for a whole-image rect, and that one is on screen.
+    if (cropped !== source) cropped.recycle()
+    return Uri.fromFile(cacheFile).toString()
 }
