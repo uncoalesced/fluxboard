@@ -84,8 +84,8 @@
     <string name="text_no_categories_found">No categories found.</string>
     <string name="text_delete_category">Delete Category?</string>
     <string name="text_delete">Delete</string>
-    <string name="text_import_video">Import Video</string>
-    <string name="text_extract_screenshot">Extract Screenshot</string>
+    <string name="text_import_video">Video</string>
+    <string name="text_extract_screenshot">Screenshot</string>
     <string name="text_no_screenshot_found">No screenshot found</string>
     <string name="text_no_screenshot_found_body">There are no screenshots in your gallery yet. You can pick any image instead.</string>
     <string name="text_no_screenshot_found_partial">No screenshot among the photos you shared with FluxBoard. Pick one directly, or allow access to more photos from Settings.</string>
@@ -154,6 +154,18 @@
     <string name="text_about">About</string>
     <string name="text_source_code">Source code</string>
     <string name="text_uncoalesced">uncoalesced</string>
+    <string name="text_sticker_save_failed">Could not save this sticker. Check that your phone has free storage and try again.</string>
+    <string name="text_video_load_failed">Could not open this video. It may have been moved or deleted.</string>
+    <string name="desc_import_video">Import a video clip</string>
+    <string name="desc_import_screenshot">Use your latest screenshot</string>
+    <plurals name="import_images_title">
+        <item quantity="one">Import %1$d image</item>
+        <item quantity="other">Import %1$d images</item>
+    </plurals>
+    <plurals name="batch_import_failed">
+        <item quantity="one">%1$d image could not be imported.</item>
+        <item quantity="other">%1$d images could not be imported.</item>
+    </plurals>
     <plurals name="sticker_count">
         <item quantity="one">%1$d sticker</item>
         <item quantity="other">%1$d stickers</item>

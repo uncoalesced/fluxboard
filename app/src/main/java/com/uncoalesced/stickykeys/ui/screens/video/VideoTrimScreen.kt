@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.ErrorScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -57,6 +58,7 @@ fun VideoTrimScreen(
     val videoUri = remember(videoUriString) { Uri.parse(videoUriString) }
 
     var totalDurationMs by remember { mutableLongStateOf(0L) }
+    var loadFailed by remember { mutableStateOf(false) }
     var keyframes by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
 
     var rangeValues by remember { mutableStateOf(0f..10000f) }
@@ -102,6 +104,10 @@ fun VideoTrimScreen(
                 currentPreviewFrame = firstFrame
             } catch (e: Exception) {
                 e.printStackTrace()
+                loadFailed = totalDurationMs == 0L
+            } catch (e: OutOfMemoryError) {
+                e.printStackTrace()
+                loadFailed = totalDurationMs == 0L
             } finally {
                 retriever.release()
             }
@@ -125,10 +131,17 @@ fun VideoTrimScreen(
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } catch (e: OutOfMemoryError) {
+                e.printStackTrace()
             } finally {
                 retriever.release()
             }
         }
+    }
+
+    if (loadFailed) {
+        ErrorScreen(stringResource(R.string.text_video_load_failed), onBack = onCancel)
+        return
     }
 
     if (totalDurationMs == 0L) {

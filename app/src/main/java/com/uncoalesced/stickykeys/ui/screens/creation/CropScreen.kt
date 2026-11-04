@@ -2,9 +2,7 @@
 package com.uncoalesced.stickykeys.ui.screens.creation
 
 import android.graphics.Bitmap
-import android.graphics.ImageDecoder
-import android.net.Uri
-import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -24,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,14 +46,15 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
-import com.uncoalesced.stickykeys.ui.components.decodeBitmap
-import com.uncoalesced.stickykeys.ui.components.scaledSizeFor
+import com.uncoalesced.stickykeys.ui.components.DecodedImage
+import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.attempt
+import com.uncoalesced.stickykeys.ui.components.rememberDecodedImage
+import com.uncoalesced.stickykeys.ui.components.writeBitmapToCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
-import java.util.UUID
 
 @Composable
 fun CropScreen(
@@ -66,40 +64,23 @@ fun CropScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var isSegmenting by remember { mutableStateOf(false) }
+    val decoded = context.rememberDecodedImage(uriString)
+    var isPreparing by remember { mutableStateOf(false) }
+    val saveFailedMessage = stringResource(R.string.text_sticker_save_failed)
 
-    LaunchedEffect(uriString) {
-        withContext(Dispatchers.IO) {
-            try {
-                val uri = Uri.parse(uriString)
-                val bmp =
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        val source = ImageDecoder.createSource(context.contentResolver, uri)
-                        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                            val (width, height) = scaledSizeFor(info.size.width, info.size.height)
-                            decoder.setTargetSize(width, height)
-                            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                            decoder.isMutableRequired = true
-                        }
-                    } else {
-                        context.decodeBitmap(uriString)
-                    }
-                bitmap = bmp
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+    if (decoded is DecodedImage.Failed) {
+        ErrorScreen(stringResource(R.string.text_image_load_failed), onBack = onCancel)
+        return
     }
 
-    if (bitmap == null || isSegmenting) {
+    if (decoded !is DecodedImage.Ready || isPreparing) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 CircularProgressIndicator()
-                if (isSegmenting) {
+                if (isPreparing) {
                     Text(
                         stringResource(R.string.text_segmenting_subject),
                         style = StickyKeysTheme.typography.bodyMedium,
@@ -110,7 +91,7 @@ fun CropScreen(
         return
     }
 
-    val source = bitmap!!
+    val source = decoded.bitmap
     // Relative to the whole-image fit, so 1 is always "all of it" whatever the photo's size.
     var zoom by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -131,7 +112,7 @@ fun CropScreen(
                 },
                 actions = {
                     TextButton(onClick = {
-                        if (isSegmenting) return@TextButton
+                        if (isPreparing) return@TextButton
                         val viewWidth = containerSize.width.toFloat()
                         val viewHeight = containerSize.height.toFloat()
                         val rect =
@@ -145,16 +126,24 @@ fun CropScreen(
                                 offset.x,
                                 offset.y,
                             )
-                        isSegmenting = true
+                        isPreparing = true
                         coroutineScope.launch {
                             // v1 has no automatic segmentation: save the crop and hand
                             // straight to the manual eraser.
                             val croppedUri =
-                                withContext(Dispatchers.IO) {
-                                    writeCrop(context.cacheDir, source, rect)
-                                }
-                            isSegmenting = false
-                            onCropComplete(croppedUri)
+                                attempt {
+                                    withContext(Dispatchers.IO) {
+                                        writeCrop(context.cacheDir, source, rect)
+                                    }
+                                }.getOrNull()
+                            isPreparing = false
+                            if (croppedUri != null) {
+                                onCropComplete(croppedUri)
+                            } else {
+                                Toast
+                                    .makeText(context, saveFailedMessage, Toast.LENGTH_LONG)
+                                    .show()
+                            }
                         }
                     }) {
                         Text(
@@ -243,11 +232,8 @@ private fun writeCrop(
 ): String {
     val cropped =
         rect?.let { Bitmap.createBitmap(source, it.left, it.top, it.width, it.height) } ?: source
-    val cacheFile = File(cacheDir, "crop_${UUID.randomUUID()}.png")
-    FileOutputStream(cacheFile).use { out ->
-        cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
-    }
+    val uri = writeBitmapToCache(cacheDir, "crop", cropped)
     // createBitmap hands back source itself for a whole-image rect, and that one is on screen.
     if (cropped !== source) cropped.recycle()
-    return Uri.fromFile(cacheFile).toString()
+    return uri
 }

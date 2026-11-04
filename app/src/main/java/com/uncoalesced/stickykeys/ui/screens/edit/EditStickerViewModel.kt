@@ -1,21 +1,24 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
-import android.graphics.Bitmap
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.uncoalesced.stickykeys.di.IoDispatcher
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
+import com.uncoalesced.stickykeys.ui.components.attempt
 import com.uncoalesced.stickykeys.ui.components.decodeBitmap
+import com.uncoalesced.stickykeys.ui.components.encodeStickerImage
+import com.uncoalesced.stickykeys.ui.components.encodeStickerThumbnail
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -38,22 +41,28 @@ class EditStickerViewModel
     @Inject
     constructor(
         private val repository: StickerRepository,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<EditStickerUiState>(EditStickerUiState.Loading)
         val uiState: StateFlow<EditStickerUiState> = _uiState.asStateFlow()
 
         fun loadSticker(stickerId: String) {
-            viewModelScope.launch(Dispatchers.IO) {
-                val sticker = repository.getStickerById(stickerId)
-                if (sticker != null && sticker.file.exists()) {
-                    _uiState.value =
+            viewModelScope.launch {
+                val sticker =
+                    attempt {
+                        withContext(ioDispatcher) {
+                            repository.getStickerById(stickerId)?.takeIf { it.file.exists() }
+                        }
+                    }.getOrNull()
+                _uiState.value =
+                    if (sticker != null) {
                         EditStickerUiState.Success(
                             sticker = sticker,
                             currentUriString = Uri.fromFile(sticker.file).toString(),
                         )
-                } else {
-                    _uiState.value = EditStickerUiState.Error("Sticker not found")
-                }
+                    } else {
+                        EditStickerUiState.Error("Sticker not found")
+                    }
             }
         }
 
@@ -64,77 +73,75 @@ class EditStickerViewModel
             }
         }
 
+        /**
+         * Replaces the sticker with the edited image, which is always a static WebP. The recorded
+         * type changes with it, because an edited GIF would otherwise stay indexed as a GIF.
+         */
         fun overwriteSticker(
-            context: android.content.Context,
+            context: Context,
             onComplete: () -> Unit,
+            onFailure: () -> Unit,
         ) {
             val state = _uiState.value
             if (state !is EditStickerUiState.Success) return
-
-            viewModelScope.launch(Dispatchers.IO) {
-                val (webpBytes, thumbBytes) = processBytes(context, state.currentUriString)
-                repository.updateStickerData(state.sticker, webpBytes, thumbBytes)
-                withContext(Dispatchers.Main) { onComplete() }
+            saveEdit(context, state, onComplete, onFailure) { image, thumbnail ->
+                repository.updateStickerData(
+                    state.sticker.copy(mimeType = EDITED_MIME_TYPE),
+                    image,
+                    thumbnail,
+                )
             }
         }
 
         fun saveAsNewSticker(
-            context: android.content.Context,
+            context: Context,
             onComplete: () -> Unit,
+            onFailure: () -> Unit,
         ) {
             val state = _uiState.value
             if (state !is EditStickerUiState.Success) return
-
-            viewModelScope.launch(Dispatchers.IO) {
-                val (webpBytes, thumbBytes) = processBytes(context, state.currentUriString)
-                val newSticker =
+            saveEdit(context, state, onComplete, onFailure) { image, thumbnail ->
+                repository.saveSticker(
                     Sticker(
                         id = UUID.randomUUID().toString(),
                         packId = state.sticker.packId,
                         categoryId = state.sticker.categoryId,
                         isFavourite = false,
                         createdAt = System.currentTimeMillis(),
-                        mimeType = "image/webp",
+                        mimeType = EDITED_MIME_TYPE,
                         file = File(""),
                         thumbnailFile = File(""),
-                    )
-                repository.saveSticker(newSticker, webpBytes, thumbBytes)
-                withContext(Dispatchers.Main) { onComplete() }
+                    ),
+                    image,
+                    thumbnail,
+                )
             }
         }
 
-        private fun processBytes(
-            context: android.content.Context,
-            uriString: String,
-        ): Pair<ByteArray, ByteArray> {
-            val bitmap =
-                checkNotNull(context.decodeBitmap(uriString)) {
-                    "Cannot decode $uriString"
-                }
-
-            val webpBytes =
-                ByteArrayOutputStream()
-                    .apply {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                            bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSLESS, 100, this)
-                        } else {
-                            @Suppress("DEPRECATION")
-                            bitmap.compress(Bitmap.CompressFormat.WEBP, 100, this)
+        /** Runs [store] off the main thread; both callbacks come back on the main thread. */
+        private fun saveEdit(
+            context: Context,
+            state: EditStickerUiState.Success,
+            onComplete: () -> Unit,
+            onFailure: () -> Unit,
+            store: suspend (image: ByteArray, thumbnail: ByteArray) -> Unit,
+        ) {
+            viewModelScope.launch {
+                val saved =
+                    attempt {
+                        withContext(ioDispatcher) {
+                            val bitmap =
+                                checkNotNull(context.decodeBitmap(state.currentUriString)) {
+                                    "Cannot decode ${state.currentUriString}"
+                                }
+                            store(encodeStickerImage(bitmap), encodeStickerThumbnail(bitmap))
                         }
-                    }.toByteArray()
+                    }
+                if (saved.isSuccess) onComplete() else onFailure()
+            }
+        }
 
-            val thumbBytes =
-                ByteArrayOutputStream()
-                    .apply {
-                        val thumbBmp = Bitmap.createScaledBitmap(bitmap, 256, 256, true)
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                            thumbBmp.compress(Bitmap.CompressFormat.WEBP_LOSSY, 80, this)
-                        } else {
-                            @Suppress("DEPRECATION")
-                            thumbBmp.compress(Bitmap.CompressFormat.WEBP, 80, this)
-                        }
-                    }.toByteArray()
-
-            return Pair(webpBytes, thumbBytes)
+        private companion object {
+            const val EDITED_MIME_TYPE = "image/webp"
         }
     }

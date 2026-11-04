@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.edit
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +34,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
-import com.uncoalesced.stickykeys.ui.components.decodeBitmap
+import com.uncoalesced.stickykeys.ui.components.DecodedImage
+import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.rememberDecodedImage
 import com.uncoalesced.stickykeys.ui.screens.creation.CropScreen
 import com.uncoalesced.stickykeys.ui.screens.creation.EraseScreen
 
@@ -59,6 +62,11 @@ fun EditStickerScreen(
         viewModel.loadSticker(stickerId)
     }
 
+    val saveFailedMessage = stringResource(R.string.text_sticker_save_failed)
+    val showSaveFailed = {
+        Toast.makeText(context, saveFailedMessage, Toast.LENGTH_LONG).show()
+    }
+
     when (val state = uiState) {
         is EditStickerUiState.Loading -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -66,9 +74,7 @@ fun EditStickerScreen(
             }
         }
         is EditStickerUiState.Error -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(state.message, color = StickyKeysTheme.colors.error)
-            }
+            ErrorScreen(state.message, onBack = onCancel)
         }
         is EditStickerUiState.Success -> {
             var activeTool by remember { mutableStateOf(EditTool.Overview) }
@@ -79,10 +85,10 @@ fun EditStickerScreen(
                         currentUriString = state.currentUriString,
                         onSelectTool = { activeTool = it },
                         onOverwrite = {
-                            viewModel.overwriteSticker(context, onComplete)
+                            viewModel.overwriteSticker(context, onComplete, showSaveFailed)
                         },
                         onSaveAsNew = {
-                            viewModel.saveAsNewSticker(context, onComplete)
+                            viewModel.saveAsNewSticker(context, onComplete, showSaveFailed)
                         },
                         onCancel = onCancel,
                     )
@@ -141,9 +147,8 @@ private fun EditOverviewScreen(
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
-    var bitmap by remember(currentUriString) {
-        mutableStateOf(context.decodeBitmap(currentUriString))
-    }
+    // Off the main thread: decoding in composition stalled every return from a tool.
+    val decoded = context.rememberDecodedImage(currentUriString)
 
     Scaffold(
         topBar = {
@@ -181,14 +186,19 @@ private fun EditOverviewScreen(
                         ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap!!.asImageBitmap(),
-                        contentDescription = stringResource(R.string.desc_edited_preview),
-                        modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm),
-                    )
-                } else {
-                    CircularProgressIndicator()
+                when (decoded) {
+                    is DecodedImage.Ready ->
+                        Image(
+                            bitmap = decoded.bitmap.asImageBitmap(),
+                            contentDescription = stringResource(R.string.desc_edited_preview),
+                            modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm),
+                        )
+                    is DecodedImage.Failed ->
+                        Text(
+                            stringResource(R.string.text_image_load_failed),
+                            color = StickyKeysTheme.colors.error,
+                        )
+                    is DecodedImage.Loading -> CircularProgressIndicator()
                 }
             }
 
