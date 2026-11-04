@@ -118,21 +118,7 @@ class StickerFileProvider : FileProvider() {
             } catch (e: Exception) {
                 return null
             }
-        if (read < HEADER_BYTES) return null
-
-        fun ascii(
-            offset: Int,
-            text: String,
-        ): Boolean = text.indices.all { header[offset + it] == text[it].code.toByte() }
-
-        return when {
-            // RIFF....WEBP
-            ascii(0, "RIFF") && ascii(8, "WEBP") -> "image/webp"
-            header[0] == 0x89.toByte() && ascii(1, "PNG") -> "image/png"
-            ascii(0, "GIF8") -> "image/gif"
-            header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte() -> "image/jpeg"
-            else -> null
-        }
+        return imageTypeFromHeader(header, read)
     }
 
     private fun extensionFor(mimeType: String?): String? =
@@ -143,10 +129,34 @@ class StickerFileProvider : FileProvider() {
             "image/jpeg" -> "jpg"
             else -> null
         }
+}
 
-    private companion object {
-        /** Enough for the longest signature checked here: RIFF + size + WEBP. */
-        const val HEADER_BYTES = 12
+/** Enough for the longest signature checked here: RIFF + size + WEBP. */
+internal const val HEADER_BYTES = 12
+
+/**
+ * The image type named by the first [length] bytes of [header], or null when unrecognised.
+ *
+ * Pure so the signatures can be tested without a ContentProvider.
+ */
+internal fun imageTypeFromHeader(
+    header: ByteArray,
+    length: Int,
+): String? {
+    if (length < HEADER_BYTES) return null
+
+    fun ascii(
+        offset: Int,
+        text: String,
+    ): Boolean = text.indices.all { header[offset + it] == text[it].code.toByte() }
+
+    return when {
+        // RIFF....WEBP
+        ascii(0, "RIFF") && ascii(8, "WEBP") -> "image/webp"
+        header[0] == 0x89.toByte() && ascii(1, "PNG") -> "image/png"
+        ascii(0, "GIF8") -> "image/gif"
+        header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte() -> "image/jpeg"
+        else -> null
     }
 }
 
