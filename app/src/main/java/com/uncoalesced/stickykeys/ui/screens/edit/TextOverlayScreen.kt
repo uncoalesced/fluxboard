@@ -4,7 +4,7 @@ package com.uncoalesced.stickykeys.ui.screens.edit
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -43,23 +43,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.ImageFit
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.attempt
 import com.uncoalesced.stickykeys.ui.components.decodeBitmap
+import com.uncoalesced.stickykeys.ui.components.writeBitmapToCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.util.UUID
 import androidx.compose.foundation.Canvas as ComposeCanvas
 
 @Composable
@@ -76,6 +79,8 @@ fun TextOverlayScreen(
     var text by remember { mutableStateOf("Sticky!") }
     var textPosition by remember { mutableStateOf(Offset(200f, 200f)) }
     var textSize by remember { mutableFloatStateOf(60f) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    val saveFailedMessage = stringResource(R.string.text_sticker_save_failed)
 
     // Preset theme colors
     val availableColors =
@@ -97,7 +102,7 @@ fun TextOverlayScreen(
 
     if (originalBitmap == null) {
         if (loadFailed) {
-            ErrorScreen(stringResource(R.string.text_image_load_failed))
+            ErrorScreen(stringResource(R.string.text_image_load_failed), onBack = onCancel)
         } else {
             LoadingScreen()
         }
@@ -121,34 +126,38 @@ fun TextOverlayScreen(
                     TextButton(onClick = {
                         coroutineScope.launch {
                             val cachedUri =
-                                withContext(Dispatchers.IO) {
-                                    val bmp = originalBitmap!!
-                                    val resultBmp =
-                                        Bitmap.createBitmap(
-                                            bmp.width,
-                                            bmp.height,
-                                            Bitmap.Config.ARGB_8888,
+                                attempt {
+                                    withContext(Dispatchers.IO) {
+                                        val bmp = originalBitmap!!
+                                        val fit =
+                                            ImageFit.of(
+                                                canvasSize.width.toFloat(),
+                                                canvasSize.height.toFloat(),
+                                                bmp.width,
+                                                bmp.height,
+                                            )
+                                        writeBitmapToCache(
+                                            context.cacheDir,
+                                            "text",
+                                            renderTextOverlay(
+                                                source = bmp,
+                                                text = text,
+                                                colorArgb = selectedColor.toArgb(),
+                                                fit = fit,
+                                                viewX = textPosition.x,
+                                                viewY = textPosition.y,
+                                                viewTextSize = textSize,
+                                            ),
                                         )
-                                    val canvas = Canvas(resultBmp)
-                                    canvas.drawBitmap(bmp, 0f, 0f, null)
-
-                                    val paint =
-                                        Paint().apply {
-                                            color = selectedColor.toArgb()
-                                            textSize = textSize
-                                            isAntiAlias = true
-                                            style = Paint.Style.FILL
-                                        }
-                                    canvas.drawText(text, textPosition.x, textPosition.y, paint)
-
-                                    val cacheFile =
-                                        File(context.cacheDir, "text_${UUID.randomUUID()}.png")
-                                    FileOutputStream(cacheFile).use { out ->
-                                        resultBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
                                     }
-                                    Uri.fromFile(cacheFile).toString()
-                                }
-                            onApplyText(cachedUri)
+                                }.getOrNull()
+                            if (cachedUri != null) {
+                                onApplyText(cachedUri)
+                            } else {
+                                Toast
+                                    .makeText(context, saveFailedMessage, Toast.LENGTH_LONG)
+                                    .show()
+                            }
                         }
                     }) {
                         Text(
@@ -181,6 +190,7 @@ fun TextOverlayScreen(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .onSizeChanged { canvasSize = it }
                             .pointerInput(Unit) {
                                 detectDragGestures { change, dragAmount ->
                                     change.consume()
@@ -188,21 +198,20 @@ fun TextOverlayScreen(
                                 }
                             },
                 ) {
-                    val scale = minOf(size.width / imgBitmap.width, size.height / imgBitmap.height)
-                    val x = (size.width - imgBitmap.width * scale) / 2
-                    val y = (size.height - imgBitmap.height * scale) / 2
-
-                    drawImage(imgBitmap, topLeft = Offset(x, y))
+                    val fit =
+                        ImageFit.of(size.width, size.height, imgBitmap.width, imgBitmap.height)
+                    withTransform({
+                        translate(fit.left, fit.top)
+                        scale(fit.scale, fit.scale, pivot = Offset.Zero)
+                    }) {
+                        drawImage(imgBitmap, topLeft = Offset.Zero)
+                    }
 
                     drawContext.canvas.nativeCanvas.drawText(
                         text,
                         textPosition.x,
                         textPosition.y,
-                        Paint().apply {
-                            color = selectedColor.toArgb()
-                            textSize = textSize
-                            isAntiAlias = true
-                        },
+                        textOverlayPaint(selectedColor.toArgb(), textSize),
                     )
                 }
             }
@@ -257,4 +266,38 @@ fun TextOverlayScreen(
             }
         }
     }
+}
+
+/**
+ * Built with a parameter rather than inside `apply` on the screen: there, `textSize = textSize`
+ * assigns the Paint's own field to itself, so the size slider never did anything.
+ */
+internal fun textOverlayPaint(
+    colorArgb: Int,
+    size: Float,
+): Paint =
+    Paint(Paint.ANTI_ALIAS_FLAG).also {
+        it.color = colorArgb
+        it.textSize = size
+        it.style = Paint.Style.FILL
+    }
+
+/** A copy of [source] with [text] drawn where it appears on screen, at the size it appears. */
+internal fun renderTextOverlay(
+    source: Bitmap,
+    text: String,
+    colorArgb: Int,
+    fit: ImageFit,
+    viewX: Float,
+    viewY: Float,
+    viewTextSize: Float,
+): Bitmap {
+    val result = source.copy(Bitmap.Config.ARGB_8888, true)
+    Canvas(result).drawText(
+        text,
+        fit.toBitmapX(viewX),
+        fit.toBitmapY(viewY),
+        textOverlayPaint(colorArgb, fit.toBitmapLength(viewTextSize)),
+    )
+    return result
 }
