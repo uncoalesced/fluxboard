@@ -187,18 +187,8 @@ internal fun compareMimeType(
 internal fun File.hasRecognisedImageHeader(): Boolean =
     try {
         inputStream().use { stream ->
-            val header = ByteArray(12)
-            if (stream.read(header) < 12) {
-                false
-            } else {
-                val riff =
-                    header[0] == 'R'.code.toByte() &&
-                        header[8] == 'W'.code.toByte()
-                riff ||
-                    header[0] == 0x89.toByte() ||
-                    header[0] == 'G'.code.toByte() ||
-                    header[0] == 0xFF.toByte()
-            }
+            val header = ByteArray(HEADER_BYTES)
+            imageTypeFromHeader(header, stream.read(header)) != null
         }
     } catch (e: Exception) {
         false

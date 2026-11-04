@@ -133,4 +133,12 @@ class StickerFileProviderHeaderTest {
     fun `missing file fails`() {
         assertFalse(File(folder.root, "does-not-exist").hasRecognisedImageHeader())
     }
+
+    @Test
+    fun `hasRecognisedImageHeader rejects garbage that begins like a signature`() {
+        listOf("GARBAGE-TEXT-FILE", "RIFFxxxxWAVEfmt ").forEach { content ->
+            val file = folder.newFile().apply { writeText(content) }
+            assertFalse(content, file.hasRecognisedImageHeader())
+        }
+    }
 }
