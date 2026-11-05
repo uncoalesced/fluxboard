@@ -199,7 +199,7 @@ fun StickersLibraryScreen(
                     ) {
                         // The same heading the Keyboard tab opens with, so moving between
                         // tabs does not change the weight of the first thing read.
-                        ScreenHeading(text = stringResource(R.string.text_styles))
+                        ScreenHeading(text = stringResource(R.string.text_stickers))
                         if (current.stickers.isNotEmpty()) {
                             Text(
                                 text =

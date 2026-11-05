@@ -6,7 +6,7 @@
     <string name="text_manage_categories">Manage Categories</string>
     <string name="text_add_rename_or_delete_your_sticker_categories">Add, rename, or delete your sticker categories</string>
     <string name="text_default_export_format">Default Export Format</string>
-    <string name="text_styles">Styles</string>
+    <string name="text_stickers">Stickers</string>
     <string name="text_library_empty_title">No stickers yet</string>
     <string name="text_library_empty_body">Make one from a photo, a screenshot or a video clip using the buttons below.</string>
     <string name="text_favourites_empty_title">No favourites yet</string>
