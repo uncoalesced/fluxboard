@@ -1,25 +1,19 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.creation
 
-import android.graphics.Bitmap
-import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,26 +22,34 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
+import com.uncoalesced.stickykeys.ui.components.DecodedImage
 import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.ImageFit
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
-import com.uncoalesced.stickykeys.ui.components.decodeBitmap
+import com.uncoalesced.stickykeys.ui.components.attempt
+import com.uncoalesced.stickykeys.ui.components.rememberDecodedImage
+import com.uncoalesced.stickykeys.ui.components.writeBitmapToCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.util.UUID
+
+/** Brush width on screen. Converted per stroke, so it looks the same on any image size. */
+private const val ERASER_BRUSH_WIDTH_PX = 50f
 
 @Composable
 fun EraseScreen(
@@ -57,28 +59,22 @@ fun EraseScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var loadFailed by remember { mutableStateOf(false) }
+    val decoded = context.rememberDecodedImage(uriString)
+    val saveFailedMessage = stringResource(R.string.text_sticker_save_failed)
 
-    val paths = remember { mutableStateListOf<Path>() }
-    var currentPath by remember { mutableStateOf<Path?>(null) }
+    val strokes = remember { mutableStateListOf<EraseStroke>() }
+    var currentStroke by remember { mutableStateOf<EraseStroke?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uriString) {
-        withContext(Dispatchers.IO) {
-            // Mutable ARGB_8888, so erasing can paint transparency.
-            bitmap = context.decodeBitmap(uriString, mutable = true)
-            loadFailed = bitmap == null
-        }
-    }
-
-    if (bitmap == null) {
-        if (loadFailed) {
-            ErrorScreen(stringResource(R.string.text_image_load_failed))
-        } else {
-            LoadingScreen()
-        }
+    if (decoded is DecodedImage.Failed) {
+        ErrorScreen(stringResource(R.string.text_image_load_failed), onBack = onCancel)
         return
     }
+    if (decoded !is DecodedImage.Ready) {
+        LoadingScreen()
+        return
+    }
+    val source = decoded.bitmap
 
     Scaffold(
         topBar = {
@@ -94,48 +90,41 @@ fun EraseScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = {
-                        coroutineScope.launch {
-                            val cachedUri =
-                                withContext(Dispatchers.IO) {
-                                    // In a real implementation, we would apply the paths to the bitmap's canvas using BlendMode.CLEAR
-                                    // Here we create a new bitmap, draw the original, and then draw the eraser paths over it.
-                                    val resultBitmap =
-                                        Bitmap.createBitmap(
-                                            bitmap!!.width,
-                                            bitmap!!.height,
-                                            Bitmap.Config.ARGB_8888,
-                                        )
-                                    val canvas = android.graphics.Canvas(resultBitmap)
-                                    canvas.drawBitmap(bitmap!!, 0f, 0f, null)
-
-                                    val paint =
-                                        android.graphics.Paint().apply {
-                                            color = android.graphics.Color.TRANSPARENT
-                                            xfermode =
-                                                android.graphics.PorterDuffXfermode(
-                                                    android.graphics.PorterDuff.Mode.CLEAR,
-                                                )
-                                            style = android.graphics.Paint.Style.STROKE
-                                            strokeWidth = 50f
-                                            strokeJoin = android.graphics.Paint.Join.ROUND
-                                            strokeCap = android.graphics.Paint.Cap.ROUND
+                    // One stroke at a time. The list drives both the preview and the saved
+                    // image, so removing a stroke here also keeps it out of the sticker.
+                    TextButton(
+                        enabled = !isSaving && strokes.isNotEmpty(),
+                        onClick = { strokes.removeAt(strokes.lastIndex) },
+                    ) {
+                        Text(stringResource(R.string.text_undo))
+                    }
+                    TextButton(
+                        enabled = !isSaving,
+                        onClick = {
+                            isSaving = true
+                            val finished = strokes.toList()
+                            coroutineScope.launch {
+                                val cachedUri =
+                                    attempt {
+                                        withContext(Dispatchers.IO) {
+                                            writeBitmapToCache(
+                                                context.cacheDir,
+                                                "erased",
+                                                applyEraseStrokes(source, finished),
+                                            )
                                         }
-
-                                    // Since we collected Compose Paths, we'd need to map them to android.graphics.Path
-                                    // For simplicity in this Compose layer, we'll just pass the original for now
-                                    // (A full eraser tool requires matrix mapping from screen coordinates to bitmap coordinates)
-
-                                    val cacheFile =
-                                        File(context.cacheDir, "erased_${UUID.randomUUID()}.png")
-                                    FileOutputStream(cacheFile).use { out ->
-                                        resultBitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                    }
-                                    Uri.fromFile(cacheFile).toString()
+                                    }.getOrNull()
+                                isSaving = false
+                                if (cachedUri != null) {
+                                    onEraseComplete(cachedUri)
+                                } else {
+                                    Toast
+                                        .makeText(context, saveFailedMessage, Toast.LENGTH_LONG)
+                                        .show()
                                 }
-                            onEraseComplete(cachedUri)
-                        }
-                    }) {
+                            }
+                        },
+                    ) {
                         Text(
                             stringResource(R.string.text_next),
                             color = StickyKeysTheme.colors.accentText,
@@ -152,72 +141,72 @@ fun EraseScreen(
                     .padding(paddingValues)
                     .background(Color.DarkGray),
         ) {
-            val imgBitmap = bitmap!!.asImageBitmap()
+            val imgBitmap = source.asImageBitmap()
             Canvas(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .pointerInput(Unit) {
+                        // Clearing needs a layer of its own, or it would punch through to the
+                        // window rather than revealing the background behind this image.
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .pointerInput(source) {
+                            fun fit() =
+                                ImageFit.of(
+                                    size.width.toFloat(),
+                                    size.height.toFloat(),
+                                    source.width,
+                                    source.height,
+                                )
+
+                            fun pointAt(position: Offset): EraseStrokePoint {
+                                val fit = fit()
+                                return EraseStrokePoint(
+                                    fit.toBitmapX(position.x),
+                                    fit.toBitmapY(position.y),
+                                )
+                            }
                             detectDragGestures(
-                                onDragStart = { offset ->
-                                    currentPath = Path().apply { moveTo(offset.x, offset.y) }
+                                onDragStart = { position ->
+                                    currentStroke =
+                                        EraseStroke(
+                                            points = listOf(pointAt(position)),
+                                            width = fit().toBitmapLength(ERASER_BRUSH_WIDTH_PX),
+                                        )
                                 },
                                 onDrag = { change, _ ->
-                                    currentPath?.lineTo(change.position.x, change.position.y)
-                                    // Force recomposition is not explicitly needed if currentPath is State, but we might need to trigger it
-                                    // by replacing the object or using a snapshot state list.
-                                    // Quick fix:
-                                    val p = currentPath
-                                    currentPath = null
-                                    currentPath = p
+                                    change.consume()
+                                    currentStroke =
+                                        currentStroke?.let {
+                                            it.copy(points = it.points + pointAt(change.position))
+                                        }
                                 },
                                 onDragEnd = {
-                                    currentPath?.let { paths.add(it) }
-                                    currentPath = null
+                                    currentStroke?.let { strokes.add(it) }
+                                    currentStroke = null
                                 },
+                                onDragCancel = { currentStroke = null },
                             )
                         },
             ) {
-                // We'll just draw the image scaled to fit
-                val scale = minOf(size.width / imgBitmap.width, size.height / imgBitmap.height)
-                val x = (size.width - imgBitmap.width * scale) / 2
-                val y = (size.height - imgBitmap.height * scale) / 2
-
+                val fit = ImageFit.of(size.width, size.height, source.width, source.height)
                 withTransform({
-                    translate(x, y)
-                    scale(scale, scale)
+                    translate(fit.left, fit.top)
+                    scale(fit.scale, fit.scale, pivot = Offset.Zero)
                 }) {
                     drawImage(imgBitmap, topLeft = Offset.Zero)
-                }
-
-                // Draw eraser paths visually on top
-                val brushPaint =
-                    androidx.compose.ui.graphics.SolidColor(
-                        Color.Red.copy(alpha = 0.5f),
-                    )
-                paths.forEach { path ->
-                    drawPath(
-                        path,
-                        brushPaint,
-                        style =
-                            androidx.compose.ui.graphics.drawscope.Stroke(
-                                width = 50f,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round,
-                            ),
-                    )
-                }
-                currentPath?.let { path ->
-                    drawPath(
-                        path,
-                        brushPaint,
-                        style =
-                            androidx.compose.ui.graphics.drawscope.Stroke(
-                                width = 50f,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round,
-                            ),
-                    )
+                    (strokes + listOfNotNull(currentStroke)).forEach { stroke ->
+                        drawPath(
+                            erasePathOf(stroke).asComposePath(),
+                            Color.Black,
+                            style =
+                                Stroke(
+                                    width = stroke.width,
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round,
+                                ),
+                            blendMode = BlendMode.Clear,
+                        )
+                    }
                 }
             }
         }

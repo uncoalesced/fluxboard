@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.uncoalesced.stickykeys.R
@@ -83,6 +84,7 @@ fun StickersLibraryScreen(
     var stickerForMenu by remember { mutableStateOf<Sticker?>(null) }
     var pendingImportUris by remember { mutableStateOf<List<String>>(emptyList()) }
     val isBatchImporting by viewModel.isBatchImporting.collectAsState()
+    val batchImportFailures by viewModel.batchImportFailures.collectAsState()
 
     val imagePickerLauncher =
         rememberLauncherForActivityResult(
@@ -133,60 +135,36 @@ fun StickersLibraryScreen(
             Scaffold(
                 containerColor = StickyKeysTheme.colors.background,
                 floatingActionButton = {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val context = LocalContext.current
-                        ExtendedFloatingActionButton(
-                            onClick = {
-                                videoPickerLauncher.launch(
-                                    PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.VideoOnly,
-                                    ),
+                    StickerImportActions(
+                        onImportVideo = {
+                            videoPickerLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.VideoOnly,
+                                ),
+                            )
+                        },
+                        onUseScreenshot = {
+                            // Ask only when we cannot already read. Reading MediaStore for
+                            // images this app did not create needs READ_MEDIA_IMAGES, and
+                            // without it the query returns an empty cursor rather than an
+                            // error -- which is why this button used to do nothing at all
+                            // on every device running API 33 or newer.
+                            if (MediaImageAccess.hasAccess(screenshotContext)) {
+                                grabLatestScreenshot()
+                            } else {
+                                screenshotPermissionLauncher.launch(
+                                    MediaImageAccess.requiredPermissions(),
                                 )
-                            },
-                            containerColor = StickyKeysTheme.colors.surfaceVariant,
-                            contentColor = StickyKeysTheme.colors.onBackground,
-                        ) {
-                            Text(stringResource(R.string.text_import_video))
-                        }
-
-                        ExtendedFloatingActionButton(
-                            onClick = {
-                                // Ask only when we cannot already read. Reading MediaStore for
-                                // images this app did not create needs READ_MEDIA_IMAGES, and
-                                // without it the query returns an empty cursor rather than an
-                                // error -- which is why this button used to do nothing at all
-                                // on every device running API 33 or newer.
-                                if (MediaImageAccess.hasAccess(screenshotContext)) {
-                                    grabLatestScreenshot()
-                                } else {
-                                    screenshotPermissionLauncher.launch(
-                                        MediaImageAccess.requiredPermissions(),
-                                    )
-                                }
-                            },
-                            containerColor = StickyKeysTheme.colors.secondary,
-                            contentColor = StickyKeysTheme.colors.onSecondary,
-                        ) {
-                            Text(stringResource(R.string.text_extract_screenshot))
-                        }
-
-                        FloatingActionButton(
-                            onClick = {
-                                imagePickerLauncher.launch(
-                                    PickVisualMediaRequest(
-                                        ActivityResultContracts.PickVisualMedia.ImageOnly,
-                                    ),
-                                )
-                            },
-                            containerColor = StickyKeysTheme.colors.primary,
-                            contentColor = StickyKeysTheme.colors.onPrimary,
-                        ) {
-                            Text(stringResource(R.string.text_))
-                        }
-                    }
+                            }
+                        },
+                        onPickImage = {
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(
+                                    ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                ),
+                            )
+                        },
+                    )
                 },
             ) { paddingValues ->
                 Column(
@@ -221,7 +199,7 @@ fun StickersLibraryScreen(
                     ) {
                         // The same heading the Keyboard tab opens with, so moving between
                         // tabs does not change the weight of the first thing read.
-                        ScreenHeading(text = stringResource(R.string.text_styles))
+                        ScreenHeading(text = stringResource(R.string.text_stickers))
                         if (current.stickers.isNotEmpty()) {
                             Text(
                                 text =
@@ -337,17 +315,18 @@ fun StickersLibraryScreen(
             }
 
             // Context Options for Sticker
-            if (stickerForMenu != null) {
+            // Held in a local: a second tap can land after the first has cleared the state.
+            stickerForMenu?.let { menuSticker ->
                 StickerContextMenuDialog(
-                    sticker = stickerForMenu!!,
+                    sticker = menuSticker,
                     categories = current.categories,
                     onDismiss = { stickerForMenu = null },
                     onAssignCategory = { catId ->
-                        viewModel.assignCategory(stickerForMenu!!, catId)
+                        viewModel.assignCategory(menuSticker, catId)
                         stickerForMenu = null
                     },
                     onDeleteSticker = {
-                        viewModel.deleteSticker(stickerForMenu!!.id)
+                        viewModel.deleteSticker(menuSticker.id)
                         stickerForMenu = null
                     },
                 )
@@ -358,7 +337,15 @@ fun StickersLibraryScreen(
                 val context = LocalContext.current
                 AlertDialog(
                     onDismissRequest = { pendingImportUris = emptyList() },
-                    title = { Text("Import ${pendingImportUris.size} Images") },
+                    title = {
+                        Text(
+                            pluralStringResource(
+                                R.plurals.import_images_title,
+                                pendingImportUris.size,
+                                pendingImportUris.size,
+                            ),
+                        )
+                    },
                     text = {
                         Text(
                             stringResource(
@@ -386,6 +373,26 @@ fun StickersLibraryScreen(
                             },
                         ) {
                             Text(stringResource(R.string.text_custom_edit))
+                        }
+                    },
+                )
+            }
+
+            if (batchImportFailures > 0) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.clearBatchImportFailures() },
+                    text = {
+                        Text(
+                            pluralStringResource(
+                                R.plurals.batch_import_failed,
+                                batchImportFailures,
+                                batchImportFailures,
+                            ),
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = { viewModel.clearBatchImportFailures() }) {
+                            Text(stringResource(R.string.text_back))
                         }
                     },
                 )
@@ -682,6 +689,66 @@ private fun EmptyLibraryState(tab: TabFilter) {
                 color = StickyKeysTheme.colors.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+/**
+ * The buttons that start a new sticker. Scaffold places this slot against the end margin without
+ * limiting its width, so a row wider than the space left runs off the start of the screen, which
+ * is what clipped the first button. Filling the width less twice that margin keeps it on screen.
+ */
+@Composable
+internal fun StickerImportActions(
+    onImportVideo: () -> Unit,
+    onUseScreenshot: () -> Unit,
+    onPickImage: () -> Unit,
+) {
+    val videoDescription = stringResource(R.string.desc_import_video)
+    val screenshotDescription = stringResource(R.string.desc_import_screenshot)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 32.dp),
+        horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ExtendedFloatingActionButton(
+            onClick = onImportVideo,
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = videoDescription },
+            containerColor = StickyKeysTheme.colors.surfaceVariant,
+            contentColor = StickyKeysTheme.colors.onBackground,
+        ) {
+            Text(
+                stringResource(R.string.text_import_video),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        ExtendedFloatingActionButton(
+            onClick = onUseScreenshot,
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = screenshotDescription },
+            containerColor = StickyKeysTheme.colors.secondary,
+            contentColor = StickyKeysTheme.colors.onSecondary,
+        ) {
+            Text(
+                stringResource(R.string.text_extract_screenshot),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        FloatingActionButton(
+            onClick = onPickImage,
+            containerColor = StickyKeysTheme.colors.primary,
+            contentColor = StickyKeysTheme.colors.onPrimary,
+        ) {
+            Text(stringResource(R.string.text_))
         }
     }
 }

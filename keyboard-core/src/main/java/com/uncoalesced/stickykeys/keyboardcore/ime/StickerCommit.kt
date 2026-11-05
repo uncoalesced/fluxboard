@@ -5,12 +5,23 @@ import android.content.ClipDescription
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.core.content.FileProvider
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
+import com.uncoalesced.stickykeys.keyboardcore.R
 import com.uncoalesced.stickykeys.stickercore.data.file.StickerFileManager
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
+
+/**
+ * The FileProvider authority for [packageName].
+ *
+ * The manifest declares `${applicationId}.fileprovider`, so a hardcoded id names a provider that
+ * does not exist under the benchmark build's ".benchmark" suffix.
+ */
+internal fun stickerProviderAuthority(packageName: String): String = "$packageName.fileprovider"
 
 /**
  * Commits a sticker into the focused editor through `commitContent`, and refuses taps that
@@ -43,18 +54,36 @@ internal class StickerCommit(
         lastCommitAt = now
 
         hapticsManager.performStickerSendHaptic()
+        val delivery =
+            try {
+                deliver(service, sticker)
+            } catch (e: Exception) {
+                // The file provider and the host app can both throw from here, and an exception
+                // on this path would take the keyboard down in the middle of the user's typing.
+                e.printStackTrace()
+                StickerDelivery.Failed
+            }
+        val message = delivery.messageRes ?: return
+        hapticsManager.performKeyPressHaptic()
+        Toast.makeText(service, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun deliver(
+        service: InputMethodService,
+        sticker: Sticker,
+    ): StickerDelivery {
         val file = fileManager.getStickerFile(sticker.id)
-        if (!file.exists()) return
+        if (!file.exists()) return StickerDelivery.Failed
 
         val uri =
             FileProvider.getUriForFile(
                 service,
-                "com.uncoalesced.stickykeys.fileprovider",
+                stickerProviderAuthority(service.packageName),
                 file,
             )
 
-        val editorInfo = service.currentInputEditorInfo ?: return
-        val inputConnection = service.currentInputConnection ?: return
+        val editorInfo = service.currentInputEditorInfo ?: return StickerDelivery.Failed
+        val inputConnection = service.currentInputConnection ?: return StickerDelivery.Failed
 
         // The type the *content* actually is, from the resolver -- which now answers, because
         // the provider reads the file header. The value recorded in Room is used only as a
@@ -63,14 +92,11 @@ internal class StickerCommit(
         val mimeType =
             service.contentResolver.getType(uri) ?: sticker.mimeType
 
-        val declared = EditorInfoCompat.getContentMimeTypes(editorInfo)
-        val accepted = declared.firstOrNull { ClipDescription.compareMimeTypes(mimeType, it) }
-        if (accepted == null) {
-            // The field genuinely does not take this content. Say so rather than doing
-            // nothing: a tap that produces no response at all is indistinguishable from the
-            // keyboard being broken, which is how this reported as "stickers do not work".
-            hapticsManager.performKeyPressHaptic()
-            return
+        // A field that does not take this content gets a message: a tap with no visible response
+        // is indistinguishable from the keyboard being broken, which is how this reported as
+        // "stickers do not work".
+        if (!fieldAcceptsMimeType(mimeType, EditorInfoCompat.getContentMimeTypes(editorInfo))) {
+            return StickerDelivery.NotAccepted
         }
 
         val clip = ClipDescription("Sticker", arrayOf(mimeType))
@@ -101,6 +127,8 @@ internal class StickerCommit(
             )
         }
 
+        // False means the editor declared the type and then refused the content anyway. Nothing
+        // more can be done through the InputConnection.
         val committed =
             InputConnectionCompat.commitContent(
                 inputConnection,
@@ -109,12 +137,7 @@ internal class StickerCommit(
                 flags,
                 null,
             )
-        if (!committed) {
-            // The editor declared the type and then refused the content anyway. Nothing more
-            // can be done through the InputConnection, and silently swallowing it is what
-            // made this look like the sticker feature simply not existing.
-            hapticsManager.performKeyPressHaptic()
-        }
+        return if (committed) StickerDelivery.Delivered else StickerDelivery.NotAccepted
     }
 
     private companion object {
@@ -142,3 +165,18 @@ internal class StickerCommit(
         const val STICKER_COMMIT_MIN_INTERVAL_MS = 300L
     }
 }
+
+/** How a sticker tap ended, and what the user is told about it. */
+internal enum class StickerDelivery(
+    @StringRes val messageRes: Int?,
+) {
+    Delivered(null),
+    NotAccepted(R.string.sticker_not_accepted),
+    Failed(R.string.sticker_send_failed),
+}
+
+/** Whether a field declaring [declared] content types takes [mimeType]. */
+internal fun fieldAcceptsMimeType(
+    mimeType: String,
+    declared: Array<String>,
+): Boolean = declared.any { ClipDescription.compareMimeTypes(mimeType, it) }

@@ -1,7 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.ui.screens.creation
 
-import android.graphics.Bitmap
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,11 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,12 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
-import com.uncoalesced.stickykeys.ui.components.decodeBitmap
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
-import java.util.UUID
+import com.uncoalesced.stickykeys.ui.components.DecodedImage
+import com.uncoalesced.stickykeys.ui.components.ErrorScreen
+import com.uncoalesced.stickykeys.ui.components.rememberDecodedImage
 
 @Composable
 fun SaveStickerScreen(
@@ -49,14 +44,13 @@ fun SaveStickerScreen(
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val decoded = context.rememberDecodedImage(uriString)
     var isSaving by remember { mutableStateOf(false) }
+    val saveFailedMessage = stringResource(R.string.text_sticker_save_failed)
 
-    LaunchedEffect(uriString) {
-        withContext(Dispatchers.IO) {
-            bitmap = context.decodeBitmap(uriString)
-        }
+    if (decoded is DecodedImage.Failed) {
+        ErrorScreen(stringResource(R.string.text_image_load_failed), onBack = onCancel)
+        return
     }
 
     Scaffold(
@@ -84,7 +78,8 @@ fun SaveStickerScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.lg),
         ) {
-            if (bitmap != null) {
+            if (decoded is DecodedImage.Ready) {
+                val bitmap = decoded.bitmap
                 Box(
                     modifier =
                         Modifier
@@ -96,7 +91,7 @@ fun SaveStickerScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
-                        bitmap = bitmap!!.asImageBitmap(),
+                        bitmap = bitmap.asImageBitmap(),
                         contentDescription = stringResource(R.string.desc_preview),
                         modifier = Modifier.fillMaxSize().padding(StickyKeysTheme.spacing.sm),
                     )
@@ -106,65 +101,14 @@ fun SaveStickerScreen(
                     onClick = {
                         if (isSaving) return@Button
                         isSaving = true
-                        coroutineScope.launch {
-                            withContext(Dispatchers.IO) {
-                                val stickerId = UUID.randomUUID().toString()
-                                val webpBytes =
-                                    ByteArrayOutputStream()
-                                        .apply {
-                                            if (android.os.Build.VERSION.SDK_INT >=
-                                                android.os.Build.VERSION_CODES.R
-                                            ) {
-                                                bitmap!!.compress(
-                                                    Bitmap.CompressFormat.WEBP_LOSSLESS,
-                                                    100,
-                                                    this,
-                                                )
-                                            } else {
-                                                @Suppress("DEPRECATION")
-                                                bitmap!!.compress(
-                                                    Bitmap.CompressFormat.WEBP,
-                                                    100,
-                                                    this,
-                                                )
-                                            }
-                                        }.toByteArray()
-
-                                // Thumbnail uses standard lossy WEBP at lower quality
-                                val thumbBytes =
-                                    ByteArrayOutputStream()
-                                        .apply {
-                                            val thumbBmp =
-                                                Bitmap.createScaledBitmap(
-                                                    bitmap!!,
-                                                    256,
-                                                    256,
-                                                    true,
-                                                )
-                                            if (android.os.Build.VERSION.SDK_INT >=
-                                                android.os.Build.VERSION_CODES.R
-                                            ) {
-                                                thumbBmp.compress(
-                                                    Bitmap.CompressFormat.WEBP_LOSSY,
-                                                    80,
-                                                    this,
-                                                )
-                                            } else {
-                                                @Suppress("DEPRECATION")
-                                                thumbBmp.compress(
-                                                    Bitmap.CompressFormat.WEBP,
-                                                    80,
-                                                    this,
-                                                )
-                                            }
-                                        }.toByteArray()
-
-                                viewModel.saveSticker(webpBytes, thumbBytes) {
-                                    isSaving = false
-                                    onSaveComplete()
-                                }
-                            }
-                        }
+                        viewModel.saveSticker(
+                            bitmap = bitmap,
+                            onComplete = onSaveComplete,
+                            onFailure = {
+                                isSaving = false
+                                Toast.makeText(context, saveFailedMessage, Toast.LENGTH_LONG).show()
+                            },
+                        )
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isSaving,

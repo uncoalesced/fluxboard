@@ -84,7 +84,7 @@ fun AppNavGraph(
 
     // The keyboard's settings shortcut lands here. Navigated like a dock tap rather than pushed
     // on top of the stack, so pressing back from it leaves the app instead of returning to the
-    // Styles screen the user never asked for -- and so a second use of the shortcut while the
+    // Stickers screen the user never asked for -- and so a second use of the shortcut while the
     // tab is already open is a no-op rather than a second copy of it.
     LaunchedEffect(initialRoute) {
         val route = initialRoute ?: return@LaunchedEffect
@@ -96,7 +96,7 @@ fun AppNavGraph(
         onInitialRouteHandled()
     }
 
-    // The icons used to be Text(title.first()), so "Styles" and "Settings" both rendered a
+    // The icons used to be Text(title.first()), so "Stickers" and "Settings" both rendered a
     // bare "S" and the bar carried no usable signal at all. All three are now outlined at the
     // same 2dp weight; the filled brand mark beside two outlined glyphs read as a different
     // icon set.
@@ -106,7 +106,7 @@ fun AppNavGraph(
     // moving to a new phone, and it held a quarter of the dock permanently for that.
     val titles =
         mapOf(
-            TopLevelDestinations.STICKERS to "Styles",
+            TopLevelDestinations.STICKERS to "Stickers",
             TopLevelDestinations.KEYBOARD to "Keyboard",
             TopLevelDestinations.SETTINGS to "Settings",
         )
@@ -168,7 +168,7 @@ fun AppNavGraph(
             popEnterTransition = { fadeIn(tween(screenFadeMs, easing = MotionEaseOut)) },
             popExitTransition = { fadeOut(tween(screenFadeMs, easing = MotionEaseOut)) },
             // The keyboard, not the sticker library. The keyboard is the app's flagship and
-            // the reason almost every launch happens -- landing on Styles meant the common
+            // the reason almost every launch happens -- landing on Stickers meant the common
             // case cost a tap and the first screen described the smaller half of the app.
             //
             // This is also the back-stack root every dock tap pops to, so it decides where

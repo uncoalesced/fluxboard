@@ -7,4 +7,6 @@
     <string name="clipboard_empty">Anything you copy while FluxBoard is installed shows up here.</string>
     <string name="text_del">Del</string>
     <string name="text_favourites">Favourites</string>
+    <string name="sticker_not_accepted">This app does not accept stickers here</string>
+    <string name="sticker_send_failed">Could not send that sticker</string>
 </resources>

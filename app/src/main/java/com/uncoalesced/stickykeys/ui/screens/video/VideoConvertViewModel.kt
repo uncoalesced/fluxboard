@@ -2,10 +2,8 @@
 package com.uncoalesced.stickykeys.ui.screens.video
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.data.local.AppPreferences
@@ -14,14 +12,15 @@ import com.uncoalesced.stickykeys.stickercore.animation.AnimatedStickerConverter
 import com.uncoalesced.stickykeys.stickercore.animation.ConversionQuality
 import com.uncoalesced.stickykeys.stickercore.domain.model.Sticker
 import com.uncoalesced.stickykeys.stickercore.domain.repository.StickerRepository
+import com.uncoalesced.stickykeys.ui.components.encodeStickerThumbnail
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -100,10 +99,18 @@ class VideoConvertViewModel
                 try {
                     convert(appContext, Uri.parse(videoUriString), startMs, endMs, quality)
                     _uiState.value = VideoConvertUiState.Done
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     e.printStackTrace()
                     _uiState.value =
                         VideoConvertUiState.Error(e.message ?: "Failed to convert video")
+                } catch (e: OutOfMemoryError) {
+                    // Encoding holds many frames at once, so a long or high-resolution clip can
+                    // legitimately run out of memory. That is a failed conversion, not a crash.
+                    e.printStackTrace()
+                    _uiState.value =
+                        VideoConvertUiState.Error("Not enough memory to convert this clip")
                 }
             }
         }
@@ -169,15 +176,6 @@ class VideoConvertViewModel
                     retriever.release()
                 } ?: return null
 
-            val scaled = Bitmap.createScaledBitmap(firstFrame, 256, 256, true)
-            return ByteArrayOutputStream()
-                .apply {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        scaled.compress(Bitmap.CompressFormat.WEBP_LOSSY, 80, this)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        scaled.compress(Bitmap.CompressFormat.WEBP, 80, this)
-                    }
-                }.toByteArray()
+            return encodeStickerThumbnail(firstFrame)
         }
     }

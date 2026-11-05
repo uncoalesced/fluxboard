@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 /**
  * Instrumented coverage for the Phase 35 sticker and keyboard UI flows.
  *
- * The bottom navigation exposes four tabs: "Styles" (sticker library),
+ * The bottom navigation exposes four tabs: "Stickers" (sticker library),
  * "Keyboard" (keyboard settings), "Transfer", and "Settings" (app settings).
  * Keyboard settings live under the "Keyboard" tab directly -- not under
  * "Settings" -- which the previous version of this test got wrong.
@@ -33,7 +33,7 @@ class SettingsInstrumentedTest {
 
     @Test
     fun stickerLibrary_launchesAndSwitchesTabs() {
-        // The app starts on the "Styles" sticker library (start destination).
+        // The app starts on the "Stickers" sticker library (start destination).
         composeTestRule.onNodeWithText("All").assertIsDisplayed()
         composeTestRule.onNodeWithText("Favourites", substring = true).assertIsDisplayed()
 

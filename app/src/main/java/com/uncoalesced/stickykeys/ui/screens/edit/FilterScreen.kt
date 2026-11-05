@@ -6,7 +6,7 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -45,13 +45,12 @@ import com.uncoalesced.stickykeys.R
 import com.uncoalesced.stickykeys.keyboardcore.theme.StickyKeysTheme
 import com.uncoalesced.stickykeys.ui.components.ErrorScreen
 import com.uncoalesced.stickykeys.ui.components.LoadingScreen
+import com.uncoalesced.stickykeys.ui.components.attempt
 import com.uncoalesced.stickykeys.ui.components.decodeBitmap
+import com.uncoalesced.stickykeys.ui.components.writeBitmapToCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.util.UUID
 import androidx.compose.ui.graphics.ColorMatrix as ComposeColorMatrix
 
 @Composable
@@ -64,6 +63,7 @@ fun FilterScreen(
     val coroutineScope = rememberCoroutineScope()
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
+    val saveFailedMessage = stringResource(R.string.text_sticker_save_failed)
 
     var brightness by remember { mutableFloatStateOf(0f) } // -100 to 100
     var contrast by remember { mutableFloatStateOf(1f) } // 0 to 2
@@ -78,7 +78,7 @@ fun FilterScreen(
 
     if (originalBitmap == null) {
         if (loadFailed) {
-            ErrorScreen(stringResource(R.string.text_image_load_failed))
+            ErrorScreen(stringResource(R.string.text_image_load_failed), onBack = onCancel)
         } else {
             LoadingScreen()
         }
@@ -172,28 +172,29 @@ fun FilterScreen(
                     TextButton(onClick = {
                         coroutineScope.launch {
                             val cachedUri =
-                                withContext(Dispatchers.IO) {
-                                    val bmp = originalBitmap!!
-                                    val resultBmp =
-                                        Bitmap.createBitmap(
-                                            bmp.width,
-                                            bmp.height,
-                                            Bitmap.Config.ARGB_8888,
-                                        )
-                                    val canvas = Canvas(resultBmp)
-                                    val paint = Paint()
-                                    paint.colorFilter =
-                                        ColorMatrixColorFilter(composeColorMatrix.values)
-                                    canvas.drawBitmap(bmp, 0f, 0f, paint)
-
-                                    val cacheFile =
-                                        File(context.cacheDir, "filter_${UUID.randomUUID()}.png")
-                                    FileOutputStream(cacheFile).use { out ->
-                                        resultBmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                                attempt {
+                                    withContext(Dispatchers.IO) {
+                                        val bmp = originalBitmap!!
+                                        val resultBmp =
+                                            Bitmap.createBitmap(
+                                                bmp.width,
+                                                bmp.height,
+                                                Bitmap.Config.ARGB_8888,
+                                            )
+                                        val paint = Paint()
+                                        paint.colorFilter =
+                                            ColorMatrixColorFilter(composeColorMatrix.values)
+                                        Canvas(resultBmp).drawBitmap(bmp, 0f, 0f, paint)
+                                        writeBitmapToCache(context.cacheDir, "filter", resultBmp)
                                     }
-                                    Uri.fromFile(cacheFile).toString()
-                                }
-                            onApplyFilter(cachedUri)
+                                }.getOrNull()
+                            if (cachedUri != null) {
+                                onApplyFilter(cachedUri)
+                            } else {
+                                Toast
+                                    .makeText(context, saveFailedMessage, Toast.LENGTH_LONG)
+                                    .show()
+                            }
                         }
                     }) {
                         Text(
