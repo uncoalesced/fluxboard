@@ -90,6 +90,14 @@ fun EraseScreen(
                     }
                 },
                 actions = {
+                    // One stroke at a time. The list drives both the preview and the saved
+                    // image, so removing a stroke here also keeps it out of the sticker.
+                    TextButton(
+                        enabled = !isSaving && strokes.isNotEmpty(),
+                        onClick = { strokes.removeAt(strokes.lastIndex) },
+                    ) {
+                        Text(stringResource(R.string.text_undo))
+                    }
                     TextButton(
                         enabled = !isSaving,
                         onClick = {

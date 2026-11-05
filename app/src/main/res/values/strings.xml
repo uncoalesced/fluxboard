@@ -113,6 +113,7 @@
     <string name="text_crop_image">Crop Image</string>
     <string name="text_next">Next</string>
     <string name="text_erase_background">Erase Background</string>
+    <string name="text_undo">Undo</string>
     <string name="text_save_sticker">Save Sticker</string>
     <string name="text_save_to_library">Save to Library</string>
     <string name="desc_preview">Preview</string>
