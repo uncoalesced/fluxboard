@@ -5,7 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -50,6 +53,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.R
@@ -82,13 +88,14 @@ fun TextOverlayScreen(
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
     val saveFailedMessage = stringResource(R.string.text_sticker_save_failed)
 
-    // Preset theme colors
+    // Preset theme colors. `secondary` used to be the fourth: it is the border grey in both
+    // palettes, the same value as the card these swatches sit on, so it drew as an empty gap.
     val availableColors =
         listOf(
             Color.White,
             Color.Black,
             StickyKeysTheme.colors.primary,
-            StickyKeysTheme.colors.secondary,
+            StickyKeysTheme.colors.accentText,
             StickyKeysTheme.colors.error,
         )
     var selectedColor by remember { mutableStateOf(availableColors.first()) }
@@ -253,13 +260,49 @@ fun TextOverlayScreen(
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(StickyKeysTheme.spacing.sm),
                     ) {
-                        availableColors.forEach { color ->
-                            Button(
-                                onClick = { selectedColor = color },
-                                colors = ButtonDefaults.buttonColors(containerColor = color),
-                                modifier = Modifier.size(36.dp),
-                                contentPadding = PaddingValues(0.dp),
-                            ) {}
+                        availableColors.forEachIndexed { index, color ->
+                            val isSelected = color == selectedColor
+                            val swatchLabel =
+                                stringResource(
+                                    R.string.text_color_swatch,
+                                    index + 1,
+                                    availableColors.size,
+                                )
+                            // Every swatch gets a thin ring in the muted ink, so no palette colour
+                            // can disappear into the card. The chosen one also gets an outer ring
+                            // with a gap of card colour before it, so the mark stays visible even
+                            // when the ring and the swatch are the same colour.
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(44.dp)
+                                        .border(
+                                            width = 2.dp,
+                                            color =
+                                                if (isSelected) {
+                                                    StickyKeysTheme.colors.onSurface
+                                                } else {
+                                                    Color.Transparent
+                                                },
+                                            shape = CircleShape,
+                                        ).padding(4.dp),
+                            ) {
+                                Button(
+                                    onClick = { selectedColor = color },
+                                    colors = ButtonDefaults.buttonColors(containerColor = color),
+                                    border =
+                                        BorderStroke(
+                                            1.dp,
+                                            StickyKeysTheme.colors.onSurfaceVariant,
+                                        ),
+                                    modifier =
+                                        Modifier.size(36.dp).semantics {
+                                            contentDescription = swatchLabel
+                                            selected = isSelected
+                                        },
+                                    contentPadding = PaddingValues(0.dp),
+                                ) {}
+                            }
                         }
                     }
                 }

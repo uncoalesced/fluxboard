@@ -131,6 +131,7 @@
     <string name="text_add_text_overlay">Add Text Overlay</string>
     <string name="text_sticker_text">Sticker Text</string>
     <string name="text_color">Color</string>
+    <string name="text_color_swatch">Color %1$d of %2$d</string>
     <string name="text_conversion_error">Conversion Error</string>
     <string name="text_image_load_failed">Could not open this image. It may have been moved or deleted.</string>
     <string name="text_creating_gif">Creating GIF...</string>
