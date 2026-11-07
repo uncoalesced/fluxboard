@@ -8,6 +8,8 @@ import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.TypingStatsStore
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PredictionEngine
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.SmartKeyHitbox
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.TouchPoint
 import com.uncoalesced.stickykeys.keyboardcore.haptics.HapticsManager
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyboardLayoutConfig
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
@@ -74,6 +76,17 @@ class TypingViewModel
         /** Whether swiping across the letters decodes into a word. */
         val glideTypingEnabled: StateFlow<Boolean> = keyboardPreferences.glideTypingEnabled
 
+        val bloomTypeBiomechanicalLearning: StateFlow<Boolean> =
+            keyboardPreferences.bloomTypeBiomechanicalLearning
+
+        fun setBloomTypeBiomechanicalLearning(enabled: Boolean) {
+            keyboardPreferences.setBloomTypeBiomechanicalLearning(enabled)
+        }
+
+        fun resetBloomLearning() {
+            predictionEngine.resetBloomSpatialProfile()
+        }
+
         /** Panel sizing, chosen by the user rather than fixed. See `ImePanelHeight`. */
         val keyboardHeightPercent: StateFlow<Int> = keyboardPreferences.keyboardHeightPercent
         val keyboardBottomPaddingDp: StateFlow<Int> = keyboardPreferences.keyboardBottomPaddingDp
@@ -114,6 +127,7 @@ class TypingViewModel
             keyboardPreferences.doubleSpacePeriodEnabled
 
         private var currentWord = ""
+        private val currentWordTouches = mutableListOf<TouchPoint>()
 
         /**
          * The word a run of backspaces is eating, kept so it can be offered back.
@@ -225,6 +239,7 @@ class TypingViewModel
             previousWord = null
             _suggestions.value = emptyList()
             _undoState.value = null
+            currentWordTouches.clear()
             predictionEngine.clearReverts()
             generation++
             detectedFieldKind = fieldKind
@@ -276,6 +291,7 @@ class TypingViewModel
         fun onInputFinished() {
             detectedFieldKind = FieldKind.NORMAL
             hostNoLearning = false
+            currentWordTouches.clear()
             predictionEngine.clearReverts()
             publishPrivacy()
         }
@@ -325,6 +341,7 @@ class TypingViewModel
         fun onGlideCommitted(
             word: String,
             alternatives: List<String>,
+            stroke: com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke? = null,
         ) {
             currentWord = ""
             _undoState.value = null
@@ -332,6 +349,17 @@ class TypingViewModel
             atSentenceStart = false
             publishAutoCapitalize()
             learn(word)
+            if (stroke != null && !_fieldKind.value.isSensitive && keyboardPreferences.bloomTypeBiomechanicalLearning.value) {
+                val trajectory = stroke.bloomTrajectory
+                if (trajectory != null && stroke.keyCentroids.isNotEmpty()) {
+                    predictionEngine.learnGlideWord(
+                        word = word,
+                        trajectory = trajectory,
+                        keyCentroids = { c -> stroke.keyCentroids[c.lowercaseChar()] },
+                        isSensitive = false,
+                    )
+                }
+            }
             // The readings that lost stay in the strip.
             //
             // A glide is wrong more often than a tap -- several real words are usually valid
@@ -472,7 +500,10 @@ class TypingViewModel
             typingStats.recordKeystroke()
         }
 
-        fun onKeyPressed(char: String) {
+        fun onKeyPressed(
+            char: String,
+            touchPoint: TouchPoint? = null,
+        ) {
             // Saved because the key that was just pressed may turn out not to be a keystroke
             // at all -- see onKeyRevoked. One level deep is all that is ever needed: only the
             // press still under the finger can be taken back.
@@ -481,6 +512,9 @@ class TypingViewModel
             // put a word the user has moved on from at the front of the strip.
             backspacedWord = null
             currentWord += char
+            if (char.length == 1) {
+                currentWordTouches.add(touchPoint ?: TouchPoint(char[0], 0f, 0f))
+            }
             _undoState.value = null // Typing clears undo state
             generation++
             // A letter was typed, so we are no longer at a sentence boundary.
@@ -508,6 +542,11 @@ class TypingViewModel
          */
         fun onKeyRevoked(char: String) {
             currentWord = currentWord.dropLast(char.length)
+            repeat(char.length.coerceAtMost(currentWordTouches.size)) {
+                if (currentWordTouches.isNotEmpty()) {
+                    currentWordTouches.removeAt(currentWordTouches.size - 1)
+                }
+            }
             atSentenceStart = atSentenceStartBeforeKey
             generation++
             publishAutoCapitalize()
@@ -527,6 +566,7 @@ class TypingViewModel
          */
         fun onSymbolCommitted(text: String): Int {
             currentWord = ""
+            currentWordTouches.clear()
             _suggestions.value = emptyList()
             _undoState.value = null
             // "." "!" "?" open a new sentence; anything else just continues.
@@ -571,6 +611,7 @@ class TypingViewModel
             val glided = consumeGlideCommit()
             generation++
             if (glided != null) {
+                predictionEngine.revertGlideWord(glided)
                 // A glide clears currentWord and commits its own trailing space, so there is
                 // no partial word here to fall through to. Whether the word being undone sat
                 // at a sentence start is a property of the text in front of it, not of the
@@ -588,6 +629,9 @@ class TypingViewModel
                 // known. Later presses must not overwrite it with the shrinking remainder.
                 if (backspacedWord == null) backspacedWord = currentWord
                 currentWord = currentWord.dropLast(1)
+                if (currentWordTouches.isNotEmpty()) {
+                    currentWordTouches.removeAt(currentWordTouches.size - 1)
+                }
                 // Deleting back to nothing puts the caret where a sentence would start again,
                 // so capitalization has to come back with it. Forcing this false
                 // unconditionally meant clearing a message and retyping it produced a
@@ -668,6 +712,10 @@ class TypingViewModel
             offerCorrections: Boolean = false,
         ) {
             if (word.isNotBlank()) {
+                if (currentWordTouches.isNotEmpty()) {
+                    SmartKeyHitbox.adaptWord(currentWordTouches)
+                    currentWordTouches.clear()
+                }
                 learn(word)
                 if (offerCorrections && !_fieldKind.value.isSensitive) {
                     offerCorrectionsOrPredict(word)
@@ -739,7 +787,8 @@ class TypingViewModel
             // the user typed into a field where they cannot see it to check.
             if (_fieldKind.value.isSensitive) return null
             if (word.isBlank() || !keyboardPreferences.autoCorrectEnabled.value) return null
-            return predictionEngine.getAutoCorrection(word, previousWord, startsClause)
+            val touches = synchronized(currentWordTouches) { currentWordTouches.toList() }
+            return predictionEngine.getAutoCorrection(word, previousWord, startsClause, touches)
         }
 
         fun onAutoCorrected(
@@ -750,6 +799,7 @@ class TypingViewModel
             typingStats.recordAutocorrectAccepted()
             _undoState.value = UndoAction(original, corrected)
             currentWord = ""
+            currentWordTouches.clear()
             _suggestions.value = emptyList()
             learn(corrected)
         }
@@ -797,6 +847,7 @@ class TypingViewModel
             _undoState.value = null
             backspacedWord = null
             currentWord = original
+            currentWordTouches.clear()
             generation++
             atSentenceStart = false
             publishAutoCapitalize()
@@ -852,6 +903,7 @@ class TypingViewModel
          */
         fun onWordAbandoned() {
             currentWord = ""
+            currentWordTouches.clear()
             _suggestions.value = emptyList()
         }
 
