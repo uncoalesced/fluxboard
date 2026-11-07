@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.remember
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.TouchPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -41,6 +42,29 @@ internal fun rememberKeyPressHandler(
                 modeState.value,
                 typingViewModel,
                 coroutineScope,
+            ) { newMode -> modeState.value = newMode }
+        }
+    }
+
+/**
+ * The key press handler for touches with 2D spatial coordinates.
+ */
+@Composable
+internal fun rememberTouchKeyPressHandler(
+    keyboardController: KeyboardController,
+    typingViewModel: TypingViewModel,
+    coroutineScope: CoroutineScope,
+    modeState: MutableState<KeyboardMode>,
+): (String, TouchPoint) -> Unit =
+    remember(keyboardController, typingViewModel, coroutineScope, modeState) {
+        { key: String, touch: TouchPoint ->
+            handleKeyPress(
+                key,
+                keyboardController,
+                modeState.value,
+                typingViewModel,
+                coroutineScope,
+                touchPoint = touch,
             ) { newMode -> modeState.value = newMode }
         }
     }
@@ -167,7 +191,7 @@ internal fun rememberGlideHandler(
                 // keys were never committed; only the tracker saw them.
                 typingViewModel.onWordAbandoned()
                 keyboardController.commitText("$word ")
-                typingViewModel.onGlideCommitted(word, alternatives)
+                typingViewModel.onGlideCommitted(word, alternatives, stroke)
             }
             Unit
         }
