@@ -97,6 +97,7 @@ internal class SpellingCorrector(
         normalized: String,
         previousWord: String? = null,
         personalWords: List<Pair<String, Float>> = emptyList(),
+        touches: List<TouchPoint>? = null,
     ): String? {
         val inputLen = normalized.length
         if (inputLen == 0) return null
@@ -111,8 +112,8 @@ internal class SpellingCorrector(
         if (isArticleRunOn(normalized)) return null
 
         // Retrieve candidates within MAX_EDIT_COST
-        val base = candidatesFor(normalized) ?: return null
-        val eligible = withPersonalWords(normalized, base, personalWords)
+        val base = candidatesFor(normalized, touches) ?: return null
+        val eligible = withPersonalWords(normalized, base, personalWords, touches)
         if (eligible.isEmpty()) return null
 
         // FluxBloom Invariants Filter
@@ -139,10 +140,30 @@ internal class SpellingCorrector(
 
         if (valid.isEmpty()) return null
 
+        // Spatial alignment boost for candidates matching physical touch points (Gboard SpatialDistanceFeature)
+        fun scoreCandidate(
+            suggestion: Suggestion,
+            cost: Int,
+        ): Float {
+            var baseScore = calcNormalizedScore(suggestion.score, cost, suggestion.word.length)
+            if (touches != null && touches.size == inputLen && suggestion.word.length == inputLen) {
+                var totalDist = 0f
+                for (idx in 0 until inputLen) {
+                    totalDist +=
+                        SmartKeyHitbox.euclideanDistance(touches[idx], suggestion.word[idx])
+                }
+                val avgDist = totalDist / inputLen
+                if (avgDist < 0.60f) {
+                    baseScore *= (1.0f + (0.60f - avgDist) * 0.25f)
+                }
+            }
+            return baseScore
+        }
+
         // Plain best candidate without contextual boost
         val plainBest =
             valid.maxByOrNull { (suggestion, cost) ->
-                calcNormalizedScore(suggestion.score, cost, suggestion.word.length)
+                scoreCandidate(suggestion, cost)
             } ?: return null
 
         // The typed word won: leave it alone
@@ -156,8 +177,7 @@ internal class SpellingCorrector(
             valid
                 .filter { it.second <= plainBest.second }
                 .maxByOrNull { (suggestion, cost) ->
-                    val baseScore =
-                        calcNormalizedScore(suggestion.score, cost, suggestion.word.length)
+                    val baseScore = scoreCandidate(suggestion, cost)
                     val boost = languageModel.boostFor(previousWord, suggestion.word)
                     baseScore + (boost / MAX_FREQ_SCALE)
                 } ?: return null
@@ -214,7 +234,10 @@ internal class SpellingCorrector(
      * The typed word itself is among them at cost 0 when it is a dictionary word.
      * Null when no dictionary can be read.
      */
-    internal fun candidatesFor(normalized: String): List<Pair<Suggestion, Int>>? {
+    internal fun candidatesFor(
+        normalized: String,
+        touches: List<TouchPoint>? = null,
+    ): List<Pair<Suggestion, Int>>? {
         val candidates = mutableListOf<Pair<Suggestion, Int>>()
         val initialRow = IntArray(normalized.length + 1) { it * COST_GAP }
         var readAny = false
@@ -233,6 +256,7 @@ internal class SpellingCorrector(
                     null,
                     MAX_EDIT_COST,
                     candidates,
+                    touches,
                 )
             } catch (e: Exception) {
                 // Safeguard against malformed offsets
@@ -259,11 +283,12 @@ internal class SpellingCorrector(
         normalized: String,
         base: List<Pair<Suggestion, Int>>,
         personalWords: List<Pair<String, Float>>,
+        touches: List<TouchPoint>? = null,
     ): List<Pair<Suggestion, Int>> {
         if (personalWords.isEmpty()) return base
         val merged = base.associateBy { it.first.word }.toMutableMap()
         for ((word, score) in personalWords) {
-            val cost = weightedEditCost(normalized, word)
+            val cost = weightedEditCost(normalized, word, touches)
             if (cost > MAX_EDIT_COST) continue
             val existing = merged[word]
             if (existing == null || existing.first.score < score) {
@@ -413,6 +438,7 @@ internal class SpellingCorrector(
         prevChar: Char?,
         maxErrors: Int,
         results: MutableList<Pair<Suggestion, Int>>,
+        touches: List<TouchPoint>? = null,
     ) {
         buf.position(offset)
         val freq = buf.get().toInt() and 0xFF
@@ -446,6 +472,15 @@ internal class SpellingCorrector(
                 val substitution =
                     when {
                         typed == childChar -> 0
+                        touches != null &&
+                            i - 1 < touches.size &&
+                            touches[i - 1].char.lowercaseChar() == typed ->
+                            SmartKeyHitbox.substitutionCost(
+                                touches[i - 1],
+                                childChar,
+                                COST_ADJACENT_SUBSTITUTE,
+                                COST_SUBSTITUTE,
+                            )
                         KeyProximity.areAdjacent(typed, childChar) -> COST_ADJACENT_SUBSTITUTE
                         else -> COST_SUBSTITUTE
                     }
@@ -473,6 +508,7 @@ internal class SpellingCorrector(
                 childChar,
                 maxErrors,
                 results,
+                touches,
             )
         }
     }
@@ -501,6 +537,7 @@ internal class SpellingCorrector(
 internal fun weightedEditCost(
     typed: String,
     candidate: String,
+    touches: List<TouchPoint>? = null,
 ): Int {
     val rows = Array(candidate.length + 1) { IntArray(typed.length + 1) }
     for (i in 0..typed.length) rows[0][i] = i * COST_GAP
@@ -512,6 +549,15 @@ internal fun weightedEditCost(
             val substitution =
                 when {
                     t == c -> 0
+                    touches != null &&
+                        i - 1 < touches.size &&
+                        touches[i - 1].char.lowercaseChar() == t ->
+                        SmartKeyHitbox.substitutionCost(
+                            touches[i - 1],
+                            c,
+                            COST_ADJACENT_SUBSTITUTE,
+                            COST_SUBSTITUTE,
+                        )
                     KeyProximity.areAdjacent(t, c) -> COST_ADJACENT_SUBSTITUTE
                     else -> COST_SUBSTITUTE
                 }
