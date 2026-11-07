@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.TouchPoint
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyDefinition
 import com.uncoalesced.stickykeys.keyboardcore.layout.ShiftRendering
 import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
@@ -145,6 +146,7 @@ internal fun KeyboardRowsView(
     onKeyRevoke: (String) -> Unit = {},
     enterAction: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
     edgeInset: Dp = 0.dp,
+    onTouchPress: ((String, TouchPoint) -> Unit)? = null,
 ) {
     val rows =
         remember(keyRows, edgeInset) {
@@ -256,6 +258,7 @@ internal fun KeyboardRowsView(
                             onKeyRevoke = onKeyRevoke,
                             onScrub = onScrub,
                             drawInset = cell.inset,
+                            onTouchPress = onTouchPress,
                         )
                     }
                 }
