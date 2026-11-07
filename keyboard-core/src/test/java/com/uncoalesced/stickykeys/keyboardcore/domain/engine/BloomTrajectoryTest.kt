@@ -7,7 +7,6 @@ import org.junit.Test
 import kotlin.math.hypot
 
 class BloomTrajectoryTest {
-
     @Test
     fun `uniform arc-length resampling produces exact target points with equal spacing`() {
         val rawX = floatArrayOf(0f, 1f, 2f, 5f, 10f)
@@ -27,7 +26,11 @@ class BloomTrajectoryTest {
         // Verify equal spacing along the arc
         val expectedSegmentLength = 10f / 47f
         for (i in 0 until 47) {
-            val d = hypot(trajectory.getX(i + 1) - trajectory.getX(i), trajectory.getY(i + 1) - trajectory.getY(i))
+            val d =
+                hypot(
+                    trajectory.getX(i + 1) - trajectory.getX(i),
+                    trajectory.getY(i + 1) - trajectory.getY(i),
+                )
             assertEquals(expectedSegmentLength.toDouble(), d.toDouble(), 0.02)
         }
     }
@@ -47,13 +50,31 @@ class BloomTrajectoryTest {
 
     @Test
     fun `soft Gaussian endpoint cost behaves continuously`() {
-        val exactCost = gaussianEndpointCost(sampleX = 5.0f, sampleY = 5.0f, keyX = 5.0f, keyY = 5.0f)
+        val exactCost =
+            gaussianEndpointCost(
+                sampleX = 5.0f,
+                sampleY = 5.0f,
+                keyX = 5.0f,
+                keyY = 5.0f,
+            )
         assertEquals(0f, exactCost, 0.001f)
 
-        val smallDriftCost = gaussianEndpointCost(sampleX = 5.1f, sampleY = 5.0f, keyX = 5.0f, keyY = 5.0f)
+        val smallDriftCost =
+            gaussianEndpointCost(
+                sampleX = 5.1f,
+                sampleY = 5.0f,
+                keyX = 5.0f,
+                keyY = 5.0f,
+            )
         assertTrue("Small drift should have low non-zero cost", smallDriftCost in 0.01f..0.2f)
 
-        val largeDriftCost = gaussianEndpointCost(sampleX = 6.5f, sampleY = 5.0f, keyX = 5.0f, keyY = 5.0f)
+        val largeDriftCost =
+            gaussianEndpointCost(
+                sampleX = 6.5f,
+                sampleY = 5.0f,
+                keyX = 5.0f,
+                keyY = 5.0f,
+            )
         assertTrue("Far offset must have high cost but not crash", largeDriftCost > smallDriftCost)
     }
 }
