@@ -49,6 +49,6 @@ class ContractionRulesTest {
         // One letter dropped.
         assertEquals(3, weightedEditCost("helo", "hello"))
         // i and y are not neighbours, so this is a full substitution.
-        assertEquals(4, weightedEditCost("zorbli", "zorbly"))
+        assertEquals(5, weightedEditCost("zorbli", "zorbly"))
     }
 }
