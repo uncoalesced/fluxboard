@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.TouchPoint
 import kotlinx.coroutines.launch
 
 // What a key press does, kept apart from TypingKeyboardView so the composable file
@@ -13,6 +14,7 @@ internal fun handleKeyPress(
     currentMode: KeyboardMode,
     viewModel: TypingViewModel,
     coroutineScope: kotlinx.coroutines.CoroutineScope,
+    touchPoint: TouchPoint? = null,
     setMode: (KeyboardMode) -> Unit,
 ) {
     if (keyLabel == KeyboardLayouts.SPACER) return
@@ -202,7 +204,7 @@ internal fun handleKeyPress(
         else -> {
             val isLetter = keyLabel.length == 1 && keyLabel.first().isLetter()
             if (isLetter) {
-                viewModel.onKeyPressed(keyLabel)
+                viewModel.onKeyPressed(keyLabel, touchPoint)
                 controller.commitText(keyLabel)
             } else {
                 // Editor-derived, same as the space bar and for the same reason.
