@@ -41,8 +41,10 @@ data class GlideStroke(
     val pivots: Set<Int>,
     val dwell: List<Int> = emptyList(),
     val pivotStrength: Map<Int, Float> = emptyMap(),
+    val bloomTrajectory: BloomTrajectory? = null,
+    val keyCentroids: Map<Char, Pair<Float, Float>> = emptyMap(),
 ) {
-    val isUsable: Boolean get() = keys.size >= MIN_KEYS
+    val isUsable: Boolean get() = keys.size >= MIN_KEYS || (bloomTrajectory?.isUsable == true)
 
     companion object {
         /**
