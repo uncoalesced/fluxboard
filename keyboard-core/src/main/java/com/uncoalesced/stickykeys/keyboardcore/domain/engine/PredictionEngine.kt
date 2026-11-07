@@ -63,13 +63,30 @@ class PredictionEngine
         private val languageModel: LanguageModel,
     ) {
         /**
-         * The mapped dictionary. Volatile so the reference publishes safely across the
+         * The mapped base dictionary. Volatile so the reference publishes safely across the
          * IO threads that read it. Never navigated directly -- see [reader]: a
          * MappedByteBuffer carries its own position, so concurrent lookups sharing one
          * instance would interleave position() calls and read each other's bytes.
          */
         @Volatile
         private var buffer: MappedByteBuffer? = null
+
+        /** Mapped names, Indian vocabulary, and cultural terms dictionary. */
+        @Volatile
+        private var namesBuffer: MappedByteBuffer? = null
+
+        /** Bloom in-memory revert memory for immediate undo suppression. */
+        private val revertHistory = BloomRevertHistory()
+
+        fun recordRevert(word: String) {
+            revertHistory.recordRevert(word)
+        }
+
+        fun clearReverts() {
+            revertHistory.clear()
+        }
+
+        fun isReverted(word: String): Boolean = revertHistory.isReverted(word)
 
         /** Guards [initialize] so two concurrent callers cannot map the file twice. */
         private val initMutex = Mutex()
@@ -80,6 +97,9 @@ class PredictionEngine
          * with no extra memory and no copy of the 7 MB payload.
          */
         private fun reader(): ByteBuffer? = buffer?.duplicate()
+
+        /** A private cursor over the names and cultural dictionary mapping. */
+        private fun namesReader(): ByteBuffer? = namesBuffer?.duplicate()
 
         suspend fun initialize() =
             withContext(Dispatchers.IO) {
@@ -96,16 +116,15 @@ class PredictionEngine
             }
 
         private fun mapDictionary() {
-            try {
-                // Re-extracted whenever the app version changes, not only when the file is
-                // missing -- see assetBackedFile. Guarding on absence alone meant an updated
-                // dictionary never reached anyone who already had the app installed.
-                val dictFile =
-                    assetBackedFile(context, "base_dict.bin") ?: run {
-                        buffer = null
-                        return
-                    }
+            buffer = mapAssetFile("base_dict.bin")
+            namesBuffer = mapAssetFile("names_dict.bin")
+        }
 
+        private fun mapAssetFile(assetName: String): MappedByteBuffer? {
+            return try {
+                // Re-extracted whenever the app version changes, not only when the file is
+                // missing -- see assetBackedFile.
+                val dictFile = assetBackedFile(context, assetName) ?: return null
                 val mapped =
                     RandomAccessFile(dictFile, "r").use { raf ->
                         raf.channel.use { channel ->
@@ -113,17 +132,15 @@ class PredictionEngine
                         }
                     }
 
-                // Check Magic Header 'FLCT' on a private cursor, then publish.
                 val header = mapped.duplicate()
                 header.position(0)
                 val magic =
                     buildString {
                         repeat(4) { append((header.get().toInt() and 0xFF).toChar()) }
                     }
-                buffer = if (magic == "FLCT") mapped else null
+                if (magic == "FLCT") mapped else null
             } catch (e: Exception) {
-                e.printStackTrace()
-                buffer = null
+                null
             }
         }
 
@@ -197,6 +214,19 @@ class PredictionEngine
                         emptyList()
                     }
 
+                // 2a. Names and Cultural Vocabulary Suggestions
+                val namesSuggestions =
+                    try {
+                        getNamesSuggestions(normalized, 10).map {
+                            Suggestion(
+                                it.word,
+                                it.score * BASE_WEIGHT,
+                            )
+                        }
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+
                 // 2b. Contractions the prefix walk cannot reach.
                 //
                 // "i'll" is in the dictionary but is not a completion of "ill" -- the trie
@@ -227,6 +257,9 @@ class PredictionEngine
                 }
                 for (s in baseSuggestions) {
                     merged[s.word] = s.score
+                }
+                for (s in namesSuggestions) {
+                    merged[s.word] = maxOf(merged[s.word] ?: 0f, s.score)
                 }
                 for (s in personalSuggestions) {
                     merged[s.word] = (merged[s.word] ?: 0f) + s.score
@@ -305,8 +338,9 @@ class PredictionEngine
                 languageModel.followersOf(previousWord.lowercase(), MAX_SUGGESTIONS)
             }
 
-        /** Spelling correction, reading the same mapping through its own cursors. */
-        private val spellingCorrector = SpellingCorrector(::reader, languageModel)
+        /** Spelling correction, reading base and names mappings through their own cursors. */
+        private val spellingCorrector =
+            SpellingCorrector(listOf(::reader, ::namesReader), languageModel)
 
         /**
          * Every contraction reachable by putting one apostrophe into [normalized]. See
@@ -335,8 +369,19 @@ class PredictionEngine
         internal fun getBaseSuggestions(
             prefix: String,
             limit: Int,
+        ): List<Suggestion> = getTrieSuggestions(reader(), prefix, limit)
+
+        internal fun getNamesSuggestions(
+            prefix: String,
+            limit: Int,
+        ): List<Suggestion> = getTrieSuggestions(namesReader(), prefix, limit)
+
+        private fun getTrieSuggestions(
+            buf: ByteBuffer?,
+            prefix: String,
+            limit: Int,
         ): List<Suggestion> {
-            val buf = reader() ?: return emptyList()
+            if (buf == null) return emptyList()
             var currentOffset = 4 // Start after FLCT
 
             // Traverse trie for prefix
@@ -363,30 +408,12 @@ class PredictionEngine
                 if (!found) return emptyList()
             }
 
-            // The subtree under the prefix holds every completion; the walk collects them and
-            // the sort at the end picks the best.
-            //
-            // The budget counts *nodes visited*, not terminals found, and that distinction is
-            // the whole fix. Stopping after 30 terminals during a breadth-first walk stops
-            // near the top of the subtree, where the short words are -- so the pool was
-            // decided by word length rather than by frequency, and a common longer word never
-            // entered it at all. Measured against the shipped dictionary: prefix "ma" offered
-            // "map" and "mar" while "many" was missing, despite "many" outranking both. That
-            // also capped what sentence context could ever do, because context re-ranks this
-            // pool and never adds to it.
-            //
-            // Sized from the real dictionary rather than guessed: the largest single-letter
-            // subtree is "s" at 15,716 nodes, so this walks every realistic prefix in full and
-            // still cannot run away if the dictionary grows.
             val results = mutableListOf<Suggestion>()
             val queue = ArrayDeque<Pair<Int, String>>()
             queue.add(Pair(currentOffset, prefix))
             var visited = 0
 
             while (queue.isNotEmpty() && visited < MAX_SUGGESTION_NODES) {
-                // ArrayDeque, not removeAt(0) on a list. The old queue never grew past a few
-                // dozen entries because the walk stopped so early; at this budget a list would
-                // shift thousands of elements per pop and make the walk quadratic.
                 val (offset, currentWord) = queue.removeFirst()
                 visited++
 
@@ -425,6 +452,9 @@ class PredictionEngine
             withContext(Dispatchers.IO) {
                 val trimmed = typedWord.trim()
                 val normalized = trimmed.lowercase()
+
+                // 0. Bloom Revert Memory: if this word was recently reverted, suppress re-correction.
+                if (revertHistory.isReverted(normalized)) return@withContext null
 
                 // The pronoun is the one word whose correct form never depends on what was
                 // typed, so it is settled before every rule below -- including the length
