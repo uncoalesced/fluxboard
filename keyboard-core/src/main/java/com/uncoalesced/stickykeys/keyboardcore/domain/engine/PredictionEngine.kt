@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
@@ -78,6 +79,8 @@ class PredictionEngine
         /** Bloom in-memory revert memory for immediate undo suppression. */
         private val revertHistory = BloomRevertHistory()
 
+        val bloomSpatialProfile = BloomSpatialProfile()
+
         fun recordRevert(word: String) {
             revertHistory.recordRevert(word)
         }
@@ -108,6 +111,7 @@ class PredictionEngine
                 // its own double-checked guard, so calling it on an already-loaded model is
                 // free.
                 languageModel.initialize()
+                loadBloomSpatialProfile()
                 if (buffer != null) return@withContext
                 initMutex.withLock {
                     if (buffer != null) return@withLock
@@ -118,6 +122,33 @@ class PredictionEngine
         private fun mapDictionary() {
             buffer = mapAssetFile("base_dict.bin")
             namesBuffer = mapAssetFile("names_dict.bin")
+        }
+
+        private fun loadBloomSpatialProfile() {
+            try {
+                val file = File(context.filesDir, "bloom_profile.bin")
+                if (file.exists()) {
+                    bloomSpatialProfile.load(file)
+                }
+            } catch (e: Exception) {
+            }
+        }
+
+        fun saveBloomSpatialProfile() {
+            try {
+                val file = File(context.filesDir, "bloom_profile.bin")
+                bloomSpatialProfile.save(file)
+            } catch (e: Exception) {
+            }
+        }
+
+        fun resetBloomSpatialProfile() {
+            bloomSpatialProfile.reset()
+            try {
+                val file = File(context.filesDir, "bloom_profile.bin")
+                if (file.exists()) file.delete()
+            } catch (e: Exception) {
+            }
         }
 
         private fun mapAssetFile(assetName: String): MappedByteBuffer? {
@@ -352,8 +383,18 @@ class PredictionEngine
         /** The glide decoder, reading the same mapping through its own cursors. */
         private val glideDecoder = GlideDecoder(::reader, languageModel)
 
+        /** GBoard-adjacent continuous trajectory decoder. */
+        private val bloomTypeDecoder =
+            BloomTypeDecoder(
+                dictionary = ::reader,
+                namesDictionary = ::namesReader,
+                languageModel = languageModel,
+                revertHistory = revertHistory,
+                profile = bloomSpatialProfile,
+            )
+
         /**
-         * Decodes a finished glide into ranked word candidates. See [GlideDecoder] for how.
+         * Decodes a finished glide into ranked word candidates. See [GlideDecoder] and [BloomTypeDecoder].
          *
          * Off the main thread because the walk can visit thousands of trie nodes, and it runs
          * from a gesture handler in the IME process.
@@ -363,8 +404,75 @@ class PredictionEngine
             previousWord: String? = null,
         ): List<String> =
             withContext(Dispatchers.IO) {
+                val trajectory = stroke.bloomTrajectory
+                if (trajectory != null && stroke.keyCentroids.isNotEmpty()) {
+                    val bloomCandidates =
+                        bloomTypeDecoder.decode(
+                            trajectory,
+                            { c -> stroke.keyCentroids[c.lowercaseChar()] },
+                            previousWord,
+                        )
+                    if (bloomCandidates.isNotEmpty()) {
+                        return@withContext bloomCandidates
+                    }
+                }
                 glideDecoder.decode(stroke, previousWord)
             }
+
+        suspend fun decodeGlideBloom(
+            trajectory: BloomTrajectory,
+            keyCentroids: (Char) -> Pair<Float, Float>?,
+            previousWord: String? = null,
+        ): List<String> =
+            withContext(Dispatchers.IO) {
+                bloomTypeDecoder.decode(trajectory, keyCentroids, previousWord)
+            }
+
+        fun learnGlideWord(
+            word: String,
+            trajectory: BloomTrajectory,
+            keyCentroids: (Char) -> Pair<Float, Float>?,
+            isSensitive: Boolean = false,
+        ) {
+            if (isSensitive) return
+            val normalized = word.lowercase().trim()
+            if (normalized.length < 2 || !trajectory.isUsable) return
+
+            for (char in normalized) {
+                val nominal = keyCentroids(char) ?: continue
+                val adapted = bloomSpatialProfile.getAdaptedCenter(char, nominal.first, nominal.second)
+                var bestDistSq = Float.MAX_VALUE
+                var bestX = 0f
+                var bestY = 0f
+                for (i in 0 until trajectory.count) {
+                    val px = trajectory.getX(i)
+                    val py = trajectory.getY(i)
+                    val dx = px - adapted.first
+                    val dy = py - adapted.second
+                    val distSq = dx * dx + dy * dy
+                    if (distSq < bestDistSq) {
+                        bestDistSq = distSq
+                        bestX = px
+                        bestY = py
+                    }
+                }
+                if (bestDistSq <= 2.25f) {
+                    bloomSpatialProfile.learnObservation(
+                        char = char,
+                        nominalX = nominal.first,
+                        nominalY = nominal.second,
+                        observedX = bestX,
+                        observedY = bestY,
+                        isSensitive = false,
+                    )
+                }
+            }
+            saveBloomSpatialProfile()
+        }
+
+        fun revertGlideWord(word: String) {
+            recordRevert(word)
+        }
 
         internal fun getBaseSuggestions(
             prefix: String,
@@ -448,6 +556,7 @@ class PredictionEngine
             typedWord: String,
             previousWord: String? = null,
             startsClause: Boolean = false,
+            touches: List<TouchPoint>? = null,
         ): String? =
             withContext(Dispatchers.IO) {
                 val trimmed = typedWord.trim()
@@ -489,6 +598,7 @@ class PredictionEngine
                             normalized,
                             previousWord,
                             personalCorrectionTargets(),
+                            touches,
                         )
                         ?: return@withContext null
 
