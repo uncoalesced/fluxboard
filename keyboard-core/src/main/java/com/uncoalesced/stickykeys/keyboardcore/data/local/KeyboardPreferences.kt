@@ -188,6 +188,16 @@ class KeyboardPreferences
             _glideTypingEnabled.value = enabled
         }
 
+        private val _bloomTypeBiomechanicalLearning =
+            MutableStateFlow(prefs.getBoolean("bloom_type_biomechanical_learning", true))
+        val bloomTypeBiomechanicalLearning: StateFlow<Boolean> =
+            _bloomTypeBiomechanicalLearning.asStateFlow()
+
+        fun setBloomTypeBiomechanicalLearning(enabled: Boolean) {
+            prefs.edit().putBoolean("bloom_type_biomechanical_learning", enabled).apply()
+            _bloomTypeBiomechanicalLearning.value = enabled
+        }
+
         private fun readKeySizePercent(): Int =
             prefs
                 .getInt("key_size_percent", DEFAULT_KEY_SIZE_PERCENT)
