@@ -349,7 +349,10 @@ class TypingViewModel
             atSentenceStart = false
             publishAutoCapitalize()
             learn(word)
-            if (stroke != null && !_fieldKind.value.isSensitive && keyboardPreferences.bloomTypeBiomechanicalLearning.value) {
+            if (stroke != null &&
+                !_fieldKind.value.isSensitive &&
+                keyboardPreferences.bloomTypeBiomechanicalLearning.value
+            ) {
                 val trajectory = stroke.bloomTrajectory
                 if (trajectory != null && stroke.keyCentroids.isNotEmpty()) {
                     predictionEngine.learnGlideWord(

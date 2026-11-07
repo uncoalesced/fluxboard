@@ -7,9 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.BloomTrajectory
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlidePoint
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke
-import com.uncoalesced.stickykeys.keyboardcore.domain.engine.BloomTrajectory
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.buildBloomTrajectory
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.buildGlideStroke
 
@@ -131,10 +131,11 @@ internal class GlideTracker {
             }
         points.clear()
         val legacyStroke = buildGlideStroke(samples)
-        val stroke = legacyStroke.copy(
-            bloomTrajectory = if (bloomTrajectory.isUsable) bloomTrajectory else null,
-            keyCentroids = centroids,
-        )
+        val stroke =
+            legacyStroke.copy(
+                bloomTrajectory = if (bloomTrajectory.isUsable) bloomTrajectory else null,
+                keyCentroids = centroids,
+            )
         return if (stroke.isUsable) stroke else null
     }
 

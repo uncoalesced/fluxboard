@@ -440,7 +440,12 @@ class PredictionEngine
 
             for (char in normalized) {
                 val nominal = keyCentroids(char) ?: continue
-                val adapted = bloomSpatialProfile.getAdaptedCenter(char, nominal.first, nominal.second)
+                val adapted =
+                    bloomSpatialProfile.getAdaptedCenter(
+                        char,
+                        nominal.first,
+                        nominal.second,
+                    )
                 var bestDistSq = Float.MAX_VALUE
                 var bestX = 0f
                 var bestY = 0f
