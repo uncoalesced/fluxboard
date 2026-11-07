@@ -225,6 +225,7 @@ class TypingViewModel
             previousWord = null
             _suggestions.value = emptyList()
             _undoState.value = null
+            predictionEngine.clearReverts()
             generation++
             detectedFieldKind = fieldKind
             hostNoLearning = noPersonalizedLearning
@@ -275,6 +276,7 @@ class TypingViewModel
         fun onInputFinished() {
             detectedFieldKind = FieldKind.NORMAL
             hostNoLearning = false
+            predictionEngine.clearReverts()
             publishPrivacy()
         }
 
@@ -798,6 +800,7 @@ class TypingViewModel
             generation++
             atSentenceStart = false
             publishAutoCapitalize()
+            predictionEngine.recordRevert(original)
             keep(original)
             updateSuggestions()
         }
