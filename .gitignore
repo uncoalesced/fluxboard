@@ -93,4 +93,7 @@ keystore.properties
 # only one; a tracked duplicate can only drift out of step with it.
 dictionary-tools/*.bin
 
-graphify-out/cache/
+graphify/*
+!graphify/graph.html
+!graphify/GRAPH_REPORT.md
+graphify-out/
