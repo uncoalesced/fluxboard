@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.TouchPoint
 import com.uncoalesced.stickykeys.keyboardcore.layout.KeyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.layout.keyGlyph
 import com.uncoalesced.stickykeys.keyboardcore.theme.PRESS_COLOR_ANIM_MS
@@ -83,6 +84,7 @@ internal fun KeyboardKey(
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
     onKeyRevoke: (String) -> Unit = {},
     drawInset: KeyDrawInset = KeyDrawInset.None,
+    onTouchPress: ((String, TouchPoint) -> Unit)? = null,
 ) {
     val spokenLabel = accessibleKeyLabel(keyOutput)
     val spokenState = accessibleKeyState(keyOutput, mode)
@@ -231,6 +233,7 @@ internal fun KeyboardKey(
                     onGlide = onGlide,
                     onRevoke = onKeyRevoke,
                     recorder = LocalUsageRecorder.current,
+                    onTouchCommit = onTouchPress,
                 )
                 // Everything below this line is drawing, and the padding belongs to drawing
                 // alone: it is what makes a key look separate from its neighbour without
