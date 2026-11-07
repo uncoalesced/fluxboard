@@ -85,6 +85,7 @@ fun KeyboardSettingsScreen(
             val privateMode by viewModel.privateMode.collectAsState()
             val showKeyHints by viewModel.showKeyHints.collectAsState()
             val glideTyping by viewModel.glideTyping.collectAsState()
+            val bloomTypeLearning by viewModel.bloomTypeLearning.collectAsState()
             val keyboardHeight by viewModel.keyboardHeightPercent.collectAsState()
             val keyboardBottomPadding by viewModel.keyboardBottomPaddingDp.collectAsState()
 
@@ -135,6 +136,8 @@ fun KeyboardSettingsScreen(
             val labelAutoCorrect = stringResource(R.string.text_auto_correction)
             val labelGlideTyping = stringResource(R.string.text_glide_typing)
             val summaryGlideTyping = stringResource(R.string.text_glide_typing_summary)
+            val labelBloomTypeLearning = "BloomType adaptive learning"
+            val summaryBloomTypeLearning = "Adapts key touch targets to your personal glide trajectory on-device. 100% private." 
             val labelDoubleSpace = stringResource(R.string.text_double_space_period)
             val summaryDoubleSpace = stringResource(R.string.text_double_space_period_summary)
 
@@ -307,6 +310,14 @@ fun KeyboardSettingsScreen(
                                 summary = summaryGlideTyping,
                                 checked = glideTyping,
                                 onCheckedChange = { viewModel.setGlideTyping(it) },
+                            )
+                        }
+                        if (glideTyping && matches(labelBloomTypeLearning, summaryBloomTypeLearning)) {
+                            SettingsSwitchRow(
+                                title = labelBloomTypeLearning,
+                                summary = summaryBloomTypeLearning,
+                                checked = bloomTypeLearning,
+                                onCheckedChange = { viewModel.setBloomTypeLearning(it) },
                             )
                         }
                         if (matches(labelDoubleSpace, summaryDoubleSpace)) {
