@@ -17,6 +17,7 @@ import com.uncoalesced.stickykeys.keyboardcore.diagnostics.LatencyTracker
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.PressOutcome
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder
 import com.uncoalesced.stickykeys.keyboardcore.diagnostics.keyKindOf
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.TouchPoint
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 
@@ -44,6 +45,7 @@ internal fun Modifier.keyGestures(
     onGlide: (com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke) -> Unit = {},
     onRevoke: (String) -> Unit = {},
     recorder: UsageRecorder? = null,
+    onTouchCommit: ((String, TouchPoint) -> Unit)? = null,
 ): Modifier =
     this.pointerInput(keyOutput, longPress, alternates, cellWidthPx, glide) {
         awaitEachGesture {
@@ -62,12 +64,46 @@ internal fun Modifier.keyGestures(
             // What this press ended as, for the debug build's per-press log. Assigned next to
             // each call that decides it; nothing reads it until the finally block below.
             var outcome = PressOutcome.NOTHING
+            val origin = keyBounds()
+            val touchPoint =
+                if (keyOutput.length == 1) {
+                    val w = origin.width
+                    val h = origin.height
+                    val nx =
+                        if (w >
+                            0f
+                        ) {
+                            ((down.position.x - w / 2f) / w).coerceIn(-0.5f, 0.5f)
+                        } else {
+                            0f
+                        }
+                    val ny =
+                        if (h >
+                            0f
+                        ) {
+                            ((down.position.y - h / 2f) / h).coerceIn(-0.5f, 0.5f)
+                        } else {
+                            0f
+                        }
+                    TouchPoint(keyOutput[0], nx, ny, down.uptimeMillis)
+                } else {
+                    null
+                }
+
+            fun commitKey(str: String) {
+                if (touchPoint != null && onTouchCommit != null && str == keyOutput) {
+                    onTouchCommit(str, touchPoint)
+                } else {
+                    onCommit(str)
+                }
+            }
+
             try {
                 // The keystroke lands here rather than on release. See commitsOnPress for the
                 // measurement that moved it, and for why only letters are eligible.
                 var committedOnPress = false
                 if (commitsOnPress(keyOutput, longPress)) {
-                    onCommit(keyOutput)
+                    commitKey(keyOutput)
                     committedOnPress = true
                     outcome = PressOutcome.COMMITTED
                 }
@@ -80,7 +116,7 @@ internal fun Modifier.keyGestures(
                         activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
                         stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
                         onScrub = onScrub,
-                        onTap = { onCommit(keyOutput) },
+                        onTap = { commitKey(keyOutput) },
                     )
                     return@awaitEachGesture
                 }
@@ -217,7 +253,7 @@ internal fun Modifier.keyGestures(
                     if (lifted) {
                         // Already on screen for an eligible key; this is the lift that only
                         // confirms it.
-                        if (!committedOnPress) onCommit(keyOutput)
+                        if (!committedOnPress) commitKey(keyOutput)
                         outcome = PressOutcome.COMMITTED
                         return@awaitEachGesture
                     }
@@ -279,7 +315,7 @@ internal fun Modifier.keyGestures(
 
                 when {
                     early == true -> {
-                        if (!committedOnPress) onCommit(keyOutput)
+                        if (!committedOnPress) commitKey(keyOutput)
                         outcome = PressOutcome.COMMITTED
                     }
                     // Cancelled out from under us before it resolved into anything.
@@ -294,7 +330,7 @@ internal fun Modifier.keyGestures(
                         // release, otherwise resting a moment on a letter would silently
                         // swallow it.
                         if (waitForUpOrCancellation() != null) {
-                            if (!committedOnPress) onCommit(keyOutput)
+                            if (!committedOnPress) commitKey(keyOutput)
                             outcome = PressOutcome.COMMITTED
                         } else {
                             if (committedOnPress) {
@@ -333,7 +369,7 @@ internal fun Modifier.keyGestures(
                             // In word mode the timer stops producing deletes entirely: they are
                             // driven by travel below, so the caret follows the finger instead of
                             // running away from it while it is still moving.
-                            if (!wordMode) onCommit(keyOutput)
+                            if (!wordMode) commitKey(keyOutput)
                             val ended =
                                 withTimeoutOrNull(repeatIntervalAt(step)) {
                                     // Replaces waitForUpOrCancellation, which threw the
