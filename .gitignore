@@ -92,3 +92,5 @@ keystore.properties
 # The shipped one is keyboard-core/src/main/assets/base_dict.bin and that is the
 # only one; a tracked duplicate can only drift out of step with it.
 dictionary-tools/*.bin
+
+graphify-out/cache/
