@@ -156,6 +156,14 @@ fun TypingKeyboardView(
             modeState = modeState,
         )
 
+    val onTouchPress =
+        rememberTouchKeyPressHandler(
+            keyboardController = keyboardController,
+            typingViewModel = typingViewModel,
+            coroutineScope = coroutineScope,
+            modeState = modeState,
+        )
+
     val onKeyRevoke =
         rememberKeyRevokeHandler(
             keyboardController = keyboardController,
@@ -463,6 +471,7 @@ fun TypingKeyboardView(
                             onGlide = onGlide,
                             enterAction = enterAction,
                             edgeInset = contentPadding,
+                            onTouchPress = onTouchPress,
                         )
                         if (glideEnabled) {
                             GlideTrailOverlay(glideTracker = glideTracker)
