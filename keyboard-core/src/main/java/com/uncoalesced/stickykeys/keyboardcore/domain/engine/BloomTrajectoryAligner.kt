@@ -12,7 +12,6 @@ import kotlin.math.hypot
  * Operates without allocating objects during scoring.
  */
 class BloomTrajectoryAligner {
-
     companion object {
         private const val MAX_ENDPOINT_DISTANCE = 2.2f
         private const val MAX_VERTEX_MISS_DISTANCE = 1.6f
@@ -143,7 +142,8 @@ class BloomTrajectoryAligner {
             }
         }
 
-        return startCost + endCost + (avgPolylineDist * 1.5f) + (vertexDistanceSum * 0.8f) + pivotScoreDelta
+        val baseScore = startCost + endCost + (avgPolylineDist * 1.5f)
+        return baseScore + (vertexDistanceSum * 0.8f) + pivotScoreDelta
     }
 
     /** Minimum squared distance from point (px, py) to line segment (x1, y1) -> (x2, y2). */
