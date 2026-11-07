@@ -137,7 +137,8 @@ fun KeyboardSettingsScreen(
             val labelGlideTyping = stringResource(R.string.text_glide_typing)
             val summaryGlideTyping = stringResource(R.string.text_glide_typing_summary)
             val labelBloomTypeLearning = "BloomType adaptive learning"
-            val summaryBloomTypeLearning = "Adapts key touch targets to your personal glide trajectory on-device. 100% private." 
+            val summaryBloomTypeLearning =
+                "Adapts key touch targets to your personal glide trajectory on-device. 100% private."
             val labelDoubleSpace = stringResource(R.string.text_double_space_period)
             val summaryDoubleSpace = stringResource(R.string.text_double_space_period_summary)
 
@@ -312,7 +313,12 @@ fun KeyboardSettingsScreen(
                                 onCheckedChange = { viewModel.setGlideTyping(it) },
                             )
                         }
-                        if (glideTyping && matches(labelBloomTypeLearning, summaryBloomTypeLearning)) {
+                        if (glideTyping &&
+                            matches(
+                                labelBloomTypeLearning,
+                                summaryBloomTypeLearning,
+                            )
+                        ) {
                             SettingsSwitchRow(
                                 title = labelBloomTypeLearning,
                                 summary = summaryBloomTypeLearning,
