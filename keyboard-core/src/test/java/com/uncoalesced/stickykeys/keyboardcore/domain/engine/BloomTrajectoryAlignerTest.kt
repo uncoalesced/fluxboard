@@ -8,18 +8,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BloomTrajectoryAlignerTest {
-
     // Simple QWERTY-like centroid map for testing (coordinates in key width units)
-    private val qwertyCentroids: Map<Char, Pair<Float, Float>> = mapOf(
-        'q' to Pair(0.5f, 0.5f), 'w' to Pair(1.5f, 0.5f), 'e' to Pair(2.5f, 0.5f),
-        'r' to Pair(3.5f, 0.5f), 't' to Pair(4.5f, 0.5f), 'y' to Pair(5.5f, 0.5f),
-        'u' to Pair(6.5f, 0.5f), 'i' to Pair(7.5f, 0.5f), 'o' to Pair(8.5f, 0.5f), 'p' to Pair(9.5f, 0.5f),
-        'a' to Pair(0.8f, 1.5f), 's' to Pair(1.8f, 1.5f), 'd' to Pair(2.8f, 1.5f),
-        'f' to Pair(3.8f, 1.5f), 'g' to Pair(4.8f, 1.5f), 'h' to Pair(5.8f, 1.5f),
-        'j' to Pair(6.8f, 1.5f), 'k' to Pair(7.8f, 1.5f), 'l' to Pair(8.8f, 1.5f),
-        'z' to Pair(1.2f, 2.5f), 'x' to Pair(2.2f, 2.5f), 'c' to Pair(3.2f, 2.5f),
-        'v' to Pair(4.2f, 2.5f), 'b' to Pair(5.2f, 2.5f), 'n' to Pair(6.2f, 2.5f), 'm' to Pair(7.2f, 2.5f)
-    )
+    private val qwertyCentroids: Map<Char, Pair<Float, Float>> =
+        mapOf(
+            'q' to Pair(0.5f, 0.5f),
+            'w' to Pair(1.5f, 0.5f),
+            'e' to Pair(2.5f, 0.5f),
+            'r' to Pair(3.5f, 0.5f),
+            't' to Pair(4.5f, 0.5f),
+            'y' to Pair(5.5f, 0.5f),
+            'u' to Pair(6.5f, 0.5f),
+            'i' to Pair(7.5f, 0.5f),
+            'o' to Pair(8.5f, 0.5f),
+            'p' to Pair(9.5f, 0.5f),
+            'a' to Pair(0.8f, 1.5f),
+            's' to Pair(1.8f, 1.5f),
+            'd' to Pair(2.8f, 1.5f),
+            'f' to Pair(3.8f, 1.5f),
+            'g' to Pair(4.8f, 1.5f),
+            'h' to Pair(5.8f, 1.5f),
+            'j' to Pair(6.8f, 1.5f),
+            'k' to Pair(7.8f, 1.5f),
+            'l' to Pair(8.8f, 1.5f),
+            'z' to Pair(1.2f, 2.5f),
+            'x' to Pair(2.2f, 2.5f),
+            'c' to Pair(3.2f, 2.5f),
+            'v' to Pair(4.2f, 2.5f),
+            'b' to Pair(5.2f, 2.5f),
+            'n' to Pair(6.2f, 2.5f),
+            'm' to Pair(7.2f, 2.5f),
+        )
 
     private val profile = BloomSpatialProfile()
     private val aligner = BloomTrajectoryAligner()
@@ -62,7 +80,10 @@ class BloomTrajectoryAlignerTest {
         assertNotNull(tonScore)
 
         val tinScore = aligner.scoreCandidate(trajectory, "tin", ::centroidLookup, profile)
-        assertTrue("ton must outrank tin because of unexplained corner at O", (tonScore ?: 999f) < (tinScore ?: 999f))
+        assertTrue(
+            "ton must outrank tin because of unexplained corner at O",
+            (tonScore ?: 999f) < (tinScore ?: 999f),
+        )
     }
 
     @Test
