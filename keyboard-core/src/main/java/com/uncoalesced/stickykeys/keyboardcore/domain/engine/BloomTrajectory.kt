@@ -20,6 +20,7 @@ class BloomTrajectory(
     val inflectionWeights: FloatArray,
 ) {
     inline fun getX(index: Int): Float = resampledPoints[index * 2]
+
     inline fun getY(index: Int): Float = resampledPoints[index * 2 + 1]
 
     val isUsable: Boolean get() = count >= 2 && totalLength > 0.1f
@@ -81,10 +82,19 @@ fun buildBloomTrajectory(
         val segStart = cumDist[currSegment]
         val segEnd = cumDist[currSegment + 1]
         val segLen = segEnd - segStart
-        val fraction = if (segLen > 0.00001f) ((targetDist - segStart) / segLen).coerceIn(0f, 1f) else 0f
+        val fraction =
+            if (segLen >
+                0.00001f
+            ) {
+                ((targetDist - segStart) / segLen).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
 
-        resampled[k * 2] = rawX[currSegment] + fraction * (rawX[currSegment + 1] - rawX[currSegment])
-        resampled[k * 2 + 1] = rawY[currSegment] + fraction * (rawY[currSegment + 1] - rawY[currSegment])
+        resampled[k * 2] =
+            rawX[currSegment] + fraction * (rawX[currSegment + 1] - rawX[currSegment])
+        resampled[k * 2 + 1] =
+            rawY[currSegment] + fraction * (rawY[currSegment + 1] - rawY[currSegment])
     }
 
     resampled[(targetPoints - 1) * 2] = rawX[count - 1]
@@ -133,7 +143,10 @@ fun buildBloomTrajectory(
 }
 
 /** Smallest difference between two angles in radians [0, PI]. */
-private fun angleDelta(a: Float, b: Float): Float {
+private fun angleDelta(
+    a: Float,
+    b: Float,
+): Float {
     var diff = abs(a - b)
     while (diff > Math.PI * 2) diff -= (Math.PI * 2).toFloat()
     return min(diff, (Math.PI * 2).toFloat() - diff)
