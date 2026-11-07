@@ -31,7 +31,7 @@ class BloomSpatialProfileTest {
         // Nominal at (10, 20), user repeatedly swipes slightly right (+0.2) and down (+0.3)
         for (i in 0 until 5) {
             profile.learnObservation(
-                c = 't',
+                char = 't',
                 nominalX = 10f,
                 nominalY = 20f,
                 observedX = 10.2f,
@@ -55,7 +55,7 @@ class BloomSpatialProfileTest {
         // Extreme outlier: user hit 3.0 key widths away
         for (i in 0 until 100) {
             profile.learnObservation(
-                c = 'p',
+                char = 'p',
                 nominalX = 5f,
                 nominalY = 5f,
                 observedX = 8f,
@@ -74,7 +74,7 @@ class BloomSpatialProfileTest {
         val profile = BloomSpatialProfile()
         // In sensitive mode, observations must be ignored
         profile.learnObservation(
-            c = 'a',
+            char = 'a',
             nominalX = 1f,
             nominalY = 1f,
             observedX = 1.3f,
@@ -91,7 +91,7 @@ class BloomSpatialProfileTest {
     fun `binary serialization and deserialization preserves learned offsets`() {
         val profile = BloomSpatialProfile()
         profile.learnObservation(
-            c = 'm',
+            char = 'm',
             nominalX = 7f,
             nominalY = 3f,
             observedX = 7.15f,
@@ -130,7 +130,7 @@ class BloomSpatialProfileTest {
     fun `reset clears all learned offsets back to zero`() {
         val profile = BloomSpatialProfile()
         profile.learnObservation(
-            c = 'k',
+            char = 'k',
             nominalX = 5f,
             nominalY = 5f,
             observedX = 5.2f,
