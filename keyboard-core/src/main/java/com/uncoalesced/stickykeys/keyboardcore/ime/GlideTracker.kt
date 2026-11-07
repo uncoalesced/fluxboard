@@ -9,6 +9,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlidePoint
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.BloomTrajectory
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.buildBloomTrajectory
 import com.uncoalesced.stickykeys.keyboardcore.domain.engine.buildGlideStroke
 
 /**
@@ -104,6 +106,19 @@ internal class GlideTracker {
             return null
         }
         val width = keyWidthPx.coerceAtLeast(1f)
+        val rawX = FloatArray(points.size)
+        val rawY = FloatArray(points.size)
+        for (i in points.indices) {
+            rawX[i] = points[i].x / width
+            rawY[i] = points[i].y / width
+        }
+        val bloomTrajectory = buildBloomTrajectory(rawX, rawY, points.size, 48)
+
+        val centroids = mutableMapOf<Char, Pair<Float, Float>>()
+        for ((k, rect) in keyRects) {
+            centroids[k] = Pair(rect.center.x / width, rect.center.y / width)
+        }
+
         val samples =
             points.map { p ->
                 GlidePoint(
@@ -115,8 +130,33 @@ internal class GlideTracker {
                 )
             }
         points.clear()
-        val stroke = buildGlideStroke(samples)
+        val legacyStroke = buildGlideStroke(samples)
+        val stroke = legacyStroke.copy(
+            bloomTrajectory = if (bloomTrajectory.isUsable) bloomTrajectory else null,
+            keyCentroids = centroids,
+        )
         return if (stroke.isUsable) stroke else null
+    }
+
+    /** Returns the center of [key] in normalized key-width units. */
+    fun keyCentroid(key: Char): Pair<Float, Float>? {
+        val rect = keyRects[key.lowercaseChar()] ?: return null
+        val width = keyWidthPx.coerceAtLeast(1f)
+        return Pair(rect.center.x / width, rect.center.y / width)
+    }
+
+    /** Exposes BloomTrajectory directly if needed. */
+    fun finishBloom(): BloomTrajectory? {
+        if (points.size < 2) return null
+        val width = keyWidthPx.coerceAtLeast(1f)
+        val rawX = FloatArray(points.size)
+        val rawY = FloatArray(points.size)
+        for (i in points.indices) {
+            rawX[i] = points[i].x / width
+            rawY[i] = points[i].y / width
+        }
+        val traj = buildBloomTrajectory(rawX, rawY, points.size, 48)
+        return if (traj.isUsable) traj else null
     }
 
     fun cancel() {
