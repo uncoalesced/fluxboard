@@ -17,7 +17,6 @@ import java.security.MessageDigest
  * All operations use flat FloatArrays for 0ms lookup latency during typing.
  */
 class BloomSpatialProfile {
-
     /** 26 letters * 2 coordinates (x, y) = 52 floats. */
     private val offsets = FloatArray(52)
     private val lock = Any()
@@ -73,10 +72,11 @@ class BloomSpatialProfile {
             val currDx = offsets[idx]
             val currDy = offsets[idx + 1]
 
-            offsets[idx] = ((1f - LEARNING_RATE) * currDx + LEARNING_RATE * observedDx)
-                .coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
-            offsets[idx + 1] = ((1f - LEARNING_RATE) * currDy + LEARNING_RATE * observedDy)
-                .coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
+            val newDx = (1f - LEARNING_RATE) * currDx + LEARNING_RATE * observedDx
+            offsets[idx] = newDx.coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
+
+            val newDy = (1f - LEARNING_RATE) * currDy + LEARNING_RATE * observedDy
+            offsets[idx + 1] = newDy.coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
         }
     }
 
