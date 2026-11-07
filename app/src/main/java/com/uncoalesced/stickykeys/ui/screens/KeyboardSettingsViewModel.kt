@@ -61,6 +61,10 @@ class KeyboardSettingsViewModel
         val privateMode = preferences.privateModeEnabled
         val showKeyHints = preferences.showKeyHints
         val glideTyping = preferences.glideTypingEnabled
+        val bloomTypeLearning = preferences.bloomTypeBiomechanicalLearning
+
+        fun setBloomTypeLearning(enabled: Boolean) =
+            preferences.setBloomTypeBiomechanicalLearning(enabled)
 
         fun setKeySizePercent(percent: Int) = preferences.setKeySizePercent(percent)
 
