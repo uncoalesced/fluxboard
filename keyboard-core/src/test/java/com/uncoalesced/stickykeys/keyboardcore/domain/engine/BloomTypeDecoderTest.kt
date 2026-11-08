@@ -108,4 +108,46 @@ class BloomTypeDecoderTest {
             candidates.contains("too") || candidates.contains("to"),
         )
     }
+
+    @Test
+    fun `decodes custom personal words matching trajectory`() {
+        // Glide for custom word "zorb" (Z -> O -> R -> B)
+        // Z(1.2, 2.5) -> O(8.5, 0.5) -> R(3.5, 0.5) -> B(5.2, 2.5)
+        val rawX = floatArrayOf(1.2f, 4.0f, 8.5f, 6.0f, 3.5f, 4.5f, 5.2f)
+        val rawY = floatArrayOf(2.5f, 1.5f, 0.5f, 0.5f, 0.5f, 1.5f, 2.5f)
+        val trajectory = buildBloomTrajectory(rawX, rawY, rawX.size, 48)
+
+        val customDecoder =
+            BloomTypeDecoder(
+                dictionary = { dictionary.duplicate() },
+                namesDictionary = { namesDictionary?.duplicate() },
+                languageModel = languageModel,
+                revertHistory = revertHistory,
+                profile = profile,
+                personalWords = { listOf("zorb" to 220f) },
+            )
+
+        val candidates = customDecoder.decode(trajectory, ::centroidLookup)
+        assertTrue(
+            "Expected custom word 'zorb' in candidates: $candidates",
+            candidates.contains("zorb"),
+        )
+    }
+
+    @Test
+    fun `first letter anchor prunes tail-matching spurious words`() {
+        // Swipe going A -> S -> D -> F
+        // A(0.8, 1.5) -> S(1.8, 1.5) -> D(2.8, 1.5) -> F(3.8, 1.5)
+        val rawX = floatArrayOf(0.8f, 1.8f, 2.8f, 3.8f)
+        val rawY = floatArrayOf(1.5f, 1.5f, 1.5f, 1.5f)
+        val trajectory = buildBloomTrajectory(rawX, rawY, rawX.size, 48)
+
+        val candidates = decoder.decode(trajectory, ::centroidLookup)
+        // Words starting with 'f' should not appear because 'f' is at the end of the stroke
+        val spurious = candidates.filter { it.startsWith("f") }
+        assertTrue(
+            "Should not propose words starting with tail letter 'f': $spurious",
+            spurious.isEmpty(),
+        )
+    }
 }
