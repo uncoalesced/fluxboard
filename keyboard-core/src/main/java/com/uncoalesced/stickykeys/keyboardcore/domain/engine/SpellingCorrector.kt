@@ -98,6 +98,7 @@ internal class SpellingCorrector(
         previousWord: String? = null,
         personalWords: List<Pair<String, Float>> = emptyList(),
         touches: List<TouchPoint>? = null,
+        revertHistory: BloomRevertHistory? = null,
     ): String? {
         val inputLen = normalized.length
         if (inputLen == 0) return null
@@ -160,7 +161,7 @@ internal class SpellingCorrector(
             return baseScore
         }
 
-        // Plain best candidate without contextual boost
+        // Plain best candidate without contextual boost to establish minimum edit cost
         val plainBest =
             valid.maxByOrNull { (suggestion, cost) ->
                 scoreCandidate(suggestion, cost)
@@ -173,17 +174,64 @@ internal class SpellingCorrector(
         if (hasCompetingDoubledReading(normalized, plainBest)) return null
 
         // Sentence context re-ranking: only candidates as close as plainBest can compete
-        val best =
+        val eligibleForContext =
             valid
                 .filter { it.second <= plainBest.second }
-                .maxByOrNull { (suggestion, cost) ->
+                .sortedByDescending { (suggestion, cost) ->
                     val baseScore = scoreCandidate(suggestion, cost)
                     val boost = languageModel.boostFor(previousWord, suggestion.word)
                     baseScore + (boost / MAX_FREQ_SCALE)
-                } ?: return null
+                }
 
-        if (best.first.word == normalized) return null
-        return best.first.word
+        val top = eligibleForContext.firstOrNull() ?: return null
+        if (top.first.word == normalized) return null
+
+        val runnerUp = eligibleForContext.getOrNull(1)
+
+        val topScored =
+            ScoredCandidate(
+                word = top.first.word,
+                cost = top.second,
+                rawScore = top.first.score,
+                normalizedScore =
+                    calcNormalizedScore(top.first.score, top.second, top.first.word.length),
+                spatialScore = scoreCandidate(top.first, top.second),
+                bigramBoost = languageModel.boostFor(previousWord, top.first.word),
+                finalScore =
+                    scoreCandidate(top.first, top.second) +
+                        (languageModel.boostFor(previousWord, top.first.word) / MAX_FREQ_SCALE),
+            )
+
+        val runnerUpScored =
+            runnerUp?.let {
+                ScoredCandidate(
+                    word = it.first.word,
+                    cost = it.second,
+                    rawScore = it.first.score,
+                    normalizedScore =
+                        calcNormalizedScore(it.first.score, it.second, it.first.word.length),
+                    spatialScore = scoreCandidate(it.first, it.second),
+                    bigramBoost = languageModel.boostFor(previousWord, it.first.word),
+                    finalScore =
+                        scoreCandidate(it.first, it.second) +
+                            (languageModel.boostFor(previousWord, it.first.word) / MAX_FREQ_SCALE),
+                )
+            }
+
+        // Bloom Engine Decision Model Gating (FeaturePool trigger evaluation)
+        val decision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = normalized,
+                topCandidate = topScored,
+                runnerUpCandidate = runnerUpScored,
+                previousWord = previousWord,
+                touches = touches,
+                revertHistory = revertHistory,
+            )
+
+        if (!decision.shouldAutoCommit) return null
+
+        return top.first.word
     }
 
     /**
