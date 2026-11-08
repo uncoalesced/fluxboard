@@ -5,7 +5,10 @@ import android.content.Context
 import com.uncoalesced.stickykeys.keyboardcore.data.local.dao.PersonalDictionaryDao
 import com.uncoalesced.stickykeys.keyboardcore.data.local.entity.PersonalWordEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -76,6 +79,9 @@ class PredictionEngine
         @Volatile
         private var namesBuffer: MappedByteBuffer? = null
 
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val bloomTrajectoryAligner = BloomTrajectoryAligner()
+
         /** Bloom in-memory revert memory for immediate undo suppression. */
         private val revertHistory = BloomRevertHistory()
 
@@ -139,6 +145,12 @@ class PredictionEngine
                 val file = File(context.filesDir, "bloom_profile.bin")
                 bloomSpatialProfile.save(file)
             } catch (e: Exception) {
+            }
+        }
+
+        private fun saveBloomSpatialProfileAsync() {
+            scope.launch {
+                saveBloomSpatialProfile()
             }
         }
 
@@ -391,6 +403,7 @@ class PredictionEngine
                 languageModel = languageModel,
                 revertHistory = revertHistory,
                 profile = bloomSpatialProfile,
+                personalWords = { personalCorrectionTargets() },
             )
 
         /**
@@ -438,45 +451,63 @@ class PredictionEngine
             val normalized = word.lowercase().trim()
             if (normalized.length < 2 || !trajectory.isUsable) return
 
-            for (char in normalized) {
+            val sampleIndices = IntArray(normalized.length)
+            val score =
+                bloomTrajectoryAligner.alignAndScore(
+                    trajectory = trajectory,
+                    word = normalized,
+                    keyCentroids = keyCentroids,
+                    profile = bloomSpatialProfile,
+                    outSampleIndices = sampleIndices,
+                ) ?: return
+
+            // Save snapshot before learning for instant rollback on backspace or alternative selection
+            bloomSpatialProfile.saveSnapshot()
+
+            for (k in normalized.indices) {
+                val char = normalized[k]
                 val nominal = keyCentroids(char) ?: continue
-                val adapted =
-                    bloomSpatialProfile.getAdaptedCenter(
-                        char,
-                        nominal.first,
-                        nominal.second,
-                    )
-                var bestDistSq = Float.MAX_VALUE
-                var bestX = 0f
-                var bestY = 0f
-                for (i in 0 until trajectory.count) {
-                    val px = trajectory.getX(i)
-                    val py = trajectory.getY(i)
-                    val dx = px - adapted.first
-                    val dy = py - adapted.second
-                    val distSq = dx * dx + dy * dy
-                    if (distSq < bestDistSq) {
-                        bestDistSq = distSq
-                        bestX = px
-                        bestY = py
-                    }
-                }
-                if (bestDistSq <= 2.25f) {
+                val sampleIdx = sampleIndices[k]
+                if (sampleIdx in 0 until trajectory.count) {
+                    val observedX = trajectory.getX(sampleIdx)
+                    val observedY = trajectory.getY(sampleIdx)
                     bloomSpatialProfile.learnObservation(
                         char = char,
                         nominalX = nominal.first,
                         nominalY = nominal.second,
-                        observedX = bestX,
-                        observedY = bestY,
+                        observedX = observedX,
+                        observedY = observedY,
                         isSensitive = false,
                     )
                 }
             }
-            saveBloomSpatialProfile()
+            saveBloomSpatialProfileAsync()
+        }
+
+        fun rollbackLastGlideLearning(): Boolean {
+            val restored = bloomSpatialProfile.rollbackLastLearning()
+            if (restored) {
+                saveBloomSpatialProfileAsync()
+            }
+            return restored
+        }
+
+        fun correctGlideLearning(
+            wrongWord: String,
+            chosenWord: String,
+            trajectory: BloomTrajectory,
+            keyCentroids: (Char) -> Pair<Float, Float>?,
+            isSensitive: Boolean = false,
+        ) {
+            if (isSensitive || !trajectory.isUsable) return
+            bloomSpatialProfile.rollbackLastLearning()
+            recordRevert(wrongWord)
+            learnGlideWord(chosenWord, trajectory, keyCentroids, isSensitive)
         }
 
         fun revertGlideWord(word: String) {
             recordRevert(word)
+            rollbackLastGlideLearning()
         }
 
         internal fun getBaseSuggestions(
@@ -604,6 +635,7 @@ class PredictionEngine
                             previousWord,
                             personalCorrectionTargets(),
                             touches,
+                            revertHistory,
                         )
                         ?: return@withContext null
 
