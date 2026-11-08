@@ -143,4 +143,41 @@ class BloomSpatialProfileTest {
         assertEquals(0f, profile.getOffset('k').first, 0.0001f)
         assertEquals(0f, profile.getOffset('k').second, 0.0001f)
     }
+
+    @Test
+    fun `saveSnapshot and rollbackLastLearning restores offsets accurately`() {
+        val profile = BloomSpatialProfile()
+        profile.learnObservation('a', 1f, 1f, 1.1f, 1.1f, false)
+        val originalDx = profile.getOffset('a').first
+        assertTrue(originalDx > 0f)
+
+        // Take snapshot before a bad drift
+        profile.saveSnapshot()
+
+        // Apply bad drift
+        profile.learnObservation('a', 1f, 1f, 1.35f, 1.35f, false)
+        val driftedDx = profile.getOffset('a').first
+        assertTrue(driftedDx > originalDx)
+
+        // Roll back
+        val rolledBack = profile.rollbackLastLearning()
+        assertTrue("Rollback should succeed", rolledBack)
+        assertEquals(originalDx, profile.getOffset('a').first, 0.00001f)
+
+        // Second rollback without new snapshot should return false
+        assertFalse("Second rollback should fail", profile.rollbackLastLearning())
+    }
+
+    @Test
+    fun `getAdaptedX and getAdaptedY match getAdaptedCenter without allocation`() {
+        val profile = BloomSpatialProfile()
+        profile.learnObservation('b', 2f, 3f, 2.2f, 3.1f, false)
+
+        val pair = profile.getAdaptedCenter('b', 2f, 3f)
+        val adaptedX = profile.getAdaptedX('b', 2f)
+        val adaptedY = profile.getAdaptedY('b', 3f)
+
+        assertEquals(pair.first, adaptedX, 0.00001f)
+        assertEquals(pair.second, adaptedY, 0.00001f)
+    }
 }
