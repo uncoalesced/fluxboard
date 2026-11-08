@@ -99,4 +99,28 @@ class BloomTrajectoryAlignerTest {
         assertNotNull(tooScore)
         assertEquals(toScore!!.toDouble(), tooScore!!.toDouble(), 0.15)
     }
+
+    @Test
+    fun `alignAndScore extracts strictly monotonic sample indices for multi-letter word`() {
+        // Swipe T -> E -> A
+        val rawX = floatArrayOf(4.5f, 3.5f, 2.5f, 1.6f, 0.8f)
+        val rawY = floatArrayOf(0.5f, 0.5f, 0.5f, 1.0f, 1.5f)
+        val trajectory = buildBloomTrajectory(rawX, rawY, rawX.size, 48)
+
+        val sampleIndices = IntArray(3)
+        val score =
+            aligner.alignAndScore(
+                trajectory = trajectory,
+                word = "tea",
+                keyCentroids = ::centroidLookup,
+                profile = profile,
+                outSampleIndices = sampleIndices,
+            )
+
+        assertNotNull(score)
+        assertTrue("Index 0 should be at start of stroke", sampleIndices[0] == 0)
+        assertTrue("Monotonic progress: s0 <= s1", sampleIndices[0] <= sampleIndices[1])
+        assertTrue("Monotonic progress: s1 <= s2", sampleIndices[1] <= sampleIndices[2])
+        assertTrue("Index 2 should be at or near end of stroke", sampleIndices[2] <= 47)
+    }
 }
