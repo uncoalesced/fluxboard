@@ -19,6 +19,8 @@ import java.security.MessageDigest
 class BloomSpatialProfile {
     /** 26 letters * 2 coordinates (x, y) = 52 floats. */
     private val offsets = FloatArray(52)
+    private val backupOffsets = FloatArray(52)
+    private var hasBackup = false
     private val lock = Any()
 
     companion object {
@@ -40,14 +42,74 @@ class BloomSpatialProfile {
         }
     }
 
+    /** Allocation-free adapted X coordinate. */
+    fun getAdaptedX(
+        char: Char,
+        nominalX: Float,
+    ): Float {
+        val idx = charToIndex(char) ?: return nominalX
+        return nominalX + synchronized(lock) { offsets[idx] }
+    }
+
+    /** Allocation-free adapted Y coordinate. */
+    fun getAdaptedY(
+        char: Char,
+        nominalY: Float,
+    ): Float {
+        val idx = charToIndex(char) ?: return nominalY
+        return nominalY + synchronized(lock) { offsets[idx + 1] }
+    }
+
     /** Returns the adapted key center (nominalX + deltaX, nominalY + deltaY). */
     fun getAdaptedCenter(
         char: Char,
         nominalX: Float,
         nominalY: Float,
     ): Pair<Float, Float> {
-        val (dx, dy) = getOffset(char)
-        return Pair(nominalX + dx, nominalY + dy)
+        val idx = charToIndex(char) ?: return Pair(nominalX, nominalY)
+        synchronized(lock) {
+            return Pair(nominalX + offsets[idx], nominalY + offsets[idx + 1])
+        }
+    }
+
+    /**
+     * Saves an in-memory backup of the current offsets before applying a new word learning pass.
+     * Can be rolled back via [rollbackLastLearning] if the word is undone or an alternative is picked.
+     */
+    fun saveSnapshot() {
+        synchronized(lock) {
+            System.arraycopy(offsets, 0, backupOffsets, 0, NUM_FLOATS)
+            hasBackup = true
+        }
+    }
+
+    /**
+     * Restores the offsets before the most recent learning pass.
+     * Returns true if a snapshot was available and restored.
+     */
+    fun rollbackLastLearning(): Boolean {
+        synchronized(lock) {
+            if (!hasBackup) return false
+            System.arraycopy(backupOffsets, 0, offsets, 0, NUM_FLOATS)
+            hasBackup = false
+            return true
+        }
+    }
+
+    /** Returns a standalone copy of the current 52-float offsets array. */
+    fun snapshot(): FloatArray {
+        synchronized(lock) {
+            return offsets.clone()
+        }
+    }
+
+    /** Restores offsets from [data]. Must have size 52. */
+    fun restore(data: FloatArray): Boolean {
+        if (data.size != NUM_FLOATS) return false
+        synchronized(lock) {
+            System.arraycopy(data, 0, offsets, 0, NUM_FLOATS)
+        }
+        return true
     }
 
     /**
@@ -65,8 +127,10 @@ class BloomSpatialProfile {
         if (isSensitive) return
         val idx = charToIndex(char) ?: return
 
-        val observedDx = (observedX - nominalX).coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
-        val observedDy = (observedY - nominalY).coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
+        val rawDx = observedX - nominalX
+        val rawDy = observedY - nominalY
+        val observedDx = rawDx.coerceIn(-MAX_DRIFT_KEY_WIDTH * 1.5f, MAX_DRIFT_KEY_WIDTH * 1.5f)
+        val observedDy = rawDy.coerceIn(-MAX_DRIFT_KEY_WIDTH * 1.5f, MAX_DRIFT_KEY_WIDTH * 1.5f)
 
         synchronized(lock) {
             val currDx = offsets[idx]
@@ -141,6 +205,8 @@ class BloomSpatialProfile {
     fun reset() {
         synchronized(lock) {
             offsets.fill(0f)
+            backupOffsets.fill(0f)
+            hasBackup = false
         }
     }
 
