@@ -373,10 +373,15 @@ class TypingViewModel
             _suggestions.value = alternatives.filter { it != word }.take(MAX_STRIP_SUGGESTIONS)
             lastGlideCommit = word
             lastGlideGeneration = generation
+            lastGlideStroke = stroke
         }
 
         private var lastGlideCommit: String? = null
         private var lastGlideGeneration = -1
+        private var lastGlideStroke:
+            com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke? = null
+        private var lastConsumedGlide:
+            Pair<String, com.uncoalesced.stickykeys.keyboardcore.domain.engine.GlideStroke?>? = null
 
         /**
          * The word a glide just committed, if the text has not moved since.
@@ -395,7 +400,11 @@ class TypingViewModel
         fun consumeGlideCommit(): String? {
             val word = lastGlideCommit ?: return null
             lastGlideCommit = null
-            return if (lastGlideGeneration == generation) word else null
+            val valid = if (lastGlideGeneration == generation) word else null
+            if (valid != null) {
+                lastConsumedGlide = Pair(valid, lastGlideStroke)
+            }
+            return valid
         }
 
         /** When the shift key was last tapped, for the caps-lock double-tap window. */
@@ -941,6 +950,25 @@ class TypingViewModel
         }
 
         fun onSuggestionSelected(suggestion: String) {
+            val consumedGlide = lastConsumedGlide
+            lastConsumedGlide = null
+            if (consumedGlide != null) {
+                val (wrongWord, stroke) = consumedGlide
+                val trajectory = stroke?.bloomTrajectory
+                if (trajectory != null &&
+                    stroke.keyCentroids.isNotEmpty() &&
+                    !_fieldKind.value.isSensitive &&
+                    keyboardPreferences.bloomTypeBiomechanicalLearning.value
+                ) {
+                    predictionEngine.correctGlideLearning(
+                        wrongWord = wrongWord,
+                        chosenWord = suggestion,
+                        trajectory = trajectory,
+                        keyCentroids = { c -> stroke.keyCentroids[c.lowercaseChar()] },
+                        isSensitive = false,
+                    )
+                }
+            }
             currentWord = ""
             _suggestions.value = emptyList()
             learn(suggestion)
