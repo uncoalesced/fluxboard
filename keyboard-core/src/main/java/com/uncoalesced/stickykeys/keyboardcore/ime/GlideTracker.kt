@@ -35,6 +35,7 @@ internal class GlideTracker {
 
     /** Points collected so far, in root coordinates. */
     private val points = mutableListOf<Offset>()
+    private val pointTimes = mutableListOf<Long>()
 
     /**
      * Live so the view can dim the suggestion strip or show a trail while a glide is running.
@@ -81,8 +82,11 @@ internal class GlideTracker {
     }
 
     fun begin(at: Offset) {
+        val now = System.currentTimeMillis()
         points.clear()
+        pointTimes.clear()
         points.add(at)
+        pointTimes.add(now)
         trailPoints.clear()
         trailPoints.add(at)
         isGliding.value = true
@@ -93,7 +97,9 @@ internal class GlideTracker {
         // drown the direction changes that identify which letters were aimed at.
         val last = points.lastOrNull()
         if (last != null && (last - to).getDistance() < MIN_SAMPLE_DISTANCE_PX) return
+        val now = System.currentTimeMillis()
         points.add(to)
+        pointTimes.add(now)
         trailPoints.add(to)
     }
 
@@ -103,16 +109,18 @@ internal class GlideTracker {
         trailPoints.clear()
         if (points.size < 2) {
             points.clear()
+            pointTimes.clear()
             return null
         }
         val width = keyWidthPx.coerceAtLeast(1f)
         val rawX = FloatArray(points.size)
         val rawY = FloatArray(points.size)
+        val rawTimes = pointTimes.toLongArray()
         for (i in points.indices) {
             rawX[i] = points[i].x / width
             rawY[i] = points[i].y / width
         }
-        val bloomTrajectory = buildBloomTrajectory(rawX, rawY, points.size, 48)
+        val bloomTrajectory = buildBloomTrajectory(rawX, rawY, points.size, 48, rawTimes)
 
         val centroids = mutableMapOf<Char, Pair<Float, Float>>()
         for ((k, rect) in keyRects) {
@@ -130,6 +138,7 @@ internal class GlideTracker {
                 )
             }
         points.clear()
+        pointTimes.clear()
         val legacyStroke = buildGlideStroke(samples)
         val stroke =
             legacyStroke.copy(
@@ -152,16 +161,20 @@ internal class GlideTracker {
         val width = keyWidthPx.coerceAtLeast(1f)
         val rawX = FloatArray(points.size)
         val rawY = FloatArray(points.size)
+        val rawTimes = pointTimes.toLongArray()
         for (i in points.indices) {
             rawX[i] = points[i].x / width
             rawY[i] = points[i].y / width
         }
-        val traj = buildBloomTrajectory(rawX, rawY, points.size, 48)
+        points.clear()
+        pointTimes.clear()
+        val traj = buildBloomTrajectory(rawX, rawY, rawX.size, 48, rawTimes)
         return if (traj.isUsable) traj else null
     }
 
     fun cancel() {
         points.clear()
+        pointTimes.clear()
         trailPoints.clear()
         isGliding.value = false
     }
