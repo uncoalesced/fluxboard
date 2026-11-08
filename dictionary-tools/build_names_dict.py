@@ -413,6 +413,61 @@ def write_flictionary(nodes, output_file):
     print(f"Successfully generated {output_file} ({os.path.getsize(output_file)} bytes).")
 
 
+TYPO_BLOCKLIST = {
+    "alot", "teh", "hte", "adn", "thier", "untill", "definately", "seperate", "occured",
+    "dont", "cant", "wont", "isnt", "arent", "hasnt", "havent", "didnt", "couldnt", "shouldnt", "wouldnt",
+}
+
+
+def load_external_tokens(vocab_dir=r"E:\gtmp\fluxboard-vocab"):
+    """Loads Wikidata names (CC0) and GeoNames populated places (CC BY 4.0) if available."""
+    tokens = set()
+    if not os.path.exists(vocab_dir):
+        return tokens
+
+    # 1. Wikidata Given Names & Surnames (CC0)
+    for fn in ["wikidata_given_tokens.txt", "wikidata_surname_tokens.txt"]:
+        p = os.path.join(vocab_dir, fn)
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip().lower()
+                    if (
+                        line
+                        and not line.startswith("#")
+                        and line.isalpha()
+                        and 2 <= len(line) <= 24
+                        and line not in TYPO_BLOCKLIST
+                    ):
+                        tokens.add(line)
+
+    # 2. GeoNames India Populated Places (CC BY 4.0, filtered pop >= 10,000)
+    in_zip = os.path.join(vocab_dir, "IN.zip")
+    if os.path.exists(in_zip):
+        import zipfile
+        import re
+        with zipfile.ZipFile(in_zip) as archive:
+            with archive.open("IN.txt") as source:
+                for raw in source:
+                    fields = raw.decode("utf-8").rstrip("\n").split("\t")
+                    if len(fields) < 15 or fields[6] != "P":
+                        continue
+                    try:
+                        pop = int(fields[14] or "0")
+                    except ValueError:
+                        pop = 0
+                    if pop >= 10000:
+                        labels = [fields[1], fields[2]] + fields[3].split(",")
+                        for label in labels:
+                            for part in re.split(r"[\s\'’ʼ-]+", label.lower()):
+                                clean = "".join(c for c in part if c.isalpha() and c.isascii())
+                                if 3 <= len(clean) <= 24 and clean not in TYPO_BLOCKLIST:
+                                    tokens.add(clean)
+
+    print(f"Loaded {len(tokens)} external tokens from {vocab_dir}")
+    return tokens
+
+
 def main():
     corpus_file = os.path.join(os.path.dirname(__file__), "count_1w.txt")
     output_file = os.path.join(
@@ -453,6 +508,9 @@ def main():
                     unique_words.add(clean)
 
     print(f"Total curated unique words: {len(unique_words)}")
+    external_tokens = load_external_tokens()
+    unique_words.update(external_tokens)
+    print(f"Total combined unique words with external sources: {len(unique_words)}")
 
     # Assign frequencies
     # If present in count_1w.txt, take the real web count.
