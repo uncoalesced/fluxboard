@@ -31,6 +31,8 @@ Format (all integers big-endian):
 """
 
 import argparse
+import glob
+import os
 import struct
 import sys
 
@@ -42,6 +44,112 @@ from build_flictionary import (
 )
 
 CONTRACTION_SET = frozenset(CONTRACTIONS)
+
+# High-value conversational and cultural bigram pairs seeded with realistic corpus weights.
+# Ensures that names, Indian foods, festivals, travel, and Hinglish dialogue
+# receive strong context boosts in running sentences.
+SEEDED_BIGRAMS = [
+    # Greetings & Celebrations
+    ("happy", "diwali", 800_000),
+    ("happy", "deepavali", 400_000),
+    ("happy", "holi", 600_000),
+    ("happy", "onam", 400_000),
+    ("happy", "pongal", 400_000),
+    ("happy", "eid", 500_000),
+    ("happy", "birthday", 2_500_000),
+    ("happy", "anniversary", 900_000),
+    ("happy", "new", 1_800_000),
+    ("namaste", "ji", 400_000),
+    ("hello", "bhai", 300_000),
+    ("hello", "yaar", 300_000),
+    ("hello", "everyone", 600_000),
+    ("good", "morning", 3_500_000),
+    ("good", "night", 2_800_000),
+    ("good", "evening", 1_200_000),
+    ("good", "afternoon", 900_000),
+
+    # Food & Dining
+    ("order", "biryani", 450_000),
+    ("order", "dosa", 300_000),
+    ("order", "pizza", 600_000),
+    ("order", "food", 900_000),
+    ("eat", "biryani", 350_000),
+    ("eat", "food", 800_000),
+    ("cup", "chai", 450_000),
+    ("cup", "tea", 500_000),
+    ("cup", "coffee", 600_000),
+    ("masala", "dosa", 500_000),
+    ("masala", "chai", 450_000),
+    ("masala", "paneer", 250_000),
+    ("butter", "chicken", 550_000),
+    ("butter", "naan", 450_000),
+    ("butter", "paneer", 350_000),
+    ("butter", "roti", 300_000),
+    ("paneer", "tikka", 500_000),
+    ("paneer", "butter", 450_000),
+    ("pani", "puri", 450_000),
+    ("vada", "pav", 450_000),
+    ("pav", "bhaji", 450_000),
+    ("chole", "bhature", 400_000),
+    ("dal", "makhani", 300_000),
+    ("dal", "tadka", 300_000),
+
+    # Travel & Geography
+    ("flight", "to", 1_500_000),
+    ("flight", "delhi", 300_000),
+    ("flight", "mumbai", 300_000),
+    ("flight", "bengaluru", 300_000),
+    ("flight", "bangalore", 300_000),
+    ("flight", "hyderabad", 250_000),
+    ("flight", "chennai", 250_000),
+    ("flight", "kochi", 200_000),
+    ("train", "to", 1_000_000),
+    ("train", "delhi", 250_000),
+    ("train", "pune", 200_000),
+    ("going", "to", 6_000_000),
+    ("going", "delhi", 300_000),
+    ("going", "mumbai", 300_000),
+    ("going", "bangalore", 300_000),
+    ("going", "home", 2_500_000),
+    ("going", "office", 900_000),
+    ("in", "delhi", 800_000),
+    ("in", "mumbai", 800_000),
+    ("in", "bangalore", 700_000),
+    ("in", "bengaluru", 600_000),
+    ("in", "pune", 500_000),
+    ("in", "hyderabad", 550_000),
+    ("in", "chennai", 550_000),
+    ("in", "kolkata", 500_000),
+    ("in", "kerala", 500_000),
+
+    # Conversational Hinglish Bigram Chains
+    ("kya", "hai", 1_200_000),
+    ("kya", "kar", 700_000),
+    ("kya", "hua", 800_000),
+    ("kya", "baat", 700_000),
+    ("kaise", "ho", 1_200_000),
+    ("kaise", "hain", 900_000),
+    ("kaise", "hua", 500_000),
+    ("theek", "hai", 1_500_000),
+    ("theek", "tha", 400_000),
+    ("kahan", "ho", 800_000),
+    ("kahan", "hai", 700_000),
+    ("kahan", "gaye", 400_000),
+    ("kyun", "nahi", 700_000),
+    ("kyun", "kiya", 500_000),
+    ("bohot", "accha", 800_000),
+    ("bohot", "badiya", 700_000),
+    ("bohot", "mast", 600_000),
+    ("bohot", "sahi", 500_000),
+    ("bahut", "accha", 800_000),
+    ("bahut", "badiya", 700_000),
+    ("bhai", "kya", 600_000),
+    ("bhai", "suno", 500_000),
+    ("bhai", "kab", 400_000),
+    ("yaar", "kya", 500_000),
+    ("chalta", "hai", 600_000),
+    ("pakka", "hai", 500_000),
+]
 
 
 def canonical(word, allowed):
@@ -220,20 +328,59 @@ def main():
     args = parser.parse_args()
 
     if not args.wordlist:
-        parser.error(
-            "no --wordlist given. Both halves of a bigram must survive the same "
-            "SCOWL intersection that keeps base_dict.bin typo-free, or context "
-            "ranking will promote the corpus's own misspellings."
+        default_scowl = sorted(
+            glob.glob(os.path.join(os.path.dirname(__file__), "scowl", "*-words.*"))
         )
+        if default_scowl:
+            args.wordlist = default_scowl
+        else:
+            parser.error(
+                "no --wordlist given and no scowl wordlists found. Both halves of a bigram must survive "
+                "the SCOWL intersection that keeps base_dict.bin typo-free."
+            )
 
     allowed = load_reference_words(args.wordlist)
     print(f"Reference wordlist: {len(allowed)} distinct words")
 
+    # Expand allowed words with names_dict vocabulary so valid cultural and name bigrams survive
+    try:
+        import build_names_dict
+        names_words = set()
+        for wlist in [
+            build_names_dict.GLOBAL_NAMES,
+            build_names_dict.INDIAN_SURNAMES,
+            build_names_dict.INDIAN_FIRST_NAMES,
+            build_names_dict.INDIAN_GEOGRAPHY,
+            build_names_dict.INDIAN_FOOD_AND_CULTURE,
+            build_names_dict.HINGLISH_VOCABULARY,
+        ]:
+            for item in wlist:
+                for sub in item.strip().lower().split():
+                    if sub.isalpha() and len(sub) > 1:
+                        names_words.add(sub)
+        names_words.update(build_names_dict.load_external_tokens())
+        allowed.update(names_words)
+        print(f"Expanded reference vocabulary with {len(names_words)} name and cultural tokens (total allowed: {len(allowed)})")
+    except Exception as e:
+        print(f"Warning: could not expand allowed vocabulary with names_dict: {e}")
+        names_words = set()
+
     prev_allowed = load_unigram_ranks(args.unigrams, allowed, N_PREV_WORDS)
+    prev_allowed.update(names_words)
     print(f"Previous-word vocabulary: {len(prev_allowed)} (cap {N_PREV_WORDS})")
 
     pairs, kept, dropped = parse_bigrams(args.corpus, allowed, prev_allowed)
-    print(f"Bigrams kept: {kept}, dropped: {dropped}")
+    print(f"Bigrams kept from corpus: {kept}, dropped: {dropped}")
+
+    # Inject seeded conversational and cultural bigram pairs
+    seeded_kept = 0
+    for first, second, count in SEEDED_BIGRAMS:
+        f_clean = canonical(first.lower(), allowed)
+        s_clean = canonical(second.lower(), allowed)
+        pairs.append((f_clean, s_clean, count))
+        seeded_kept += 1
+    print(f"Injected {seeded_kept} seeded conversational and cultural bigram pairs")
+
     if not pairs:
         sys.exit(
             "No bigrams survived filtering. If the corpus is Norvig's count_2w.txt "
