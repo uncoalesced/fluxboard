@@ -198,6 +198,16 @@ class KeyboardPreferences
             _bloomTypeBiomechanicalLearning.value = enabled
         }
 
+        private val _personalizedLearningEnabled =
+            MutableStateFlow(prefs.getBoolean("personalized_learning", true))
+        val personalizedLearningEnabled: StateFlow<Boolean> =
+            _personalizedLearningEnabled.asStateFlow()
+
+        fun setPersonalizedLearning(enabled: Boolean) {
+            prefs.edit().putBoolean("personalized_learning", enabled).apply()
+            _personalizedLearningEnabled.value = enabled
+        }
+
         private fun readKeySizePercent(): Int =
             prefs
                 .getInt("key_size_percent", DEFAULT_KEY_SIZE_PERCENT)

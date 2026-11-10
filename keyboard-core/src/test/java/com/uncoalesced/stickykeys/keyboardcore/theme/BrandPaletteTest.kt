@@ -36,7 +36,7 @@ class BrandPaletteTest {
 
     @Test
     fun `the accent fill is below text contrast, which is why it is not the text colour`() {
-        assertEquals(3.73, ratio(Watermelon, DarkBackground), 0.01)
+        assertEquals(5.18, ratio(Watermelon, DarkBackground), 0.01)
         assertEquals(4.03, ratio(Watermelon, Porcelain), 0.01)
         assertNotEquals(Watermelon, darkStickyKeysColors().accentText)
         assertNotEquals(Watermelon, lightStickyKeysColors().accentText)
@@ -53,6 +53,16 @@ class BrandPaletteTest {
             assertTrue(ratio(p.onPrimary, p.primary) >= 4.5)
             assertTrue(ratio(p.onAccentText, p.accentText) >= 4.5)
         }
+    }
+
+    @Test
+    fun `dark theme uses AMOLED true black background and graphite elevated surface`() {
+        assertEquals(Color(0xFF000000), DarkBackground)
+        assertEquals(Color(0xFF000000), darkStickyKeysColors().background)
+        assertEquals(Color(0xFF141414), Graphite)
+        assertEquals(Color(0xFF141414), darkStickyKeysColors().surface)
+        assertEquals(Color(0xFF2E2E2E), DarkBorder)
+        assertEquals(Color(0xFF2E2E2E), darkStickyKeysColors().secondary)
     }
 
     @Test

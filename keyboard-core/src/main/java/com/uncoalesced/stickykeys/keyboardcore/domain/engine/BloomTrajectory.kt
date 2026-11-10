@@ -20,6 +20,7 @@ class BloomTrajectory(
     val inflections: IntArray,
     val inflectionWeights: FloatArray,
     val dwellProfile: FloatArray = FloatArray(count) { 1.0f },
+    val pointWeights: FloatArray = FloatArray(count) { 1.0f },
 ) {
     inline fun getX(index: Int): Float = resampledPoints[index * 2]
 
@@ -138,6 +139,8 @@ fun buildBloomTrajectory(
     inflWeights.add(1.0f)
 
     val angles = FloatArray(targetPoints)
+    val pointWeights = FloatArray(targetPoints) { 1.0f }
+    val gamma = 0.45f
     for (k in 1 until targetPoints - 1) {
         val inDx = resampled[k * 2] - resampled[(k - 1) * 2]
         val inDy = resampled[k * 2 + 1] - resampled[(k - 1) * 2 + 1]
@@ -146,7 +149,11 @@ fun buildBloomTrajectory(
 
         val inAngle = atan2(inDy, inDx)
         val outAngle = atan2(outDy, outDx)
-        angles[k] = angleDelta(inAngle, outAngle)
+        val a = angleDelta(inAngle, outAngle)
+        angles[k] = a
+        val kappa = (a / 1.57f).coerceIn(0f, 2f)
+        val dwellBoost = (dwell[k] / 1.5f).coerceIn(1.0f, 1.3f)
+        pointWeights[k] = (1.0f + gamma * kappa * dwellBoost).coerceIn(1.0f, 2.0f)
     }
 
     // Curvature maxima >= 0.45 rad (~25 deg) or curvature >= 0.35 with high dwell (pause)
@@ -174,6 +181,7 @@ fun buildBloomTrajectory(
         inflections = inflList.toIntArray(),
         inflectionWeights = inflWeights.toFloatArray(),
         dwellProfile = dwell,
+        pointWeights = pointWeights,
     )
 }
 

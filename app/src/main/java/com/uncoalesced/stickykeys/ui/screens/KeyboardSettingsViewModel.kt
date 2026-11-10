@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.data.local.dao.ClipboardDao
+import com.uncoalesced.stickykeys.keyboardcore.domain.engine.PersonalLearningEngine
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
 import com.uncoalesced.stickykeys.keyboardcore.theme.ThemeManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +37,7 @@ class KeyboardSettingsViewModel
         private val usageLog: com.uncoalesced.stickykeys.keyboardcore.diagnostics.UsageRecorder,
         private val typingStats:
             com.uncoalesced.stickykeys.keyboardcore.diagnostics.TypingStatsStore,
+        private val personalLearningEngine: PersonalLearningEngine? = null,
     ) : ViewModel() {
         /** Opening either editor is what arms the default-keyboard prompt. */
         fun onCustomizerOpened() {
@@ -62,9 +64,12 @@ class KeyboardSettingsViewModel
         val showKeyHints = preferences.showKeyHints
         val glideTyping = preferences.glideTypingEnabled
         val bloomTypeLearning = preferences.bloomTypeBiomechanicalLearning
+        val personalizedLearning = preferences.personalizedLearningEnabled
 
         fun setBloomTypeLearning(enabled: Boolean) =
             preferences.setBloomTypeBiomechanicalLearning(enabled)
+
+        fun setPersonalizedLearning(enabled: Boolean) = preferences.setPersonalizedLearning(enabled)
 
         fun setKeySizePercent(percent: Int) = preferences.setKeySizePercent(percent)
 
@@ -139,4 +144,8 @@ class KeyboardSettingsViewModel
         fun statsSnapshot() = typingStats.snapshot()
 
         fun clearStats() = typingStats.clear()
+
+        fun clearLearnedData() {
+            personalLearningEngine?.clearAll()
+        }
     }

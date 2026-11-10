@@ -1,10 +1,10 @@
 <!-- Engineered by uncoalesced -->
 <p align="center">
-  <img src="assets/banner.png" alt="fluxboard v1.0.0-stable: a privacy-first keyboard with built-in stickers and GIFs" width="100%">
+  <img src="assets/banner.png" alt="fluxboard v1.0.0-testing: a privacy-first keyboard with built-in stickers and GIFs" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/uncoalesced/fluxboard/releases/latest"><img alt="Version v1.0.0-stable" src="https://img.shields.io/badge/version-v1.0.0--stable-AD2F4A?labelColor=333333&style=flat-square"></a>
+  <a href="https://github.com/uncoalesced/fluxboard/releases/latest"><img alt="Version v1.0.0-testing" src="https://img.shields.io/badge/version-v1.0.0--testing-AD2F4A?labelColor=333333&style=flat-square"></a>
   <a href="https://github.com/uncoalesced/fluxboard/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/uncoalesced/fluxboard/ci.yml?branch=main&label=CI&labelColor=333333&style=flat-square"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/uncoalesced/fluxboard?color=4B4B4B&labelColor=333333&style=flat-square"></a>
   <a href="https://github.com/uncoalesced/fluxboard/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/uncoalesced/fluxboard?color=4B4B4B&labelColor=333333&style=flat-square"></a>
@@ -41,11 +41,11 @@ Store screenshots. Add PNGs to fastlane/metadata/android/en-US/images/phoneScree
 
 ## Install
 
-v1.0.0-stable needs Android 8.0 (API 26) or newer.
+v1.0.0-testing needs Android 8.0 (API 26) or newer.
 
 | Source | Status | How to get it |
 |---|---|---|
-| GitHub Releases | Available | Download `FluxBoard-v1.0.0-stable-release.apk` from the [latest release](https://github.com/uncoalesced/fluxboard/releases/latest) |
+| GitHub Releases | Available | Download `FluxBoard-v1.0.0-testing-release.apk` from the [latest release](https://github.com/uncoalesced/fluxboard/releases/latest) |
 | Obtainium | Available | Add `https://github.com/uncoalesced/fluxboard` as an app source |
 | Komi Store | Available | Search for FluxBoard, or add `uncoalesced/fluxboard` |
 | F-Droid | Planned | Store metadata already lives in [`fastlane/`](fastlane/metadata/android/en-US) |
@@ -92,7 +92,7 @@ Plenty of apps promise privacy. Two of FluxBoard's biggest claims are enforced b
 
 The full picture, including every permission and why it exists, is in [PRIVACY.md](docs/PRIVACY.md). See also [SECURITY.md](docs/SECURITY.md) and [TERMS.md](docs/TERMS.md).
 
-## Known limitations in v1.0.0-stable
+## Known limitations in v1.0.0-testing
 
 - No automatic background removal. ML Kit was taken out because it pulls in Play Services and a telemetry transport. Automatic removal will return only with an open, on-device model that ships in this repo.
 - Sticker links only work on your own network. The relay that would carry them further is written but not deployed.
@@ -121,7 +121,7 @@ Release signing reads a `keystore.properties` at the repo root that points at a 
 | | |
 |---|---|
 | Application ID | `com.uncoalesced.stickykeys` |
-| Version | v1.0.0-stable |
+| Version | v1.0.0-testing |
 | Min / target SDK | 26 (Android 8.0) / 36 |
 | License | [MIT](LICENSE) |
 | Source tag | Each release is tagged with its version name |
@@ -169,5 +169,5 @@ Using the app is also covered by [TERMS.md](docs/TERMS.md), which mostly repeats
     <img src="assets/logos/fluxboard-mark-light.svg" alt="FluxBoard mark" width="64">
   </picture>
   <br>
-  <sub>FluxBoard v1.0.0-stable</sub>
+  <sub>FluxBoard v1.0.0-testing</sub>
 </p>

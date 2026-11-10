@@ -241,36 +241,52 @@ fun TypingKeyboardView(
         // under the user's thumbs. Hoisting it out here, above a panel that keeps its own
         // fixed height, means the extra height is added at the top edge and the grid's
         // position and size are identical in both states.
+        val resizing by typingViewModel.resizeMode.collectAsState()
+        val heightPercent by typingViewModel.keyboardHeightPercent.collectAsState()
+
         Column(modifier = Modifier.fillMaxWidth()) {
-            QuickAccessRow(
-                expanded = quickExpanded,
-                palette = StickyKeysTheme.colors,
-                privateMode = privateMode,
-                onAction = { action ->
-                    typingViewModel.performKeyPressHaptic()
-                    when {
-                        action.comingSoon -> comingSoon = action.label
-                        action.id == "grid" -> keyboardController.switchMode(AppMode.EMOJI_PICKER)
-                        action.id == "clipboard" ->
-                            keyboardController.switchMode(AppMode.CLIPBOARD)
-                        action.id == "textedit" ->
-                            keyboardController.switchMode(AppMode.TEXT_EDIT)
-                        action.id == "private" ->
-                            typingViewModel.setPrivateMode(!privateMode)
-                        action.id == "settings" ->
-                            openAppAt(context, ROUTE_KEYBOARD_SETTINGS)
-                        action.id == "switchime" -> keyboardController.showInputMethodPicker()
-                        action.id == "resize" -> typingViewModel.setResizeMode(true)
-                    }
-                    // The privacy toggle stays put. Collapsing the row on it would hide the
-                    // control the instant it was used, so confirming the state means reopening
-                    // the toolbar -- and a privacy switch you cannot see is one you stop
-                    // trusting. Everything else here navigates away, so it collapses.
-                    if (!action.comingSoon && action.id != "private") quickExpanded = false
-                },
-                onMedia = { action -> MediaTransport.dispatch(context, action) },
-                isMediaPlaying = { MediaTransport.isPlaying(context) },
-            )
+            if (resizing) {
+                KeyboardResizeBar(
+                    onHeightDelta = { steps ->
+                        typingViewModel.setKeyboardHeightPercent(heightPercent + steps)
+                    },
+                    onReset = typingViewModel::resetKeyboardSize,
+                    onDone = { typingViewModel.setResizeMode(false) },
+                )
+            } else {
+                QuickAccessRow(
+                    expanded = quickExpanded,
+                    palette = StickyKeysTheme.colors,
+                    privateMode = privateMode,
+                    onAction = { action ->
+                        typingViewModel.performKeyPressHaptic()
+                        when {
+                            action.comingSoon -> comingSoon = action.label
+                            action.id == "grid" ->
+                                keyboardController.switchMode(
+                                    AppMode.EMOJI_PICKER,
+                                )
+                            action.id == "clipboard" ->
+                                keyboardController.switchMode(AppMode.CLIPBOARD)
+                            action.id == "textedit" ->
+                                keyboardController.switchMode(AppMode.TEXT_EDIT)
+                            action.id == "private" ->
+                                typingViewModel.setPrivateMode(!privateMode)
+                            action.id == "settings" ->
+                                openAppAt(context, ROUTE_KEYBOARD_SETTINGS)
+                            action.id == "switchime" -> keyboardController.showInputMethodPicker()
+                            action.id == "resize" -> typingViewModel.setResizeMode(true)
+                        }
+                        // The privacy toggle stays put. Collapsing the row on it would hide the
+                        // control the instant it was used, so confirming the state means reopening
+                        // the toolbar -- and a privacy switch you cannot see is one you stop
+                        // trusting. Everything else here navigates away, so it collapses.
+                        if (!action.comingSoon && action.id != "private") quickExpanded = false
+                    },
+                    onMedia = { action -> MediaTransport.dispatch(context, action) },
+                    isMediaPlaying = { MediaTransport.isPlaying(context) },
+                )
+            }
 
             // Everything below here is the unchanging part: one fixed height, shared with the
             // sticker and clipboard panels, so switching mode changes what is drawn and never

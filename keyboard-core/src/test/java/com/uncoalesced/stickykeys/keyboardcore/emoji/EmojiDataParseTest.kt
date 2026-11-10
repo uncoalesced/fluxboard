@@ -128,4 +128,43 @@ class EmojiDataParseTest {
             )
         assertEquals(1, groups.single().emoji.size)
     }
+
+    @Test
+    fun `hash keycap starting with hash and tabs is parsed as emoji not group`() {
+        val hashKeycap = "#" + String(Character.toChars(0xFE0F)) + String(Character.toChars(0x20E3))
+        val groups =
+            parse(
+                """
+                #Symbols
+                $hashKeycap	0.6	keycap: #
+                #Flags
+                $apple	0.6	red apple
+                """.trimIndent(),
+            )
+        assertEquals(listOf("Symbols", "Flags"), groups.map { it.name })
+        val symbolsGroup = groups.first { it.name == "Symbols" }
+        assertEquals(1, symbolsGroup.emoji.size)
+        assertEquals(hashKeycap, symbolsGroup.emoji.first().glyph)
+        assertEquals("keycap: #", symbolsGroup.emoji.first().name)
+        assertTrue(groups.none { it.name.contains("keycap") })
+    }
+
+    @Test
+    fun `emoji_data txt asset has no phantom keycap group and symbols contains keycap hash`() {
+        val fileCandidates =
+            listOf(
+                java.io.File("src/main/assets/emoji_data.txt"),
+                java.io.File("keyboard-core/src/main/assets/emoji_data.txt"),
+                java.io.File("../keyboard-core/src/main/assets/emoji_data.txt"),
+            )
+        val assetFile = fileCandidates.firstOrNull { it.exists() }
+        if (assetFile != null) {
+            val groups = parseEmojiData(assetFile.readLines().asSequence()) { true }
+            val groupNames = groups.map { it.name }
+            assertTrue(groupNames.none { it.contains("keycap") })
+            val symbols = groups.firstOrNull { it.name == "Symbols" }
+            org.junit.Assert.assertNotNull(symbols)
+            assertTrue(symbols!!.emoji.any { it.name == "keycap: #" })
+        }
+    }
 }

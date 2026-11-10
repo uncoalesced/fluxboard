@@ -126,13 +126,16 @@ class BloomTrajectoryAligner {
                             min(vertexDist, kotlin.math.sqrt(segDistSq))
                         }
 
+                    val pointWeight = trajectory.pointWeights.getOrElse(s) { 1.0f }
+                    val weightedDist = localDist * pointWeight
+
                     // Candidate 1: Dwell (from s-1, v)
-                    var bestPrev = dpTable[prevRowOffset + v] + (localDist * 0.85f)
+                    var bestPrev = dpTable[prevRowOffset + v] + (weightedDist * 0.85f)
                     var bestAction: Byte = 1
 
                     // Candidate 2: Advance from previous vertex (from s-1, v-1)
                     if (v > 0) {
-                        val advCost = dpTable[prevRowOffset + (v - 1)] + localDist
+                        val advCost = dpTable[prevRowOffset + (v - 1)] + weightedDist
                         if (advCost < bestPrev) {
                             bestPrev = advCost
                             bestAction = 2
@@ -152,7 +155,7 @@ class BloomTrajectoryAligner {
                             )
                         val skipDist = kotlin.math.sqrt(skipDistSq)
                         val skipPenalty = skipDist * 1.25f
-                        val skipCost = dpTable[prevRowOffset + (v - 2)] + localDist + skipPenalty
+                        val skipCost = dpTable[prevRowOffset + (v - 2)] + weightedDist + skipPenalty
                         if (skipCost < bestPrev) {
                             bestPrev = skipCost
                             bestAction = 3

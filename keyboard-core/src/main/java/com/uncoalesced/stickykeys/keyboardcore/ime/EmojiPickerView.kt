@@ -185,9 +185,12 @@ internal fun EmojiPickerView(
                     items(tabLabels.size) { index ->
                         val label = tabLabels[index]
                         val selected = index == selectedTab
+                        val iconRes = categoryIconFor(label)
                         Box(
                             modifier =
                                 Modifier
+                                    .size(34.dp)
+                                    .minimumInteractiveComponentSize()
                                     .clickable { viewModel.selectTab(index) }
                                     .background(
                                         if (selected) {
@@ -196,25 +199,51 @@ internal fun EmojiPickerView(
                                             Color.Transparent
                                         },
                                         StickyKeysTheme.shapes.small,
-                                    ).padding(horizontal = 10.dp, vertical = 6.dp)
-                                    .semantics {
+                                    ).semantics {
                                         role = Role.Tab
                                         contentDescription = label
                                         stateDescription =
                                             if (selected) "Selected" else "Not selected"
                                     },
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                text = label,
-                                maxLines = 1,
-                                color =
-                                    if (selected) {
-                                        StickyKeysTheme.colors.onPrimary
-                                    } else {
-                                        StickyKeysTheme.colors.onSurfaceVariant
-                                    },
-                                style = StickyKeysTheme.typography.labelMedium,
-                            )
+                            if (iconRes != null) {
+                                Icon(
+                                    painter = painterResource(iconRes),
+                                    contentDescription = null,
+                                    tint =
+                                        if (selected) {
+                                            StickyKeysTheme.colors.onPrimary
+                                        } else {
+                                            StickyKeysTheme.colors.onSurfaceVariant
+                                        },
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            } else if (label == EMOTICONS_TAB_LABEL) {
+                                Text(
+                                    text = "^_^",
+                                    maxLines = 1,
+                                    color =
+                                        if (selected) {
+                                            StickyKeysTheme.colors.onPrimary
+                                        } else {
+                                            StickyKeysTheme.colors.onSurfaceVariant
+                                        },
+                                    style = StickyKeysTheme.typography.labelMedium,
+                                )
+                            } else {
+                                Text(
+                                    text = label,
+                                    maxLines = 1,
+                                    color =
+                                        if (selected) {
+                                            StickyKeysTheme.colors.onPrimary
+                                        } else {
+                                            StickyKeysTheme.colors.onSurfaceVariant
+                                        },
+                                    style = StickyKeysTheme.typography.labelMedium,
+                                )
+                            }
                         }
                     }
                 }
@@ -333,6 +362,13 @@ internal fun EmojiPickerView(
             EmojiSearchPad(
                 onLetter = { viewModel.onSearchQueryChanged(query + it) },
                 onDelete = { viewModel.onSearchQueryChanged(query.dropLast(1)) },
+                onClose = {
+                    searchActive = false
+                    viewModel.onSearchQueryChanged("")
+                },
+                onSearch = {
+                    searchActive = false
+                },
             )
         } else if (selectedTab == EmojiPickerViewModel.RECENT_TAB) {
             if (recent.isEmpty()) {
@@ -513,6 +549,8 @@ internal fun EmojiPickerView(
 private fun EmojiSearchPad(
     onLetter: (String) -> Unit,
     onDelete: () -> Unit,
+    onClose: () -> Unit = {},
+    onSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Hoisted and remembered for the same reason the typing keyboard hoists its handler: a
@@ -520,12 +558,16 @@ private fun EmojiSearchPad(
     // whole grid out of skipping.
     val letter = rememberUpdatedState(onLetter)
     val delete = rememberUpdatedState(onDelete)
+    val close = rememberUpdatedState(onClose)
+    val search = rememberUpdatedState(onSearch)
     val onKeyPress =
         remember {
             { output: String ->
                 when (output) {
                     "DEL" -> delete.value()
                     "SPACE" -> letter.value(" ")
+                    "CLOSE", "ABC" -> close.value()
+                    "SEARCH", "ENTER" -> search.value()
                     else -> letter.value(output)
                 }
             }
@@ -546,39 +588,104 @@ private fun EmojiSearchPad(
 }
 
 /**
- * The search keyboard's own rows: the shipped letters, a backspace, and a space bar.
+ * The search keyboard's own rows: the shipped letters, balanced row centering, a backspace,
+ * close/done key, space bar, and search action key.
  *
- * Built here rather than taken from `KeyboardLayouts.letterRows` because that carries the
- * action row, whose symbols page, emoji key and enter key have nothing to do in a search
- * box. No hints and no alternates, so no letter here offers a corner symbol that the query
- * has no use for.
+ * Built here with standard QWERTY proportions:
+ * Row 1: 10 keys (weight 1f each)
+ * Row 2: 0.5f spacer + 9 keys (weight 1f each) + 0.5f spacer
+ * Row 3: 1.5f spacer + 7 keys (weight 1f each) + DEL (weight 1.5f)
+ * Row 4: ABC/Close (weight 1.5f) + Space (weight 7f) + Enter/Search (weight 1.5f)
  */
-private val SEARCH_KEYBOARD_ROWS =
+internal val SEARCH_KEYBOARD_ROWS =
     KeyboardRows(
         listOf(
-            "qwertyuiop".map { KeyDefinition(id = "search_$it", output = it.toString()) },
-            "asdfghjkl".map { KeyDefinition(id = "search_$it", output = it.toString()) },
-            "zxcvbnm".map { KeyDefinition(id = "search_$it", output = it.toString()) } +
-                KeyDefinition(id = "search_del", output = "DEL", weight = 1.5f),
-            listOf(KeyDefinition(id = "search_space", output = "SPACE", weight = 10f)),
+            "qwertyuiop".map {
+                KeyDefinition(
+                    id = "search_$it",
+                    output = it.toString(),
+                    weight = 1f,
+                )
+            },
+            listOf(
+                KeyDefinition(
+                    id = "search_spacer_r2_l",
+                    output = KeyboardLayouts.SPACER,
+                    weight = 0.5f,
+                ),
+            ) +
+                "asdfghjkl".map {
+                    KeyDefinition(
+                        id = "search_$it",
+                        output = it.toString(),
+                        weight = 1f,
+                    )
+                } +
+                listOf(
+                    KeyDefinition(
+                        id = "search_spacer_r2_r",
+                        output = KeyboardLayouts.SPACER,
+                        weight = 0.5f,
+                    ),
+                ),
+            listOf(
+                KeyDefinition(
+                    id = "search_spacer_r3_l",
+                    output = KeyboardLayouts.SPACER,
+                    weight = 1.5f,
+                ),
+            ) +
+                "zxcvbnm".map {
+                    KeyDefinition(
+                        id = "search_$it",
+                        output = it.toString(),
+                        weight = 1f,
+                    )
+                } +
+                listOf(KeyDefinition(id = "search_del", output = "DEL", weight = 1.5f)),
+            listOf(
+                KeyDefinition(
+                    id = "search_close",
+                    output = "CLOSE",
+                    displayLabel = "ABC",
+                    weight = 1.5f,
+                ),
+                KeyDefinition(
+                    id = "search_space",
+                    output = "SPACE",
+                    displayLabel = "space",
+                    weight = 7f,
+                ),
+                KeyDefinition(id = "search_enter", output = "ENTER", weight = 1.5f),
+            ),
         ),
     )
 
 /**
- * Four rows, sized so the emoji results keep room to be results.
- *
- * At the typing keyboard's own row height this came to 176dp, which left the grid above it
- * about one and a half rows of emoji inside the picker's fixed panel -- narrower than the
- * plain pad it replaced, so the search got prettier and less useful in the same change.
- * Measured on device. 148dp keeps rows comfortably above the 34dp the old pad used while
- * giving the results back roughly a full row.
+ * Four rows, sized comfortably at 192dp (48dp per row) matching standard Android touch target minimums.
  */
-private val SEARCH_KEYBOARD_HEIGHT = 148.dp
+internal val SEARCH_KEYBOARD_HEIGHT = 192.dp
 
 private const val SEARCH_HINT = "Search emoji"
 private const val SEARCH_PROMPT = "Type a name, like heart or cat"
 
 private const val STICKERS_TAB = "Stickers"
+
+private fun categoryIconFor(label: String): Int? =
+    when (label) {
+        RECENT_TAB_LABEL -> R.drawable.ic_emoji_category_recent
+        STICKERS_TAB -> R.drawable.ic_emoji_category_stickers
+        "Smileys & Emotion" -> R.drawable.ic_emoji_category_smileys
+        "People & Body" -> R.drawable.ic_emoji_category_people
+        "Animals & Nature" -> R.drawable.ic_emoji_category_nature
+        "Food & Drink" -> R.drawable.ic_emoji_category_food
+        "Travel & Places" -> R.drawable.ic_emoji_category_travel
+        "Activities" -> R.drawable.ic_emoji_category_activities
+        "Objects" -> R.drawable.ic_emoji_category_objects
+        "Symbols" -> R.drawable.ic_emoji_category_symbols
+        "Flags" -> R.drawable.ic_emoji_category_flags
+        else -> null
+    }
 
 /** The first tab, and where the emoji key lands. */
 private const val RECENT_TAB_LABEL = "Recent"

@@ -312,7 +312,9 @@ class TypingViewModel
             val effective =
                 effectiveFieldKind(detectedFieldKind, keyboardPreferences.privateModeEnabled.value)
             _fieldKind.value = effective
-            incognitoState.set(hostNoLearning || effective.isSensitive)
+            val isPrivate = hostNoLearning || effective.isSensitive
+            incognitoState.set(isPrivate)
+            predictionEngine.personalLearningEngine.isIncognitoOrPassword = isPrivate
         }
 
         fun isCurrent(token: Int): Boolean = token == generation
@@ -496,9 +498,13 @@ class TypingViewModel
             // "Keys typed" beside it kept climbing, which reads as the stat being broken.
             typingStats.recordWord()
             if (incognitoState.active.value) return
+            val prev = previousWord
             previousWord = word.lowercase()
             viewModelScope.launch {
                 predictionEngine.learnWord(word)
+                if (!prev.isNullOrBlank()) {
+                    predictionEngine.learnBigram(prev, word)
+                }
             }
         }
 
@@ -624,6 +630,7 @@ class TypingViewModel
             generation++
             if (glided != null) {
                 predictionEngine.revertGlideWord(glided)
+                predictionEngine.personalLearningEngine.onWordReverted(previousWord, glided)
                 // A glide clears currentWord and commits its own trailing space, so there is
                 // no partial word here to fall through to. Whether the word being undone sat
                 // at a sentence start is a property of the text in front of it, not of the
@@ -863,7 +870,14 @@ class TypingViewModel
             generation++
             atSentenceStart = false
             publishAutoCapitalize()
+            val undoneAction = _undoState.value
             predictionEngine.recordRevert(original)
+            if (undoneAction != null) {
+                predictionEngine.personalLearningEngine.onWordReverted(
+                    previousWord,
+                    undoneAction.corrected,
+                )
+            }
             keep(original)
             updateSuggestions()
         }

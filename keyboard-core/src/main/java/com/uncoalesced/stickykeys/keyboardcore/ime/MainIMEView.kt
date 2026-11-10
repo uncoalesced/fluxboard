@@ -11,7 +11,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -130,7 +129,6 @@ fun MainIMEView(
     val showKeyHints by typingViewModel.showKeyHints.collectAsState()
     // Session-scoped, and cleared by the view model along with every other latch when a new
     // field is focused -- see TypingViewModel.resizeMode.
-    val resizing by typingViewModel.resizeMode.collectAsState()
 
     val panelMetrics =
         remember(
@@ -202,24 +200,6 @@ fun MainIMEView(
                 // The resize bar sits above the panel and the panel keeps its own height, so
                 // the two stack rather than the bar eating key space.
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    if (resizing) {
-                        // Holds the window still while the panel under it moves: the headroom
-                        // shrinks by exactly what the panel grows, so the sum -- and therefore
-                        // the window -- is constant for the whole drag. Without this the panel
-                        // could only be previewed by resizing the window on every frame, which
-                        // is the relayout storm this codebase already paid for once.
-                        Spacer(
-                            modifier =
-                                Modifier.height(rememberResizeHeadroom(rememberImePanelHeight())),
-                        )
-                        KeyboardResizeBar(
-                            onHeightDelta = { steps ->
-                                typingViewModel.setKeyboardHeightPercent(heightPercent + steps)
-                            },
-                            onReset = typingViewModel::resetKeyboardSize,
-                            onDone = { typingViewModel.setResizeMode(false) },
-                        )
-                    }
                     // The three modes are the same height, so a crossfade reads as the surface changing
                     // contents rather than the window jumping. Sliding would fight the IME window, which
                     // is anchored to the bottom of the screen; a fade is the honest motion here.

@@ -105,9 +105,9 @@ internal fun parseEmojiData(
 
     lines.forEach { line ->
         if (line.isEmpty()) return@forEach
-        if (line[0] == '#') {
+        if (line[0] == '#' && !line.contains('\t')) {
             flush()
-            currentName = line.substring(1)
+            currentName = line.substring(1).trim()
             current = mutableListOf()
             return@forEach
         }

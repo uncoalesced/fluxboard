@@ -382,13 +382,15 @@ private const val SITE_URL = "https://github.com/uncoalesced"
 private val IS_PRERELEASE: Boolean =
     BuildConfig.VERSION_NAME.contains("BETA", ignoreCase = true) ||
         BuildConfig.VERSION_NAME.contains("ALPHA", ignoreCase = true) ||
-        BuildConfig.VERSION_NAME.contains("RC", ignoreCase = true)
+        BuildConfig.VERSION_NAME.contains("RC", ignoreCase = true) ||
+        BuildConfig.VERSION_NAME.contains("TESTING", ignoreCase = true)
 
 /** The word itself, next to the app name, in the one colour reserved for saying "not final". */
 @Composable
 private fun PrereleaseBadge() {
     val label =
         when {
+            BuildConfig.VERSION_NAME.contains("TESTING", ignoreCase = true) -> "TESTING"
             BuildConfig.VERSION_NAME.contains("BETA", ignoreCase = true) -> "BETA"
             BuildConfig.VERSION_NAME.contains("ALPHA", ignoreCase = true) -> "ALPHA"
             else -> "PRE-RELEASE"

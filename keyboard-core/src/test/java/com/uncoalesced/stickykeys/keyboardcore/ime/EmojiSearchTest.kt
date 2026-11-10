@@ -1,6 +1,7 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.ime
 
+import androidx.compose.ui.unit.dp
 import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
 import com.uncoalesced.stickykeys.keyboardcore.emoji.Emoji
 import com.uncoalesced.stickykeys.keyboardcore.emoji.EmojiGroup
@@ -162,4 +163,47 @@ class EmojiSearchTest {
             assertEquals("", vm.searchQuery.value)
             assertEquals(groups, vm.filteredEmojiGroups.value)
         }
+
+    @Test
+    fun `search keyboard rows are balanced and symmetrical across all 4 rows`() {
+        val rows = SEARCH_KEYBOARD_ROWS.rows
+        assertEquals(4, rows.size)
+
+        // Every row has total weight 10.0f
+        rows.forEachIndexed { index, row ->
+            val totalWeight = row.sumOf { it.weight.toDouble() }
+            assertEquals("Row $index total weight", 10.0, totalWeight, 0.01)
+        }
+
+        // Row 1: 10 letter keys
+        assertEquals(10, rows[0].size)
+
+        // Row 2: 0.5f left spacer + 9 letters + 0.5f right spacer
+        assertEquals(11, rows[1].size)
+        assertEquals(KeyboardLayouts.SPACER, rows[1].first().output)
+        assertEquals(0.5f, rows[1].first().weight)
+        assertEquals(KeyboardLayouts.SPACER, rows[1].last().output)
+        assertEquals(0.5f, rows[1].last().weight)
+
+        // Row 3: 1.5f left spacer + 7 letters + 1.5f DEL
+        assertEquals(9, rows[2].size)
+        assertEquals(KeyboardLayouts.SPACER, rows[2].first().output)
+        assertEquals(1.5f, rows[2].first().weight)
+        assertEquals("DEL", rows[2].last().output)
+        assertEquals(1.5f, rows[2].last().weight)
+
+        // Row 4: Close/ABC (1.5f) + Space (7f) + Enter (1.5f)
+        assertEquals(3, rows[3].size)
+        assertEquals("CLOSE", rows[3][0].output)
+        assertEquals(1.5f, rows[3][0].weight)
+        assertEquals("SPACE", rows[3][1].output)
+        assertEquals(7.0f, rows[3][1].weight)
+        assertEquals("ENTER", rows[3][2].output)
+        assertEquals(1.5f, rows[3][2].weight)
+    }
+
+    @Test
+    fun `search keyboard height is ergonomic and at least 188dp`() {
+        assertTrue(SEARCH_KEYBOARD_HEIGHT >= 188.dp)
+    }
 }

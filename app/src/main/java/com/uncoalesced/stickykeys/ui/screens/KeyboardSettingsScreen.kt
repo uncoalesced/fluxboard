@@ -86,6 +86,7 @@ fun KeyboardSettingsScreen(
             val showKeyHints by viewModel.showKeyHints.collectAsState()
             val glideTyping by viewModel.glideTyping.collectAsState()
             val bloomTypeLearning by viewModel.bloomTypeLearning.collectAsState()
+            val personalizedLearning by viewModel.personalizedLearning.collectAsState()
             val keyboardHeight by viewModel.keyboardHeightPercent.collectAsState()
             val keyboardBottomPadding by viewModel.keyboardBottomPaddingDp.collectAsState()
 
@@ -123,6 +124,7 @@ fun KeyboardSettingsScreen(
 
             var showClearClipboardDialog by remember { mutableStateOf(false) }
             var showResetAppearanceDialog by remember { mutableStateOf(false) }
+            var showClearLearnedDataDialog by remember { mutableStateOf(false) }
             val context = LocalContext.current
 
             // Restructured (2c): a flat list of ~15 rows made "which setting was that" a
@@ -139,6 +141,10 @@ fun KeyboardSettingsScreen(
             val labelBloomTypeLearning = "BloomType adaptive learning"
             val summaryBloomTypeLearning =
                 "Adapts key touch targets to your personal glide trajectory on-device. 100% private."
+            val labelPersonalizedLearning = "Personalized learning"
+            val summaryPersonalizedLearning =
+                "Learn words and phrases privately on-device to improve predictions. Never leaves your phone."
+            val labelClearLearnedData = "Clear learned data"
             val labelDoubleSpace = stringResource(R.string.text_double_space_period)
             val summaryDoubleSpace = stringResource(R.string.text_double_space_period_summary)
 
@@ -289,7 +295,15 @@ fun KeyboardSettingsScreen(
                     .DefaultKeyboardPrompt(viewModel.appPreferences)
 
                 // TYPING
-                if (matches(labelAutoCap, labelAutoCorrect, labelGlideTyping, labelDoubleSpace)) {
+                if (
+                    matches(
+                        labelAutoCap,
+                        labelAutoCorrect,
+                        labelGlideTyping,
+                        labelDoubleSpace,
+                        labelPersonalizedLearning,
+                    )
+                ) {
                     SettingsGroup(title = "Typing", icon = keyboardIcon) {
                         if (matches(labelAutoCap)) {
                             SettingsSwitchRow(
@@ -324,6 +338,14 @@ fun KeyboardSettingsScreen(
                                 summary = summaryBloomTypeLearning,
                                 checked = bloomTypeLearning,
                                 onCheckedChange = { viewModel.setBloomTypeLearning(it) },
+                            )
+                        }
+                        if (matches(labelPersonalizedLearning, summaryPersonalizedLearning)) {
+                            SettingsSwitchRow(
+                                title = labelPersonalizedLearning,
+                                summary = summaryPersonalizedLearning,
+                                checked = personalizedLearning,
+                                onCheckedChange = { viewModel.setPersonalizedLearning(it) },
                             )
                         }
                         if (matches(labelDoubleSpace, summaryDoubleSpace)) {
@@ -569,7 +591,7 @@ fun KeyboardSettingsScreen(
                 }
 
                 // PRIVACY
-                if (matches(labelPrivateMode, labelClearClipboard)) {
+                if (matches(labelPrivateMode, labelClearClipboard, labelClearLearnedData)) {
                     SettingsGroup(title = "Privacy", icon = Icons.Outlined.Lock) {
                         if (matches(labelPrivateMode, summaryPrivateMode)) {
                             SettingsSwitchRow(
@@ -591,7 +613,55 @@ fun KeyboardSettingsScreen(
                                 Text(labelClearClipboard)
                             }
                         }
+                        if (matches(labelClearLearnedData)) {
+                            Button(
+                                onClick = { showClearLearnedDataDialog = true },
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error,
+                                    ),
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            ) {
+                                Text(labelClearLearnedData)
+                            }
+                        }
                     }
+                }
+
+                if (showClearLearnedDataDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showClearLearnedDataDialog = false },
+                        title = { Text("Clear learned data?") },
+                        text = {
+                            Text(
+                                "Reset learned vocabulary and phrase patterns? This cannot be undone.",
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.clearLearnedData()
+                                    showClearLearnedDataDialog = false
+                                    Toast
+                                        .makeText(
+                                            context,
+                                            "Learned data cleared",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                },
+                            ) {
+                                Text(
+                                    stringResource(R.string.text_clear),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showClearLearnedDataDialog = false }) {
+                                Text(stringResource(R.string.text_cancel))
+                            }
+                        },
+                    )
                 }
 
                 if (showClearClipboardDialog) {

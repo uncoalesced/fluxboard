@@ -82,11 +82,22 @@ private const val MIN_SPLIT_FREQUENCY = 40
 internal class SpellingCorrector(
     private val dictionaries: List<() -> ByteBuffer?>,
     private val languageModel: LanguageModel,
+    private val personalLexicon: BloomPersonalLexicon? = null,
 ) {
     constructor(
         dictionary: () -> ByteBuffer?,
         languageModel: LanguageModel,
-    ) : this(listOf(dictionary), languageModel)
+        personalLexicon: BloomPersonalLexicon? = null,
+    ) : this(listOf(dictionary), languageModel, personalLexicon)
+
+    /**
+     * Checks if [word] is a known word in any active dictionary trie or shielded in the
+     * user personal lexicon.
+     */
+    internal fun hasWord(word: String): Boolean {
+        val norm = word.lowercase()
+        return frequencyOf(norm) != null || personalLexicon?.isShielded(norm) == true
+    }
 
     /**
      * Finds the optimal single-word autocorrection using the FluxBloom Master Normalized Score formula.
@@ -105,7 +116,7 @@ internal class SpellingCorrector(
 
         // Inviolable Lexicon Veto: Never autocorrect a word that already exists in the dictionary
         // or user personal lexicon.
-        if (frequencyOf(normalized) != null) return null
+        if (hasWord(normalized)) return null
         if (personalWords.any { it.first == normalized }) return null
 
         // "alot" is "a lot" with the space missed, and also one key from "slot". Two
@@ -114,7 +125,20 @@ internal class SpellingCorrector(
 
         // Retrieve candidates within MAX_EDIT_COST
         val base = candidatesFor(normalized, touches) ?: return null
-        val eligible = withPersonalWords(normalized, base, personalWords, touches)
+        val effectivePersonalWords =
+            if (personalLexicon != null) {
+                val fromLex =
+                    personalLexicon
+                        .snapshot()
+                        .filter { it.value >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD }
+                        .map { (w, count) ->
+                            w to minOf(255f, 128f + count * 5f)
+                        }
+                (personalWords + fromLex).distinctBy { it.first }
+            } else {
+                personalWords
+            }
+        val eligible = withPersonalWords(normalized, base, effectivePersonalWords, touches)
         if (eligible.isEmpty()) return null
 
         // FluxBloom Invariants Filter
@@ -242,7 +266,7 @@ internal class SpellingCorrector(
         personalWords: List<Pair<String, Float>> = emptyList(),
         limit: Int = 3,
     ): List<String> {
-        if (frequencyOf(normalized) != null) return emptyList()
+        if (hasWord(normalized)) return emptyList()
         val split =
             if (isArticleRunOn(normalized)) {
                 listOf(normalized.take(1) + " " + normalized.substring(1))
@@ -262,8 +286,21 @@ internal class SpellingCorrector(
 
         val base =
             candidatesFor(normalized) ?: return (split + doubledOffers).distinct().take(limit)
+        val effectivePersonalWords =
+            if (personalLexicon != null) {
+                val fromLex =
+                    personalLexicon
+                        .snapshot()
+                        .filter { it.value >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD }
+                        .map { (w, count) ->
+                            w to minOf(255f, 128f + count * 5f)
+                        }
+                (personalWords + fromLex).distinctBy { it.first }
+            } else {
+                personalWords
+            }
         val near =
-            withPersonalWords(normalized, base, personalWords)
+            withPersonalWords(normalized, base, effectivePersonalWords)
                 .filter { it.first.word != normalized }
                 .filter { it.second <= normalized.length * MAX_COST_PER_LETTER }
                 .sortedByDescending {

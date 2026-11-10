@@ -98,6 +98,8 @@ class BigramLanguageModel
     constructor(
         @ApplicationContext private val context: Context,
     ) : LanguageModel {
+        var personalBigramCache: BloomPersonalBigramCache? = null
+
         /**
          * Held fully parsed in memory rather than mmap'd and re-walked per lookup the way
          * base_dict.bin is. Two reasons: it is a fraction of the dictionary's size, and every
@@ -156,9 +158,19 @@ class BigramLanguageModel
             previousWord: String?,
             candidate: String,
         ): Float {
-            val followers = followerRecords(previousWord) ?: return 0f
-            val weight = followers.firstOrNull { it.first == candidate }?.second ?: return 0f
-            return weight * BIGRAM_WEIGHT_SCALE
+            val followers = followerRecords(previousWord)
+            val staticBoost =
+                followers?.firstOrNull { it.first == candidate }?.second?.let {
+                    it * BIGRAM_WEIGHT_SCALE
+                } ?: 0f
+            val personalBoost =
+                if (previousWord != null) {
+                    (personalBigramCache?.boostFor(previousWord, candidate) ?: 0f) *
+                        MAX_LANGUAGE_MODEL_BOOST
+                } else {
+                    0f
+                }
+            return maxOf(staticBoost, personalBoost)
         }
 
         override fun followersOf(
@@ -166,14 +178,20 @@ class BigramLanguageModel
             limit: Int,
         ): List<String> {
             if (limit <= 0) return emptyList()
-            val followers = followerRecords(previousWord) ?: return emptyList()
-            // Sorted here rather than trusted from the file. The weights are what rank these,
-            // and nothing in the FLBG format promises an order -- a writer that changed its
-            // grouping would silently reorder every prediction with no test able to see it.
-            return followers
-                .sortedByDescending { it.second }
-                .take(limit)
-                .map { it.first }
+            val personalFollowers =
+                if (previousWord != null) {
+                    personalBigramCache?.followersOf(previousWord, limit)?.map { it.first }
+                        ?: emptyList()
+                } else {
+                    emptyList()
+                }
+            val followers = followerRecords(previousWord) ?: emptyList()
+            val staticFollowers =
+                followers
+                    .sortedByDescending { it.second }
+                    .take(limit)
+                    .map { it.first }
+            return (personalFollowers + staticFollowers).distinct().take(limit)
         }
     }
 

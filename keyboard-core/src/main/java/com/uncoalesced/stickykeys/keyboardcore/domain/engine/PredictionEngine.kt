@@ -3,7 +3,6 @@ package com.uncoalesced.stickykeys.keyboardcore.domain.engine
 
 import android.content.Context
 import com.uncoalesced.stickykeys.keyboardcore.data.local.dao.PersonalDictionaryDao
-import com.uncoalesced.stickykeys.keyboardcore.data.local.entity.PersonalWordEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +64,25 @@ class PredictionEngine
         @ApplicationContext private val context: Context,
         private val personalDao: PersonalDictionaryDao,
         private val languageModel: LanguageModel,
+        val personalLearningEngine: PersonalLearningEngine,
     ) {
+        constructor(
+            context: Context,
+            personalDao: PersonalDictionaryDao,
+            languageModel: LanguageModel,
+        ) : this(
+            context = context,
+            personalDao = personalDao,
+            languageModel = languageModel,
+            personalLearningEngine = PersonalLearningEngine(personalDao),
+        )
+
+        init {
+            if (languageModel is BigramLanguageModel) {
+                languageModel.personalBigramCache = personalLearningEngine.bigramCache
+            }
+        }
+
         /**
          * The mapped base dictionary. Volatile so the reference publishes safely across the
          * IO threads that read it. Never navigated directly -- see [reader]: a
@@ -97,8 +114,11 @@ class PredictionEngine
 
         fun isReverted(word: String): Boolean = revertHistory.isReverted(word)
 
-        /** Guards [initialize] so two concurrent callers cannot map the file twice. */
+        /** Guards [initialize] so concurrent callers synchronize safely and initialize once. */
         private val initMutex = Mutex()
+
+        @Volatile
+        private var isInitialized = false
 
         /**
          * A private cursor over the shared mapping. duplicate() copies position/limit
@@ -112,16 +132,20 @@ class PredictionEngine
 
         suspend fun initialize() =
             withContext(Dispatchers.IO) {
-                // The ranking data warms alongside the dictionary rather than from a second
-                // call the next caller of this engine would have to know to make. It carries
-                // its own double-checked guard, so calling it on an already-loaded model is
-                // free.
-                languageModel.initialize()
-                loadBloomSpatialProfile()
-                if (buffer != null) return@withContext
+                if (isInitialized) return@withContext
                 initMutex.withLock {
-                    if (buffer != null) return@withLock
-                    mapDictionary()
+                    if (isInitialized) return@withLock
+                    if (languageModel is BigramLanguageModel) {
+                        languageModel.personalBigramCache = personalLearningEngine.bigramCache
+                    }
+                    languageModel.initialize()
+                    loadBloomSpatialProfile()
+                    personalLearningEngine.prewarmSync()
+                    personalLearningEngine.runDecayMaintenanceSync()
+                    if (buffer == null) {
+                        mapDictionary()
+                    }
+                    isInitialized = true
                 }
             }
 
@@ -194,27 +218,15 @@ class PredictionEngine
                 // A split correction ("thank you") is two words, and storing it as one would
                 // put a phrase into the prefix trie that no prefix lookup can ever match.
                 if (normalized.any { it.isWhitespace() }) return@withContext
-
-                val existing = personalDao.getWord(normalized)
-                val now = System.currentTimeMillis()
-
-                if (existing != null) {
-                    val daysSince = (now - existing.lastUsedTimestamp) / (1000 * 60 * 60 * 24)
-                    var newFreq = existing.frequency
-
-                    // Decay older words
-                    if (daysSince > 7) {
-                        newFreq /= 2
-                    }
-
-                    newFreq = (newFreq + 1).coerceAtMost(255)
-                    personalDao.insertOrUpdate(
-                        existing.copy(frequency = newFreq, lastUsedTimestamp = now),
-                    )
-                } else {
-                    personalDao.insertOrUpdate(PersonalWordEntity(normalized, 1, now))
-                }
+                personalLearningEngine.onUnigramCommitted(normalized)
             }
+
+        suspend fun learnBigram(
+            previousWord: String,
+            nextWord: String,
+        ) = withContext(Dispatchers.IO) {
+            personalLearningEngine.recordBigramTransition(previousWord, nextWord)
+        }
 
         /**
          * Completions for [prefix], ranked.
@@ -236,11 +248,21 @@ class PredictionEngine
                 // 1. Get from Personal Dictionary. Two-strike rule: a word only counts as
                 // "personal" once it has been used at least twice, so one-off typos that
                 // were learned in passing never outrank the base dictionary.
-                val personalSuggestions =
-                    personalDao
-                        .getSuggestionsForPrefix(normalized, 5)
-                        .filter { it.frequency >= 2 }
-                        .map { Suggestion(it.word, it.frequency * PERSONAL_WEIGHT) }
+                val l1Personal =
+                    personalLearningEngine.lexicon
+                        .wordsMatchingPrefix(normalized, 5)
+                        .filter { it.second >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD }
+                        .map { Suggestion(it.first, it.second * PERSONAL_WEIGHT) }
+                val dbPersonal =
+                    try {
+                        personalDao
+                            .getSuggestionsForPrefix(normalized, 5)
+                            .filter { it.frequency >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD }
+                            .map { Suggestion(it.word, it.frequency * PERSONAL_WEIGHT) }
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                val personalSuggestions = (l1Personal + dbPersonal).distinctBy { it.word }
 
                 // 2. Get from Base Flictionary. A malformed offset must never escape into an
                 // uncaught exception: this runs on a coroutine in the IME process, where an
@@ -383,7 +405,11 @@ class PredictionEngine
 
         /** Spelling correction, reading base and names mappings through their own cursors. */
         private val spellingCorrector =
-            SpellingCorrector(listOf(::reader, ::namesReader), languageModel)
+            SpellingCorrector(
+                listOf(::reader, ::namesReader),
+                languageModel,
+                personalLearningEngine.lexicon,
+            )
 
         /**
          * Every contraction reachable by putting one apostrophe into [normalized]. See
@@ -624,8 +650,13 @@ class PredictionEngine
                 // Words the user has typed at least twice are treated as deliberate and are
                 // never corrected. A single occurrence is not enough -- otherwise every
                 // one-off typo would permanently disable its own correction.
+                if (personalLearningEngine.lexicon.isShielded(normalized)) return@withContext null
                 val personalEntry = personalDao.getWord(normalized)
-                if (personalEntry != null && personalEntry.frequency >= 2) return@withContext null
+                if (personalEntry != null &&
+                    personalEntry.frequency >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD
+                ) {
+                    return@withContext null
+                }
 
                 val corrected =
                     spellingCorrector.restoreApostrophe(normalized)
@@ -657,8 +688,16 @@ class PredictionEngine
                 val trimmed = typedWord.trim()
                 val normalized = trimmed.lowercase()
                 if (normalized.length < 3) return@withContext emptyList()
+                if (personalLearningEngine.lexicon.isShielded(
+                        normalized,
+                    )
+                ) {
+                    return@withContext emptyList()
+                }
                 val personalEntry = personalDao.getWord(normalized)
-                if (personalEntry != null && personalEntry.frequency >= 2) {
+                if (personalEntry != null &&
+                    personalEntry.frequency >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD
+                ) {
                     return@withContext emptyList()
                 }
                 try {
@@ -680,14 +719,7 @@ class PredictionEngine
          */
         suspend fun keepWord(word: String) =
             withContext(Dispatchers.IO) {
-                val normalized = word.lowercase().trim()
-                if (normalized.isBlank() || normalized.length > 30) return@withContext
-                if (normalized.any { it.isWhitespace() }) return@withContext
-                val existing = personalDao.getWord(normalized)
-                val frequency = maxOf((existing?.frequency ?: 0) + 1, 2).coerceAtMost(255)
-                personalDao.insertOrUpdate(
-                    PersonalWordEntity(normalized, frequency, System.currentTimeMillis()),
-                )
+                personalLearningEngine.onWordKept(word)
             }
 
         /**
@@ -699,12 +731,31 @@ class PredictionEngine
          * nothing about a word it does not contain, and the user has already said twice that
          * this one is real.
          */
-        private fun personalCorrectionTargets(): List<Pair<String, Float>> =
-            personalDao
-                .getFrequentWords(minFrequency = 2, limit = MAX_PERSONAL_TARGETS)
-                .map {
-                    it.word to
-                        (PERSONAL_TARGET_BASE + it.frequency * PERSONAL_WEIGHT)
-                            .coerceAtMost(MAX_FREQUENCY)
+        private fun personalCorrectionTargets(): List<Pair<String, Float>> {
+            val fromDb =
+                try {
+                    personalDao
+                        .getFrequentWords(
+                            minFrequency = BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD,
+                            limit = MAX_PERSONAL_TARGETS,
+                        ).map {
+                            it.word to
+                                (PERSONAL_TARGET_BASE + it.frequency * PERSONAL_WEIGHT)
+                                    .coerceAtMost(MAX_FREQUENCY)
+                        }
+                } catch (e: Exception) {
+                    emptyList()
                 }
+            val fromLexicon =
+                personalLearningEngine.lexicon
+                    .snapshot()
+                    .filter { it.value >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD }
+                    .map { (w, count) ->
+                        w to
+                            (PERSONAL_TARGET_BASE + count * PERSONAL_WEIGHT).coerceAtMost(
+                                MAX_FREQUENCY,
+                            )
+                    }
+            return (fromLexicon + fromDb).distinctBy { it.first }.take(MAX_PERSONAL_TARGETS)
+        }
     }

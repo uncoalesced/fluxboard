@@ -31,4 +31,16 @@ interface PersonalDictionaryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertOrUpdate(word: PersonalWordEntity)
+
+    @Query("SELECT * FROM personal_dictionary ORDER BY frequency DESC LIMIT :limit")
+    fun getAll(limit: Int): List<PersonalWordEntity>
+
+    @Query("DELETE FROM personal_dictionary WHERE word = :word")
+    fun deleteWord(word: String): Int
+
+    @Query("DELETE FROM personal_dictionary WHERE lastUsedTimestamp < :cutoffTimestamp")
+    fun pruneOldEntries(cutoffTimestamp: Long): Int
+
+    @Query("DELETE FROM personal_dictionary")
+    fun clear(): Int
 }
