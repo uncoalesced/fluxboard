@@ -107,6 +107,7 @@ class BloomTrajectoryAligner {
 
             // Base cell (sample 0, vertex 0)
             dpTable[0] = startDist * 0.5f
+            var weightSum = trajectory.pointWeights.getOrElse(0) { 1.0f }
 
             // 4. Dynamic Programming forward pass
             for (s in 1 until tCount) {
@@ -114,6 +115,8 @@ class BloomTrajectoryAligner {
                 val py = trajectory.getY(s)
                 val rowOffset = s * numCols
                 val prevRowOffset = (s - 1) * numCols
+                val sampleWeight = trajectory.pointWeights.getOrElse(s) { 1.0f }
+                weightSum += sampleWeight
 
                 for (v in 0 until numCols) {
                     val vertexDist = hypot(px - vx[v], py - vy[v])
@@ -126,8 +129,7 @@ class BloomTrajectoryAligner {
                             min(vertexDist, kotlin.math.sqrt(segDistSq))
                         }
 
-                    val pointWeight = trajectory.pointWeights.getOrElse(s) { 1.0f }
-                    val weightedDist = localDist * pointWeight
+                    val weightedDist = localDist * sampleWeight
 
                     // Candidate 1: Dwell (from s-1, v)
                     var bestPrev = dpTable[prevRowOffset + v] + (weightedDist * 0.85f)
@@ -170,7 +172,7 @@ class BloomTrajectoryAligner {
             val finalDtwCost = dpTable[(tCount - 1) * numCols + lastV]
             if (finalDtwCost >= INF_COST / 2f) return null
 
-            val normalizedDtwCost = finalDtwCost / tCount
+            val normalizedDtwCost = finalDtwCost / weightSum.coerceAtLeast(1.0f)
 
             // 5. Backtracking to extract best sample index per vertex
             if (outSampleIndices != null) {
