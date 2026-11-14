@@ -19,20 +19,28 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,6 +79,41 @@ fun ThemeEditorScreen(
     val themes by viewModel.availableThemes.collectAsState()
     val activeTheme by viewModel.activeTheme.collectAsState()
     val context = LocalContext.current
+    var themeToDelete by remember { mutableStateOf<KeyboardTheme?>(null) }
+
+    val pendingDeleteTheme = themeToDelete
+    if (pendingDeleteTheme != null) {
+        AlertDialog(
+            onDismissRequest = { themeToDelete = null },
+            title = { Text(stringResource(R.string.title_delete_theme)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.msg_delete_theme_confirm,
+                        pendingDeleteTheme.name,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteCustomTheme(pendingDeleteTheme.id)
+                        themeToDelete = null
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.text_delete),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { themeToDelete = null }) {
+                    Text(stringResource(R.string.text_cancel))
+                }
+            },
+        )
+    }
 
     val imagePickerLauncher =
         rememberLauncherForActivityResult(
@@ -128,15 +171,32 @@ fun ThemeEditorScreen(
                                         if (isSelected) "Selected" else "Not selected"
                                 },
                     ) {
-                        Text(
-                            text = theme.name,
-                            color =
-                                if (isSelected) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = theme.name,
+                                color =
+                                    if (isSelected) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (!theme.id.startsWith("preset_")) {
+                                IconButton(onClick = { themeToDelete = theme }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription =
+                                            stringResource(R.string.desc_delete_theme),
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         KeyboardPreview(theme = theme, compact = true)
                     }
