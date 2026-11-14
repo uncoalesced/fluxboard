@@ -221,6 +221,12 @@ class LayoutEditorViewModel
             keyboardPreferences.setActiveLayoutId(layoutId)
         }
 
+        fun deleteCustomLayout(layoutId: String) {
+            viewModelScope.launch {
+                layoutManager.deleteCustomLayout(layoutId)
+            }
+        }
+
         fun clearSaveSuccess() {
             _saveSuccess.value = false
         }
