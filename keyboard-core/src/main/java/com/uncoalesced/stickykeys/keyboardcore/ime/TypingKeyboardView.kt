@@ -168,6 +168,7 @@ fun TypingKeyboardView(
         rememberKeyRevokeHandler(
             keyboardController = keyboardController,
             typingViewModel = typingViewModel,
+            modeState = modeState,
         )
 
     val onDeleteWord = rememberDeleteWordHandler(keyboardController, typingViewModel)
