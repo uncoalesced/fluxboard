@@ -93,10 +93,54 @@ internal class SpellingCorrector(
     /**
      * Checks if [word] is a known word in any active dictionary trie or shielded in the
      * user personal lexicon.
+     *
+     * Distinguishes the primary core lexicon (`base_dict.bin`) from supplemental proper-noun
+     * lexicons (`names_dict.bin`): a short lowercase word found only in a supplemental lexicon
+     * at low frequency (`< 165`) does not veto autocorrection if it is a single-edit transposition
+     * or adjacent-key slip of a high-frequency core English word (`freq >= 210`, e.g. "thr" -> "the",
+     * "nad" -> "and", "abd" -> "and", "sre" -> "are", "theh" -> "they").
      */
     internal fun hasWord(word: String): Boolean {
         val norm = word.lowercase()
-        return frequencyOf(norm) != null || personalLexicon?.isShielded(norm) == true
+        if (personalLexicon?.isShielded(norm) == true) return true
+        if (primaryFrequencyOf(norm) != null) return true
+        val suppFreq = frequencyOf(norm) ?: return false
+        if (word.isNotEmpty() && word[0].isUpperCase()) return true
+        if (norm.length <= SHORT_WORD_MAX_LENGTH &&
+            suppFreq < 165 &&
+            isTypoOfHighFreqPrimaryWord(norm)
+        ) {
+            return false
+        }
+        return true
+    }
+
+    private fun primaryFrequencyOf(word: String): Int? {
+        val primary = dictionaries.firstOrNull()?.invoke() ?: return null
+        return trieFrequencyOf(primary, word.lowercase())
+    }
+
+    private fun isTypoOfHighFreqPrimaryWord(norm: String): Boolean {
+        if (norm.length < 2) return false
+        // 1. Check adjacent transposition of a top-tier core English word (freq >= 210)
+        for (i in 0 until norm.length - 1) {
+            val transposed =
+                norm.substring(0, i) + norm[i + 1] + norm[i] + norm.substring(i + 2)
+            val freq = primaryFrequencyOf(transposed) ?: 0
+            if (freq >= 210) return true
+        }
+        // 2. Check single adjacent QWERTY slip of a top-tier core English word (freq >= 215)
+        for (i in norm.indices) {
+            val ch = norm[i]
+            for (c in 'a'..'z') {
+                if (c != ch && KeyProximity.areAdjacent(ch, c)) {
+                    val substituted = norm.substring(0, i) + c + norm.substring(i + 1)
+                    val freq = primaryFrequencyOf(substituted) ?: 0
+                    if (freq >= 215) return true
+                }
+            }
+        }
+        return false
     }
 
     /**
@@ -327,9 +371,10 @@ internal class SpellingCorrector(
         val initialRow = IntArray(normalized.length + 1) { it * COST_GAP }
         var readAny = false
 
-        for (dictProvider in dictionaries) {
-            val buf = dictProvider() ?: continue
+        dictionaries.forEachIndexed { dictIndex, dictProvider ->
+            val buf = dictProvider() ?: return@forEachIndexed
             readAny = true
+            val dictCandidates = mutableListOf<Pair<Suggestion, Int>>()
             try {
                 dfsEditDistance(
                     buf,
@@ -340,11 +385,22 @@ internal class SpellingCorrector(
                     null,
                     null,
                     MAX_EDIT_COST,
-                    candidates,
+                    dictCandidates,
                     touches,
                 )
             } catch (e: Exception) {
                 // Safeguard against malformed offsets
+            }
+            if (dictIndex == 0) {
+                candidates.addAll(dictCandidates)
+            } else {
+                // Supplemental lexicon candidates receive a source discount when non-exact
+                // so obscure proper nouns do not outscore core English words at the same cost.
+                for ((sugg, dist) in dictCandidates) {
+                    if (dist == 0 && !hasWord(sugg.word)) continue
+                    val discountedScore = if (dist == 0) sugg.score else sugg.score * 0.82f
+                    candidates.add(Suggestion(sugg.word, discountedScore) to dist)
+                }
             }
         }
         if (!readAny) return null
