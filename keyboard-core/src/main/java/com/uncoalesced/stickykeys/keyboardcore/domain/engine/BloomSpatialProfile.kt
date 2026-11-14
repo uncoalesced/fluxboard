@@ -3,7 +3,6 @@ package com.uncoalesced.stickykeys.keyboardcore.domain.engine
 
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -32,6 +31,13 @@ class BloomSpatialProfile {
 
         private const val MAX_DRIFT_KEY_WIDTH = 0.35f
         private const val LEARNING_RATE = 0.05f
+
+        /**
+         * Serialises file I/O across every instance: the file is shared by path, not owned by
+         * an instance, and all saves write the same temp file. Separate from [lock] so a disk
+         * write never stalls a glide lookup.
+         */
+        private val ioLock = Any()
     }
 
     /** Returns the learned (deltaX, deltaY) offset in key widths for [char]. */
@@ -106,8 +112,12 @@ class BloomSpatialProfile {
     /** Restores offsets from [data]. Must have size 52. */
     fun restore(data: FloatArray): Boolean {
         if (data.size != NUM_FLOATS) return false
+        // NaN survives coerceIn (every comparison with it is false), so reject it outright.
+        if (!data.all { it.isFinite() }) return false
         synchronized(lock) {
-            System.arraycopy(data, 0, offsets, 0, NUM_FLOATS)
+            for (i in 0 until NUM_FLOATS) {
+                offsets[i] = data[i].coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
+            }
         }
         return true
     }
@@ -126,6 +136,12 @@ class BloomSpatialProfile {
     ) {
         if (isSensitive) return
         val idx = charToIndex(char) ?: return
+        val allFinite =
+            nominalX.isFinite() &&
+                nominalY.isFinite() &&
+                observedX.isFinite() &&
+                observedY.isFinite()
+        if (!allFinite) return
 
         val rawDx = observedX - nominalX
         val rawDy = observedY - nominalY
@@ -162,13 +178,24 @@ class BloomSpatialProfile {
         val digest = MessageDigest.getInstance("SHA-256").digest(payloadBytes)
         buffer.put(digest)
 
-        file.parentFile?.mkdirs()
-        FileOutputStream(file).use { it.write(buffer.array()) }
+        synchronized(ioLock) {
+            writeFileAtomically(file, buffer.array())
+        }
     }
 
     /** Loads and verifies the profile from [file]. Returns true on success, false if invalid. */
-    fun load(file: File): Boolean {
-        if (!file.exists() || file.length() != TOTAL_FILE_SIZE.toLong()) return false
+    fun load(file: File): Boolean = synchronized(ioLock) { loadLocked(file) }
+
+    /** Deletes the saved profile under the I/O lock, so an in-flight save cannot resurrect it. */
+    fun delete(file: File) {
+        synchronized(ioLock) {
+            if (file.exists()) file.delete()
+            File(file.parentFile, "${file.name}.tmp").delete()
+        }
+    }
+
+    private fun loadLocked(file: File): Boolean {
+        if (!file.exists() || file.length() < TOTAL_FILE_SIZE.toLong()) return false
 
         try {
             val bytes = FileInputStream(file).use { it.readBytes() }
@@ -178,9 +205,11 @@ class BloomSpatialProfile {
             if (magic != MAGIC) return false
 
             val version = buffer.int
-            if (version != VERSION) return false
+            if (version < 1) return false
 
-            val payloadBytes = ByteArray(PAYLOAD_BYTES)
+            val payloadLen = bytes.size - 8 - 32
+            if (payloadLen < PAYLOAD_BYTES) return false
+            val payloadBytes = ByteArray(payloadLen)
             buffer.get(payloadBytes)
 
             val expectedDigest = ByteArray(32)
@@ -190,9 +219,12 @@ class BloomSpatialProfile {
             if (!actualDigest.contentEquals(expectedDigest)) return false
 
             val payloadBuf = ByteBuffer.wrap(payloadBytes).order(ByteOrder.LITTLE_ENDIAN)
+            val parsed = FloatArray(NUM_FLOATS) { payloadBuf.float }
+            // A valid digest proves the bytes are the ones written, not that they are sane.
+            if (!parsed.all { it.isFinite() }) return false
             synchronized(lock) {
                 for (i in 0 until NUM_FLOATS) {
-                    offsets[i] = payloadBuf.float
+                    offsets[i] = parsed[i].coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
                 }
             }
             return true
