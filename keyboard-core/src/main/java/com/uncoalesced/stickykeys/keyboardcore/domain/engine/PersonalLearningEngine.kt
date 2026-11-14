@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Phase 4 Coordinator: Continuous On-Device N-gram Personalization & Dynamic User Dictionary Learning.
@@ -28,6 +29,8 @@ class PersonalLearningEngine(
     val bigramCache: BloomPersonalBigramCache = BloomPersonalBigramCache(),
     private val keyboardPreferences: KeyboardPreferences? = null,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /** Where the BloomType `.bin` stores live; [clearAll] deletes them. See [BloomStateFiles]. */
+    private val stateDir: File? = null,
 ) {
     /**
      * Secondary constructor for unit testing or when [PersonalBigramDao] is not supplied.
@@ -362,6 +365,14 @@ class PersonalLearningEngine(
     fun clearAll() {
         lexicon.clear()
         bigramCache.clear()
+        // Not left to onMemoryCleared alone: that hook exists only once PredictionEngine has
+        // been created in this process, and a vault left on disk restores every cleared word.
+        stateDir?.let { dir ->
+            try {
+                BloomStateFiles.deleteAll(dir)
+            } catch (e: Exception) {
+            }
+        }
         onMemoryCleared?.invoke()
         scope.launch {
             try {

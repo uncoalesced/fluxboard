@@ -38,6 +38,17 @@ class BloomSpatialProfile {
          * write never stalls a glide lookup.
          */
         private val ioLock = Any()
+
+        /**
+         * Deletes a saved profile and its temp file under the I/O lock. Lives on the companion
+         * because the file is shared by path, so clearing it must not need a live instance.
+         */
+        fun deleteFile(file: File) {
+            synchronized(ioLock) {
+                if (file.exists()) file.delete()
+                File(file.parentFile, "${file.name}.tmp").delete()
+            }
+        }
     }
 
     /** Returns the learned (deltaX, deltaY) offset in key widths for [char]. */
@@ -187,12 +198,7 @@ class BloomSpatialProfile {
     fun load(file: File): Boolean = synchronized(ioLock) { loadLocked(file) }
 
     /** Deletes the saved profile under the I/O lock, so an in-flight save cannot resurrect it. */
-    fun delete(file: File) {
-        synchronized(ioLock) {
-            if (file.exists()) file.delete()
-            File(file.parentFile, "${file.name}.tmp").delete()
-        }
-    }
+    fun delete(file: File) = deleteFile(file)
 
     private fun loadLocked(file: File): Boolean {
         if (!file.exists() || file.length() < TOTAL_FILE_SIZE.toLong()) return false

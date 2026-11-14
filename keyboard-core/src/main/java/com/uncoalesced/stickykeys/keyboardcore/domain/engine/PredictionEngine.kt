@@ -267,9 +267,7 @@ class PredictionEngine
             // Each delete takes its store's I/O lock, so a save already in flight on the
             // background scope cannot write the file back after the user cleared it.
             try {
-                bloomSpatialProfile.delete(File(context.filesDir, "bloom_profile.bin"))
-                SmartKeyHitbox.delete(File(context.filesDir, "bloom_tap_profile.bin"))
-                BloomMemoryVault.delete(File(context.filesDir, "bloom_user_memory.bin"))
+                BloomStateFiles.deleteAll(context.filesDir)
             } catch (e: Exception) {
             }
         }
