@@ -191,6 +191,41 @@ class PersonalLearningEngineTest {
             assertEquals(0, fakeBigramDao.getAllRecent(10).size)
         }
 
+    /**
+     * "Clear learned data" can run before PredictionEngine exists in the process, so the
+     * onMemoryCleared hook is unset. The .bin stores must still go, or the vault restores
+     * every cleared word into Room on the next keyboard start.
+     */
+    @Test
+    fun clearAll_deletesBloomStateFiles_withoutPredictionEngine() =
+        testScope.runTest {
+            val dir = Files.createTempDirectory("clear-learned").toFile()
+            try {
+                val stores =
+                    listOf(
+                        BloomStateFiles.GLIDE_PROFILE,
+                        BloomStateFiles.TAP_PROFILE,
+                        BloomStateFiles.USER_MEMORY,
+                    ).map { File(dir, it) }
+                val tmp = File(dir, "${BloomStateFiles.USER_MEMORY}.tmp")
+                (stores + tmp).forEach { it.writeBytes(byteArrayOf(1, 2, 3)) }
+                val withDir =
+                    PersonalLearningEngine(
+                        personalDao = fakePersonalDao,
+                        personalBigramDao = fakeBigramDao,
+                        scope = testScope,
+                        stateDir = dir,
+                    )
+
+                withDir.clearAll()
+                advanceUntilIdle()
+
+                (stores + tmp).forEach { assertFalse("${it.name} survived", it.exists()) }
+            } finally {
+                dir.deleteRecursively()
+            }
+        }
+
     @Test
     fun startupPrewarmAndMaintenance_preservesLearnedCountsAcrossRestarts() =
         testScope.runTest {
