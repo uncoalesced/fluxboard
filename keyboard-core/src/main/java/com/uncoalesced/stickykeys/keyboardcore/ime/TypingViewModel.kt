@@ -25,6 +25,7 @@ import javax.inject.Inject
 data class UndoAction(
     val original: String,
     val corrected: String,
+    val priorWord: String? = null,
 )
 
 @HiltViewModel
@@ -635,8 +636,12 @@ class TypingViewModel
                 // no partial word here to fall through to. Whether the word being undone sat
                 // at a sentence start is a property of the text in front of it, not of the
                 // glide -- so drop the word and its trailing space and ask about the rest.
-                atSentenceStart =
-                    startsNewSentence(textBeforeCursor.dropLast(glided.length + 1))
+                val remaining = textBeforeCursor.dropLast(glided.length + 1)
+                if (textBeforeCursor.isNotEmpty()) {
+                    currentWord = wordUnderCaret(remaining)
+                    previousWord = precedingWord(remaining)
+                }
+                atSentenceStart = startsNewSentence(remaining)
                 publishAutoCapitalize()
                 // One press removed a whole word, so one tap has to be able to put it back.
                 backspacedWord = glided
@@ -647,7 +652,21 @@ class TypingViewModel
                 // The first backspace of a run is the only moment the whole word is still
                 // known. Later presses must not overwrite it with the shrinking remainder.
                 if (backspacedWord == null) backspacedWord = currentWord
-                currentWord = currentWord.dropLast(1)
+                val remaining =
+                    if (textBeforeCursor.isNotEmpty()) {
+                        val deleteLen =
+                            backspaceLengthFor(textBeforeCursor.takeLast(2)).coerceAtLeast(1)
+                        textBeforeCursor.dropLast(deleteLen)
+                    } else {
+                        ""
+                    }
+                currentWord =
+                    if (textBeforeCursor.isNotEmpty()) {
+                        previousWord = precedingWord(remaining)
+                        wordUnderCaret(remaining)
+                    } else {
+                        currentWord.dropLast(1)
+                    }
                 if (currentWordTouches.isNotEmpty()) {
                     currentWordTouches.removeAt(currentWordTouches.size - 1)
                 }
@@ -656,7 +675,7 @@ class TypingViewModel
                 // unconditionally meant clearing a message and retyping it produced a
                 // lower-case first letter every time -- but an empty mirror is not the same
                 // fact as an empty field, which is what asking the text settles.
-                atSentenceStart = startsNewSentence(textBeforeCursor.dropLast(1))
+                atSentenceStart = startsNewSentence(remaining)
                 publishAutoCapitalize()
                 if (currentWord.isEmpty()) {
                     // Nothing left to predict from, so the strip would otherwise be empty.
@@ -669,10 +688,25 @@ class TypingViewModel
                 return 1
             }
             // The mirror was already empty going in; the common case is straight after
-            // punctuation committed and cleared it. Nothing about the character being removed
-            // is decidable from here, which is the whole of 4G.7.
-            atSentenceStart = startsNewSentence(textBeforeCursor.dropLast(1))
+            // a space or punctuation committed and cleared it. If the editor text is known,
+            // re-derive the surviving word under the caret and its preceding context so
+            // backspacing into a word or after a symbol keeps the prefix intact.
+            val deleteLen =
+                if (textBeforeCursor.isNotEmpty()) {
+                    backspaceLengthFor(textBeforeCursor.takeLast(2)).coerceAtLeast(1)
+                } else {
+                    1
+                }
+            val remaining = textBeforeCursor.dropLast(deleteLen)
+            if (textBeforeCursor.isNotEmpty()) {
+                currentWord = wordUnderCaret(remaining)
+                previousWord = precedingWord(remaining)
+            }
+            atSentenceStart = startsNewSentence(remaining)
             publishAutoCapitalize()
+            if (currentWord.isNotEmpty()) {
+                updateSuggestions()
+            }
             return 1
         }
 
@@ -732,7 +766,10 @@ class TypingViewModel
         ) {
             if (word.isNotBlank()) {
                 if (currentWordTouches.isNotEmpty()) {
-                    SmartKeyHitbox.adaptWord(currentWordTouches)
+                    if (!_fieldKind.value.isSensitive) {
+                        SmartKeyHitbox.adaptWord(currentWordTouches)
+                        predictionEngine.saveBloomTapProfileAsync()
+                    }
                     currentWordTouches.clear()
                 }
                 learn(word)
@@ -816,7 +853,7 @@ class TypingViewModel
         ) {
             usageLog.onAutocorrectAccepted()
             typingStats.recordAutocorrectAccepted()
-            _undoState.value = UndoAction(original, corrected)
+            _undoState.value = UndoAction(original, corrected, priorWord = previousWord)
             currentWord = ""
             currentWordTouches.clear()
             _suggestions.value = emptyList()
@@ -834,8 +871,17 @@ class TypingViewModel
         fun onUndoApplied(original: String) {
             usageLog.onAutocorrectUndone()
             typingStats.recordAutocorrectUndone()
+            val undoneAction = _undoState.value
             _undoState.value = null
+            if (undoneAction != null) {
+                predictionEngine.recordRevert(original)
+                predictionEngine.personalLearningEngine.onWordReverted(
+                    undoneAction.priorWord,
+                    undoneAction.corrected,
+                )
+            }
             keep(original)
+            previousWord = original
         }
 
         /**
@@ -863,18 +909,21 @@ class TypingViewModel
             typingStats.recordBackspace()
             usageLog.onAutocorrectUndone()
             typingStats.recordAutocorrectUndone()
+            val undoneAction = _undoState.value
             _undoState.value = null
             backspacedWord = null
             currentWord = original
+            if (undoneAction != null) {
+                previousWord = undoneAction.priorWord
+            }
             currentWordTouches.clear()
             generation++
             atSentenceStart = false
             publishAutoCapitalize()
-            val undoneAction = _undoState.value
             predictionEngine.recordRevert(original)
             if (undoneAction != null) {
                 predictionEngine.personalLearningEngine.onWordReverted(
-                    previousWord,
+                    undoneAction.priorWord,
                     undoneAction.corrected,
                 )
             }
@@ -931,6 +980,21 @@ class TypingViewModel
             currentWord = ""
             currentWordTouches.clear()
             _suggestions.value = emptyList()
+        }
+
+        /**
+         * Synchronizes word context after a word-wise backspace delete without learning.
+         */
+        fun onWordDeleted(remainingTextBeforeCursor: String) {
+            currentWord = wordUnderCaret(remainingTextBeforeCursor)
+            previousWord = precedingWord(remainingTextBeforeCursor)
+            currentWordTouches.clear()
+            backspacedWord = null
+            _undoState.value = null
+            generation++
+            atSentenceStart = startsNewSentence(remainingTextBeforeCursor)
+            publishAutoCapitalize()
+            updateSuggestions()
         }
 
         /**

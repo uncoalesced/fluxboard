@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -46,10 +47,12 @@ internal fun Modifier.keyGestures(
     onRevoke: (String) -> Unit = {},
     recorder: UsageRecorder? = null,
     onTouchCommit: ((String, TouchPoint) -> Unit)? = null,
+    liveKeyOutput: State<String>? = null,
 ): Modifier =
-    this.pointerInput(keyOutput, longPress, alternates, cellWidthPx, glide) {
+    this.pointerInput(keyOutput.lowercase(), longPress, alternates, cellWidthPx, glide) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            val activeKeyOutput = liveKeyOutput?.value ?: keyOutput
             // The only place in this process that sees a press before anything reacts to it,
             // which is why the latency measurement starts here rather than in handleKeyPress.
             // The event's own timestamp is passed rather than read here: the gap between the
@@ -66,7 +69,7 @@ internal fun Modifier.keyGestures(
             var outcome = PressOutcome.NOTHING
             val origin = keyBounds()
             val touchPoint =
-                if (keyOutput.length == 1) {
+                if (activeKeyOutput.length == 1) {
                     val w = origin.width
                     val h = origin.height
                     val nx =
@@ -85,13 +88,13 @@ internal fun Modifier.keyGestures(
                         } else {
                             0f
                         }
-                    TouchPoint(keyOutput[0], nx, ny, down.uptimeMillis)
+                    TouchPoint(activeKeyOutput[0], nx, ny, down.uptimeMillis)
                 } else {
                     null
                 }
 
             fun commitKey(str: String) {
-                if (touchPoint != null && onTouchCommit != null && str == keyOutput) {
+                if (touchPoint != null && onTouchCommit != null && str == activeKeyOutput) {
                     onTouchCommit(str, touchPoint)
                 } else {
                     onCommit(str)
@@ -102,8 +105,15 @@ internal fun Modifier.keyGestures(
                 // The keystroke lands here rather than on release. See commitsOnPress for the
                 // measurement that moved it, and for why only letters are eligible.
                 var committedOnPress = false
-                if (commitsOnPress(keyOutput, longPress)) {
-                    commitKey(keyOutput)
+                if (commitsOnPress(activeKeyOutput, longPress)) {
+                    commitKey(activeKeyOutput)
+                    committedOnPress = true
+                    outcome = PressOutcome.COMMITTED
+                } else if (longPress is LongPress.Repeat) {
+                    // Backspace commits its initial single-character delete immediately on press
+                    // so rapid two-thumb sequences (e.g. DEL followed by a letter) never invert
+                    // ordering while waiting for the repeat hold threshold.
+                    commitKey(activeKeyOutput)
                     committedOnPress = true
                     outcome = PressOutcome.COMMITTED
                 }
@@ -116,7 +126,7 @@ internal fun Modifier.keyGestures(
                         activationPx = SCRUB_ACTIVATION_DP.dp.toPx(),
                         stepPxFor = { held -> scrubStepDp(held).dp.toPx() },
                         onScrub = onScrub,
-                        onTap = { commitKey(keyOutput) },
+                        onTap = { commitKey(activeKeyOutput) },
                     )
                     return@awaitEachGesture
                 }
@@ -155,7 +165,7 @@ internal fun Modifier.keyGestures(
                 // finger still on the key, which is a hold and is handed to the existing
                 // machinery below untouched.
                 var heldPastThreshold = false
-                if (glide != null && isGlideCandidate(keyOutput)) {
+                if (glide != null && isGlideCandidate(activeKeyOutput)) {
                     val origin = keyBounds()
                     val escapePx = GLIDE_ESCAPE_DP.dp.toPx()
                     val stirPx = GLIDE_STIR_DP.dp.toPx()
@@ -231,7 +241,7 @@ internal fun Modifier.keyGestures(
                         // the word the decoder commits is not prefixed by its own first letter.
                         if (committedOnPress) {
                             committedOnPress = false
-                            onRevoke(keyOutput)
+                            onRevoke(activeKeyOutput)
                             outcome = PressOutcome.NOTHING
                         }
                         while (true) {
@@ -253,7 +263,7 @@ internal fun Modifier.keyGestures(
                     if (lifted) {
                         // Already on screen for an eligible key; this is the lift that only
                         // confirms it.
-                        if (!committedOnPress) commitKey(keyOutput)
+                        if (!committedOnPress) commitKey(activeKeyOutput)
                         outcome = PressOutcome.COMMITTED
                         return@awaitEachGesture
                     }
@@ -262,7 +272,7 @@ internal fun Modifier.keyGestures(
                     // key's own character, so the letter shown on press comes back off.
                     if (committedOnPress) {
                         committedOnPress = false
-                        onRevoke(keyOutput)
+                        onRevoke(activeKeyOutput)
                         outcome = PressOutcome.NOTHING
                     }
                     heldPastThreshold = true
@@ -292,7 +302,7 @@ internal fun Modifier.keyGestures(
                         // would make every long press on a letter take twice as long.
                         null
                     } else if (longPress is LongPress.Repeat) {
-                        withTimeoutOrNull(LONG_PRESS_MS) {
+                        withTimeoutOrNull(REPEAT_HOLD_MS) {
                             var releasedCleanly = false
                             while (true) {
                                 val change =
@@ -315,14 +325,14 @@ internal fun Modifier.keyGestures(
 
                 when {
                     early == true -> {
-                        if (!committedOnPress) commitKey(keyOutput)
+                        if (!committedOnPress) commitKey(activeKeyOutput)
                         outcome = PressOutcome.COMMITTED
                     }
                     // Cancelled out from under us before it resolved into anything.
                     early == false ->
-                        if (committedOnPress) {
+                        if (committedOnPress && longPress !is LongPress.Repeat) {
                             committedOnPress = false
-                            onRevoke(keyOutput)
+                            onRevoke(activeKeyOutput)
                             outcome = PressOutcome.NOTHING
                         }
                     longPress is LongPress.None -> {
@@ -330,12 +340,12 @@ internal fun Modifier.keyGestures(
                         // release, otherwise resting a moment on a letter would silently
                         // swallow it.
                         if (waitForUpOrCancellation() != null) {
-                            if (!committedOnPress) commitKey(keyOutput)
+                            if (!committedOnPress) commitKey(activeKeyOutput)
                             outcome = PressOutcome.COMMITTED
                         } else {
                             if (committedOnPress) {
                                 committedOnPress = false
-                                onRevoke(keyOutput)
+                                onRevoke(activeKeyOutput)
                             }
                         }
                     }
@@ -369,7 +379,7 @@ internal fun Modifier.keyGestures(
                             // In word mode the timer stops producing deletes entirely: they are
                             // driven by travel below, so the caret follows the finger instead of
                             // running away from it while it is still moving.
-                            if (!wordMode) commitKey(keyOutput)
+                            if (!wordMode) commitKey(activeKeyOutput)
                             val ended =
                                 withTimeoutOrNull(repeatIntervalAt(step)) {
                                     // Replaces waitForUpOrCancellation, which threw the
@@ -416,7 +426,7 @@ internal fun Modifier.keyGestures(
                         // different character than the one already on screen.
                         if (committedOnPress) {
                             committedOnPress = false
-                            onRevoke(keyOutput)
+                            onRevoke(activeKeyOutput)
                             outcome = PressOutcome.NOTHING
                         }
                         alternates.show(
@@ -475,7 +485,7 @@ internal fun Modifier.keyGestures(
                 pressed.value = false
                 if (recorder != null && recorder.enabled) {
                     recorder.onPressResolved(
-                        keyKindOf(keyOutput),
+                        keyKindOf(activeKeyOutput),
                         outcome,
                         SystemClock.uptimeMillis() - down.uptimeMillis,
                     )

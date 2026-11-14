@@ -152,4 +152,19 @@ class BloomEngineMultiLexiconTest {
                 }
             assertTrue("Expected 'biryani' in suggestions for 'biry'", hasBiryani)
         }
+
+    @Test
+    fun `supplemental names lexicon does not block single-edit typos of core english words`() =
+        runBlocking {
+            assertEquals("the", engine.getAutoCorrection("thr"))
+            assertEquals("had", engine.getAutoCorrection("nad"))
+            assertEquals("and", engine.getAutoCorrection("abd"))
+            assertEquals("are", engine.getAutoCorrection("sre"))
+            assertEquals("they", engine.getAutoCorrection("theh"))
+            assertEquals("news", engine.getAutoCorrection("newe"))
+            assertEquals("see", engine.getAutoCorrection("sse"))
+            assertEquals("use", engine.getAutoCorrection("ise"))
+            assertEquals("now", engine.getAutoCorrection("niw"))
+            assertEquals("one", engine.getAutoCorrection("pne"))
+        }
 }

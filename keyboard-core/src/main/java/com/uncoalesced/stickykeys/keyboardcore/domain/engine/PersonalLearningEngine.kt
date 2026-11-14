@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Phase 4 Coordinator: Continuous On-Device N-gram Personalization & Dynamic User Dictionary Learning.
@@ -28,6 +29,8 @@ class PersonalLearningEngine(
     val bigramCache: BloomPersonalBigramCache = BloomPersonalBigramCache(),
     private val keyboardPreferences: KeyboardPreferences? = null,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /** Where the BloomType `.bin` stores live; [clearAll] deletes them. See [BloomStateFiles]. */
+    private val stateDir: File? = null,
 ) {
     /**
      * Secondary constructor for unit testing or when [PersonalBigramDao] is not supplied.
@@ -61,6 +64,15 @@ class PersonalLearningEngine(
     @Volatile
     var isIncognitoOrPassword: Boolean = false
 
+    @Volatile
+    internal var onMemoryMutated: (() -> Unit)? = null
+
+    @Volatile
+    internal var onMemoryCleared: (() -> Unit)? = null
+
+    internal val bigramDao: PersonalBigramDao?
+        get() = personalBigramDao
+
     /**
      * Pre-warms in-memory L1 caches from the Room database on launch.
      * Runs asynchronously off the main thread when invoked via [prewarm],
@@ -73,25 +85,41 @@ class PersonalLearningEngine(
 
     /**
      * Synchronous prewarm routine; avoids racing against fast teardowns or Room database closures.
+     * Prunes entries inactive for > 30 days in SQLite first without eroding active L1 counts.
      */
     fun prewarmSync() {
+        val cutoffTimestamp = System.currentTimeMillis() - THIRTY_DAYS_MS
         try {
-            // Preload unigrams
+            personalDao.pruneOldEntries(cutoffTimestamp)
+            personalBigramDao?.pruneOldEntries(cutoffTimestamp)
+        } catch (e: Exception) {
+        }
+
+        try {
+            // Preload unigrams idempotently
             personalDao.getAll(BloomPersonalLexicon.MAX_UNIGRAMS).forEach { entity ->
-                lexicon.recordOccurrence(entity.word, entity.frequency)
+                val current = lexicon.countOf(entity.word)
+                if (entity.frequency > current) {
+                    lexicon.recordOccurrence(entity.word, entity.frequency - current)
+                }
             }
         } catch (e: Exception) {
             // In-memory operation degrades gracefully if DB read fails
         }
 
         try {
-            // Preload bigrams
-            personalBigramDao?.getAllRecent(2000)?.forEach { bigram ->
-                bigramCache.recordTransition(
-                    bigram.previousWord,
-                    bigram.nextWord,
-                    bigram.count,
-                )
+            // Preload bigrams idempotently
+            val recentBigrams =
+                personalBigramDao?.getAllRecent(BloomPersonalBigramCache.MAX_BIGRAMS)
+            recentBigrams?.forEach { bigram ->
+                val current = bigramCache.countFor(bigram.previousWord, bigram.nextWord)
+                if (bigram.count > current) {
+                    bigramCache.recordTransition(
+                        bigram.previousWord,
+                        bigram.nextWord,
+                        bigram.count - current,
+                    )
+                }
             }
         } catch (e: Exception) {
             // Graceful degradation
@@ -115,13 +143,20 @@ class PersonalLearningEngine(
 
         scope.launch {
             try {
+                val lower = word.lowercase()
+                val dbFreq = personalDao.getWord(lower)?.frequency ?: 0
+                val mergedFreq = maxOf(newCount, dbFreq + 1).coerceAtMost(255)
+                if (mergedFreq > newCount) {
+                    lexicon.recordOccurrence(lower, mergedFreq - newCount)
+                }
                 personalDao.insertOrUpdate(
                     PersonalWordEntity(
-                        word = word.lowercase(),
-                        frequency = newCount,
+                        word = lower,
+                        frequency = mergedFreq,
                         lastUsedTimestamp = System.currentTimeMillis(),
                     ),
                 )
+                onMemoryMutated?.invoke()
             } catch (e: Exception) {
             }
         }
@@ -171,6 +206,7 @@ class PersonalLearningEngine(
                         ),
                     )
                 }
+                onMemoryMutated?.invoke()
             } catch (e: Exception) {
             }
         }
@@ -218,6 +254,7 @@ class PersonalLearningEngine(
                         ),
                     )
                 }
+                onMemoryMutated?.invoke()
             } catch (e: Exception) {
             }
         }
@@ -225,10 +262,22 @@ class PersonalLearningEngine(
         // Rollback bigram transition
         if (!previousWord.isNullOrBlank()) {
             val prev = previousWord.trim()
-            bigramCache.rollbackTransition(prev, word)
+            val remainingBigram = bigramCache.rollbackTransition(prev, word)
             scope.launch {
                 try {
-                    personalBigramDao?.deleteBigram(prev.lowercase(), word.lowercase())
+                    if (remainingBigram <= 0) {
+                        personalBigramDao?.deleteBigram(prev.lowercase(), word.lowercase())
+                    } else {
+                        personalBigramDao?.upsertBigram(
+                            PersonalBigramEntity(
+                                previousWord = prev.lowercase(),
+                                nextWord = word.lowercase(),
+                                count = remainingBigram,
+                                lastUsedTimestamp = System.currentTimeMillis(),
+                            ),
+                        )
+                    }
+                    onMemoryMutated?.invoke()
                 } catch (e: Exception) {
                 }
             }
@@ -255,13 +304,20 @@ class PersonalLearningEngine(
 
         scope.launch {
             try {
+                val lower = trimmed.lowercase()
+                val dbFreq = personalDao.getWord(lower)?.frequency ?: 0
+                val mergedFreq = maxOf(newCount, dbFreq + 1).coerceAtMost(255)
+                if (mergedFreq > newCount) {
+                    lexicon.recordOccurrence(lower, mergedFreq - newCount)
+                }
                 personalDao.insertOrUpdate(
                     PersonalWordEntity(
-                        word = trimmed.lowercase(),
-                        frequency = newCount,
+                        word = lower,
+                        frequency = mergedFreq,
                         lastUsedTimestamp = System.currentTimeMillis(),
                     ),
                 )
+                onMemoryMutated?.invoke()
             } catch (e: Exception) {
             }
         }
@@ -289,11 +345,10 @@ class PersonalLearningEngine(
 
     /**
      * Synchronous maintenance routine for background initialization paths.
+     * Prunes capacity limits and expired entries older than 30 days without decaying fresh active counts.
      */
     fun runDecayMaintenanceSync() {
         val cutoffTimestamp = System.currentTimeMillis() - THIRTY_DAYS_MS
-        lexicon.decayAll(1)
-        bigramCache.decayAll(1)
         lexicon.prune(BloomPersonalLexicon.MAX_UNIGRAMS)
         bigramCache.prune(BloomPersonalBigramCache.MAX_BIGRAMS)
 
@@ -310,6 +365,15 @@ class PersonalLearningEngine(
     fun clearAll() {
         lexicon.clear()
         bigramCache.clear()
+        // Not left to onMemoryCleared alone: that hook exists only once PredictionEngine has
+        // been created in this process, and a vault left on disk restores every cleared word.
+        stateDir?.let { dir ->
+            try {
+                BloomStateFiles.deleteAll(dir)
+            } catch (e: Exception) {
+            }
+        }
+        onMemoryCleared?.invoke()
         scope.launch {
             try {
                 personalDao.clear()

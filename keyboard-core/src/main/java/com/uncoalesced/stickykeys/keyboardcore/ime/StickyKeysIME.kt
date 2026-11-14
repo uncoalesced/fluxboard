@@ -86,6 +86,7 @@ class StickyKeysIME :
      */
     private var selStart = 0
     private var selEnd = 0
+    private val pendingCarets = ArrayDeque<Pair<Int, Int>>()
 
     /**
      * Whether the last caret move was refused because there was nowhere to go.
@@ -244,6 +245,7 @@ class StickyKeysIME :
         // A fresh field reports its caret here and nowhere else -- onUpdateSelection only
         // fires on subsequent moves -- so without this the first cursor move of every session
         // would be computed against a stale position from the previous field.
+        pendingCarets.clear()
         selStart = (info?.initialSelStart ?: 0).coerceAtLeast(0)
         selEnd = (info?.initialSelEnd ?: 0).coerceAtLeast(selStart)
         typingViewModel().onInputStarted(
@@ -322,9 +324,22 @@ class StickyKeysIME :
         //
         // Every edit made here predicts its own caret, so a mismatch means something else
         // moved it. Only then is the field re-read, which keeps this off the keystroke path.
-        val external = newSelStart != selStart || newSelEnd != selEnd
-        selStart = newSelStart
-        selEnd = newSelEnd
+        val incoming = newSelStart to newSelEnd
+        val matchIdx = pendingCarets.indexOf(incoming)
+        val external: Boolean
+        if (matchIdx >= 0) {
+            repeat(matchIdx + 1) { pendingCarets.removeFirst() }
+            if (pendingCarets.isEmpty()) {
+                selStart = newSelStart
+                selEnd = newSelEnd
+            }
+            external = false
+        } else {
+            external = newSelStart != selStart || newSelEnd != selEnd
+            pendingCarets.clear()
+            selStart = newSelStart
+            selEnd = newSelEnd
+        }
         if (external) {
             typingViewModel().onEditorContextChanged(textBeforeCursor(WORD_CONTEXT_CHARS))
         }
@@ -446,6 +461,10 @@ class StickyKeysIME :
      * user moved by hand is never noticed at all).
      */
     private fun predictCaret(position: Int) {
+        if (pendingCarets.size >= 32) {
+            pendingCarets.removeFirst()
+        }
+        pendingCarets.addLast(position to position)
         selStart = position
         selEnd = position
         // Every edit this keyboard makes to the host passes through here -- that is the whole
@@ -637,10 +656,14 @@ class StickyKeysIME :
 
         if (extend) {
             ic.setSelection(anchor, target)
+            if (pendingCarets.size >= 32) pendingCarets.removeFirst()
+            pendingCarets.addLast(anchor to target)
             selStart = anchor
             selEnd = target
         } else {
             ic.setSelection(target, target)
+            if (pendingCarets.size >= 32) pendingCarets.removeFirst()
+            pendingCarets.addLast(target to target)
             selStart = target
             selEnd = target
         }

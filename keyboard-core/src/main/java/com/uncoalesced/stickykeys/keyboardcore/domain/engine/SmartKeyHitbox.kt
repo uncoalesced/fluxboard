@@ -1,6 +1,11 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.domain.engine
 
+import java.io.File
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.security.MessageDigest
 import kotlin.math.min
 import kotlin.math.sqrt
 
@@ -22,6 +27,13 @@ internal object SmartKeyHitbox {
     const val BASE_PROXIMITY_INTERIOR: Float = 0.0694f
     const val BASE_PROXIMITY_INITIAL: Float = 0.0779f
     const val DISTANCE_WEIGHT_LENGTH: Float = 0.1524f
+
+    private const val MAGIC = 0x42544150 // "BTAP"
+    private const val VERSION = 1
+    private const val NUM_FLOATS = 52
+    private const val PAYLOAD_BYTES = NUM_FLOATS * 4
+    private const val TOTAL_FILE_SIZE = 4 + 4 + PAYLOAD_BYTES + 32
+    private const val MAX_DRIFT_KEY_WIDTH = 0.35f
 
     private val ROWS =
         listOf(
@@ -49,6 +61,12 @@ internal object SmartKeyHitbox {
     /** Running touch offset centroids per key: char -> (meanOffsetX, meanOffsetY). */
     private val runningCentroids = mutableMapOf<Char, Pair<Float, Float>>()
 
+    /**
+     * Serialises file I/O. Deliberately not the object monitor that guards [runningCentroids]:
+     * holding that across a disk write would stall every key press waiting on [getCentroid].
+     */
+    private val ioLock = Any()
+
     @Synchronized
     fun resetCentroids() {
         runningCentroids.clear()
@@ -70,9 +88,15 @@ internal object SmartKeyHitbox {
     ) {
         val lower = char.lowercaseChar()
         if (lower !in nominalPositions) return
+        // NaN passes coerceIn untouched and would then poison every distance for this key.
+        if (!offsetX.isFinite() || !offsetY.isFinite()) return
         val current = runningCentroids[lower] ?: (0f to 0f)
-        val newX = ALPHA * current.first + (1f - ALPHA) * offsetX
-        val newY = ALPHA * current.second + (1f - ALPHA) * offsetY
+        val newX =
+            (ALPHA * current.first + (1f - ALPHA) * offsetX)
+                .coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
+        val newY =
+            (ALPHA * current.second + (1f - ALPHA) * offsetY)
+                .coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
         runningCentroids[lower] = (newX to newY)
     }
 
@@ -82,6 +106,104 @@ internal object SmartKeyHitbox {
     fun adaptWord(touches: List<TouchPoint>) {
         for (tp in touches) {
             adaptCentroid(tp.char, tp.normalizedX, tp.normalizedY)
+        }
+    }
+
+    /** Returns a 52-float snapshot (deltaX, deltaY for 'a'..'z') of learned tap centroids. */
+    @Synchronized
+    fun snapshot(): FloatArray {
+        val out = FloatArray(NUM_FLOATS)
+        for (i in 0 until 26) {
+            val ch = ('a'.code + i).toChar()
+            val pair = runningCentroids[ch] ?: continue
+            out[i * 2] = pair.first
+            out[i * 2 + 1] = pair.second
+        }
+        return out
+    }
+
+    /**
+     * Restores learned tap centroids from a 52-float array.
+     *
+     * Rejected whole, leaving the current centroids untouched, if any value is non-finite:
+     * NaN survives `coerceIn` because every comparison with it is false.
+     */
+    @Synchronized
+    fun restore(data: FloatArray): Boolean {
+        if (data.size != NUM_FLOATS) return false
+        if (!data.all { it.isFinite() }) return false
+        runningCentroids.clear()
+        for (i in 0 until 26) {
+            val dx = data[i * 2].coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
+            val dy = data[i * 2 + 1].coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
+            if (dx != 0f || dy != 0f) {
+                val ch = ('a'.code + i).toChar()
+                runningCentroids[ch] = dx to dy
+            }
+        }
+        return true
+    }
+
+    /** Saves the learned tap centroids to [file] with magic header, version, and SHA-256 digest. */
+    fun save(file: File) {
+        val floats = snapshot()
+        val buffer = ByteBuffer.allocate(TOTAL_FILE_SIZE).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.putInt(MAGIC)
+        buffer.putInt(VERSION)
+
+        val payloadBytes = ByteArray(PAYLOAD_BYTES)
+        val payloadBuf = ByteBuffer.wrap(payloadBytes).order(ByteOrder.LITTLE_ENDIAN)
+        for (f in floats) {
+            payloadBuf.putFloat(f)
+        }
+        buffer.put(payloadBytes)
+
+        val digest = MessageDigest.getInstance("SHA-256").digest(payloadBytes)
+        buffer.put(digest)
+
+        synchronized(ioLock) {
+            writeFileAtomically(file, buffer.array())
+        }
+    }
+
+    /** Loads and verifies the learned tap centroids from [file]. Forward-compatible across versions. */
+    fun load(file: File): Boolean = synchronized(ioLock) { loadLocked(file) }
+
+    /** Deletes the saved centroids under the I/O lock, so an in-flight save cannot resurrect them. */
+    fun delete(file: File) {
+        synchronized(ioLock) {
+            if (file.exists()) file.delete()
+            File(file.parentFile, "${file.name}.tmp").delete()
+        }
+    }
+
+    private fun loadLocked(file: File): Boolean {
+        if (!file.exists() || file.length() < TOTAL_FILE_SIZE.toLong()) return false
+        return try {
+            val bytes = FileInputStream(file).use { it.readBytes() }
+            val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            if (buffer.int != MAGIC) return false
+            val version = buffer.int
+            if (version < 1) return false
+
+            val payloadLen = bytes.size - 8 - 32
+            if (payloadLen < PAYLOAD_BYTES) return false
+            val payloadBytes = ByteArray(payloadLen)
+            buffer.get(payloadBytes)
+
+            val expectedDigest = ByteArray(32)
+            buffer.get(expectedDigest)
+            val actualDigest = MessageDigest.getInstance("SHA-256").digest(payloadBytes)
+            if (!actualDigest.contentEquals(expectedDigest)) return false
+
+            val payloadBuf = ByteBuffer.wrap(payloadBytes).order(ByteOrder.LITTLE_ENDIAN)
+            val floats = FloatArray(NUM_FLOATS)
+            for (i in 0 until NUM_FLOATS) {
+                floats[i] = payloadBuf.float
+            }
+            restore(floats)
+        } catch (e: Exception) {
+            false
         }
     }
 

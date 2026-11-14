@@ -78,12 +78,26 @@ class BloomTypeDecoder(
 
         // 2. Search base dictionary trie
         dictionary()?.let { buf ->
-            searchTrie(buf, trajectory, keyCentroids, previousWord, bestScores)
+            searchTrie(
+                buf = buf,
+                trajectory = trajectory,
+                keyCentroids = keyCentroids,
+                previousWord = previousWord,
+                bestScores = bestScores,
+                isSupplemental = false,
+            )
         }
 
         // 3. Search names / cultural dictionary trie if present
         namesDictionaryProvider()?.let { buf ->
-            searchTrie(buf, trajectory, keyCentroids, previousWord, bestScores)
+            searchTrie(
+                buf = buf,
+                trajectory = trajectory,
+                keyCentroids = keyCentroids,
+                previousWord = previousWord,
+                bestScores = bestScores,
+                isSupplemental = true,
+            )
         }
 
         return bestScores.entries
@@ -100,6 +114,7 @@ class BloomTypeDecoder(
         keyCentroids: (Char) -> Pair<Float, Float>?,
         previousWord: String?,
         bestScores: MutableMap<String, Float>,
+        isSupplemental: Boolean = false,
     ) {
         try {
             var frontier = listOf(BloomBeam(TRIE_ROOT_OFFSET, "", 0, 0f))
@@ -109,7 +124,16 @@ class BloomTypeDecoder(
             while (frontier.isNotEmpty() && depth < MAX_BLOOM_WORD_LEN) {
                 next.clear()
                 for (beam in frontier) {
-                    expandBeam(buf, beam, trajectory, keyCentroids, previousWord, bestScores, next)
+                    expandBeam(
+                        buf = buf,
+                        beam = beam,
+                        trajectory = trajectory,
+                        keyCentroids = keyCentroids,
+                        previousWord = previousWord,
+                        bestScores = bestScores,
+                        next = next,
+                        isSupplemental = isSupplemental,
+                    )
                 }
                 if (next.isEmpty()) break
                 frontier =
@@ -133,6 +157,7 @@ class BloomTypeDecoder(
         previousWord: String?,
         bestScores: MutableMap<String, Float>,
         next: MutableList<BloomBeam>,
+        isSupplemental: Boolean = false,
     ) {
         buf.position(beam.offset)
         val frequency = buf.get().toInt() and 0xFF
@@ -140,11 +165,17 @@ class BloomTypeDecoder(
         val childCount = buf.get().toInt() and 0xFF
 
         // 1. Evaluate completed terminal word
-        if (isTerminal == 1 && beam.word.length >= 2) {
+        val eligibleTerminal =
+            isTerminal == 1 &&
+                beam.word.length >= 2 &&
+                (!isSupplemental || beam.word.length >= 4 || frequency >= 170)
+        if (eligibleTerminal) {
             val spatialCost = aligner.scoreCandidate(trajectory, beam.word, keyCentroids, profile)
             if (spatialCost != null) {
                 val contextCredit = contextBoost(previousWord, beam.word)
-                val freqScore = (frequency / 255.0f) * 1.5f
+                val freqScale = if (isSupplemental) 0.95f else 1.5f
+                val sourcePenalty = if (isSupplemental) 0.55f else 0f
+                val freqScore = (frequency / 255.0f) * freqScale
                 val revertPenalty =
                     if (revertHistory.isReverted(beam.word)) {
                         REVERT_PENALTY_COST
@@ -152,7 +183,8 @@ class BloomTypeDecoder(
                         0f
                     }
 
-                val finalCost = spatialCost - contextCredit - freqScore + revertPenalty
+                val finalCost =
+                    spatialCost - contextCredit - freqScore + sourcePenalty + revertPenalty
                 val existing = bestScores[beam.word]
                 if (existing == null || finalCost < existing) {
                     bestScores[beam.word] = finalCost

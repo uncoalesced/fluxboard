@@ -82,8 +82,9 @@ internal fun rememberTouchKeyPressHandler(
 internal fun rememberKeyRevokeHandler(
     keyboardController: KeyboardController,
     typingViewModel: TypingViewModel,
+    modeState: MutableState<KeyboardMode>? = null,
 ): (String) -> Unit =
-    remember(keyboardController, typingViewModel) {
+    remember(keyboardController, typingViewModel, modeState) {
         { key: String ->
             // Sized from the key itself rather than from the editor, unlike every other
             // destructive edit here. This one is not a guess about what is in front of the
@@ -91,6 +92,12 @@ internal fun rememberKeyRevokeHandler(
             // that would have let anything else move has not finished yet.
             keyboardController.deleteBefore(key.length)
             typingViewModel.onKeyRevoked(key)
+            if (key.length == 1 &&
+                key[0].isUpperCase() &&
+                modeState?.value == KeyboardMode.LETTERS_LOWER
+            ) {
+                modeState.value = KeyboardMode.LETTERS_UPPER
+            }
         }
     }
 
@@ -119,7 +126,7 @@ internal fun rememberDeleteWordHandler(
                 // still holding it would size its next edit against text that no longer
                 // exists. Abandoned rather than finished: the user is deleting it, which
                 // is the clearest possible signal not to learn it.
-                typingViewModel.onWordAbandoned()
+                typingViewModel.onWordDeleted(before.dropLast(length))
                 typingViewModel.performKeyPressHaptic()
             }
             Unit
@@ -172,7 +179,7 @@ internal fun rememberGlideHandler(
     coroutineScope: CoroutineScope,
     modeState: MutableState<KeyboardMode>,
 ): (GlideStroke) -> Unit =
-    remember(keyboardController, typingViewModel, coroutineScope) {
+    remember(keyboardController, typingViewModel, coroutineScope, modeState) {
         { stroke: GlideStroke ->
             coroutineScope.launch {
                 val candidates = typingViewModel.decodeGlide(stroke)
@@ -182,16 +189,19 @@ internal fun rememberGlideHandler(
                 // actually asked for is applied here. Read from the flow rather than the
                 // composable's snapshot of it: this lambda is remembered, so a captured
                 // local would still hold whatever the value was when it was built.
+                val currentMode = modeState.value
                 val atSentenceStart = typingViewModel.shouldAutoCapitalize.value
-                val word = glideCase(decoded, modeState.value, atSentenceStart)
+                val word = glideCase(decoded, currentMode, atSentenceStart)
                 val alternatives =
-                    candidates.map { glideCase(it, modeState.value, atSentenceStart) }
+                    candidates.map { glideCase(it, currentMode, atSentenceStart) }
                 // A glide replaces nothing -- it starts a new word -- so whatever partial
                 // word the finger crossed on the way is dropped rather than deleted. The
                 // keys were never committed; only the tracker saw them.
                 typingViewModel.onWordAbandoned()
                 keyboardController.commitText("$word ")
                 typingViewModel.onGlideCommitted(word, alternatives, stroke)
+                modeAfterPrintableKey(currentMode, typingViewModel.shouldAutoCapitalize.value)
+                    ?.let { modeState.value = it }
             }
             Unit
         }

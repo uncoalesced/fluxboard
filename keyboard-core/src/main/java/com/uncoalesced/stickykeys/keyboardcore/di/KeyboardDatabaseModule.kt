@@ -81,6 +81,7 @@ object KeyboardDatabaseModule {
     @Provides
     @Singleton
     fun providePersonalLearningEngine(
+        @ApplicationContext context: Context,
         personalDao: PersonalDictionaryDao,
         personalBigramDao: PersonalBigramDao,
         keyboardPreferences: KeyboardPreferences,
@@ -89,5 +90,6 @@ object KeyboardDatabaseModule {
             personalDao = personalDao,
             personalBigramDao = personalBigramDao,
             keyboardPreferences = keyboardPreferences,
+            stateDir = context.filesDir,
         )
 }
