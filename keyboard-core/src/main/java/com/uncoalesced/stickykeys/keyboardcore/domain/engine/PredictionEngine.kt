@@ -81,6 +81,12 @@ class PredictionEngine
             if (languageModel is BigramLanguageModel) {
                 languageModel.personalBigramCache = personalLearningEngine.bigramCache
             }
+            personalLearningEngine.onMemoryMutated = {
+                syncMemoryVaultAsync()
+            }
+            personalLearningEngine.onMemoryCleared = {
+                resetBloomSpatialProfile()
+            }
         }
 
         /**
@@ -140,8 +146,9 @@ class PredictionEngine
                     }
                     languageModel.initialize()
                     loadBloomSpatialProfile()
+                    loadBloomTapProfile()
                     personalLearningEngine.prewarmSync()
-                    personalLearningEngine.runDecayMaintenanceSync()
+                    reconcileCrossVersionMemory()
                     if (buffer == null) {
                         mapDictionary()
                     }
@@ -164,11 +171,87 @@ class PredictionEngine
             }
         }
 
+        private fun loadBloomTapProfile() {
+            try {
+                val file = File(context.filesDir, "bloom_tap_profile.bin")
+                if (file.exists()) {
+                    SmartKeyHitbox.load(file)
+                }
+            } catch (e: Exception) {
+            }
+        }
+
+        private fun reconcileCrossVersionMemory() {
+            if (personalLearningEngine.bigramDao == null) return
+            try {
+                val vaultFile = File(context.filesDir, "bloom_user_memory.bin")
+                val glideFile = File(context.filesDir, "bloom_profile.bin")
+                val tapFile = File(context.filesDir, "bloom_tap_profile.bin")
+                BloomMemoryVault.reconcileAndSync(
+                    vaultFile = vaultFile,
+                    glideFile = glideFile,
+                    tapFile = tapFile,
+                    personalDao = personalDao,
+                    personalBigramDao = personalLearningEngine.bigramDao,
+                    learningEngine = personalLearningEngine,
+                    glideProfile = bloomSpatialProfile,
+                )
+            } catch (e: Exception) {
+            }
+        }
+
         fun saveBloomSpatialProfile() {
             try {
                 val file = File(context.filesDir, "bloom_profile.bin")
                 bloomSpatialProfile.save(file)
+                if (personalLearningEngine.bigramDao != null) {
+                    BloomMemoryVault.saveCurrentState(
+                        vaultFile = File(context.filesDir, "bloom_user_memory.bin"),
+                        learningEngine = personalLearningEngine,
+                        glideProfile = bloomSpatialProfile,
+                    )
+                }
             } catch (e: Exception) {
+            }
+        }
+
+        fun saveBloomTapProfile() {
+            try {
+                val file = File(context.filesDir, "bloom_tap_profile.bin")
+                SmartKeyHitbox.save(file)
+                if (personalLearningEngine.bigramDao != null) {
+                    BloomMemoryVault.saveCurrentState(
+                        vaultFile = File(context.filesDir, "bloom_user_memory.bin"),
+                        learningEngine = personalLearningEngine,
+                        glideProfile = bloomSpatialProfile,
+                    )
+                }
+            } catch (e: Exception) {
+            }
+        }
+
+        internal fun saveBloomTapProfileAsync() {
+            if (!personalLearningEngine.isEnabled ||
+                personalLearningEngine.isIncognitoOrPassword
+            ) {
+                return
+            }
+            scope.launch {
+                saveBloomTapProfile()
+            }
+        }
+
+        private fun syncMemoryVaultAsync() {
+            if (personalLearningEngine.bigramDao == null) return
+            scope.launch {
+                try {
+                    BloomMemoryVault.saveCurrentState(
+                        vaultFile = File(context.filesDir, "bloom_user_memory.bin"),
+                        learningEngine = personalLearningEngine,
+                        glideProfile = bloomSpatialProfile,
+                    )
+                } catch (e: Exception) {
+                }
             }
         }
 
@@ -180,9 +263,13 @@ class PredictionEngine
 
         fun resetBloomSpatialProfile() {
             bloomSpatialProfile.reset()
+            SmartKeyHitbox.resetCentroids()
+            // Each delete takes its store's I/O lock, so a save already in flight on the
+            // background scope cannot write the file back after the user cleared it.
             try {
-                val file = File(context.filesDir, "bloom_profile.bin")
-                if (file.exists()) file.delete()
+                bloomSpatialProfile.delete(File(context.filesDir, "bloom_profile.bin"))
+                SmartKeyHitbox.delete(File(context.filesDir, "bloom_tap_profile.bin"))
+                BloomMemoryVault.delete(File(context.filesDir, "bloom_user_memory.bin"))
             } catch (e: Exception) {
             }
         }
