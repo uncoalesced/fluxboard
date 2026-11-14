@@ -128,4 +128,10 @@ class ThemeEditorViewModel
                 themeManager.saveCustomTheme(updatedTheme)
             }
         }
+
+        fun deleteCustomTheme(themeId: String) {
+            viewModelScope.launch {
+                themeManager.deleteCustomTheme(themeId)
+            }
+        }
     }
