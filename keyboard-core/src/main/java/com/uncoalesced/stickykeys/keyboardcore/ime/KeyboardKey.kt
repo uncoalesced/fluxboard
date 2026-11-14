@@ -88,8 +88,10 @@ internal fun KeyboardKey(
 ) {
     val spokenLabel = accessibleKeyLabel(keyOutput)
     val spokenState = accessibleKeyState(keyOutput, mode)
+    val liveKeyOutput = remember { mutableStateOf(keyOutput) }
+    liveKeyOutput.value = keyOutput
     val longPress =
-        remember(keyOutput, hint, keyAlternates, keyAlternatesDefaultIndex) {
+        remember(keyOutput.lowercase(), hint, keyAlternates, keyAlternatesDefaultIndex) {
             longPressFor(keyOutput, hint, keyAlternates, keyAlternatesDefaultIndex)
         }
     // Sized per key rather than once for the grid: the strip's cell width depends on how many
@@ -234,6 +236,7 @@ internal fun KeyboardKey(
                     onRevoke = onKeyRevoke,
                     recorder = LocalUsageRecorder.current,
                     onTouchCommit = onTouchPress,
+                    liveKeyOutput = liveKeyOutput,
                 )
                 // Everything below this line is drawing, and the padding belongs to drawing
                 // alone: it is what makes a key look separate from its neighbour without
