@@ -1,10 +1,21 @@
 // Engineered by uncoalesced
 package com.uncoalesced.stickykeys.keyboardcore.layout
 
+import androidx.test.core.app.ApplicationProvider
+import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.io.File
 
 /**
  * The layout half of the dangling-pointer defence.
@@ -17,8 +28,11 @@ import org.junit.Test
  * cache clearing and reboot -- the user's chosen layout stays un-applied on every launch and
  * nothing anywhere says why.
  *
- * Plain JUnit rather than Robolectric: unlike themes, nothing here parses a colour.
+ * Uses Robolectric so [LayoutManager] deletion and active-layout fallback tests run
+ * against real `filesDir` and `KeyboardPreferences` alongside the pure `resolveLayout` checks.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class LayoutFallbackTest {
     private fun layout(id: String) =
         KeyboardLayoutConfig(
@@ -96,4 +110,99 @@ class LayoutFallbackTest {
             LayoutValidator.validate(preset),
         )
     }
+
+    private suspend fun freshLayoutManager(
+        context: android.content.Context,
+        prefs: KeyboardPreferences,
+    ): LayoutManager =
+        LayoutManager(context, prefs).also { manager ->
+            withTimeout(5_000L) {
+                manager.availableLayouts.first { it.isNotEmpty() }
+            }
+        }
+
+    @Test
+    fun `deleteCustomLayout removes layout json and keeps preset qwerty`() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val layoutsDir = File(context.filesDir, "layouts").apply { deleteRecursively() }
+            val prefs = KeyboardPreferences(context)
+            prefs.setActiveLayoutId(LayoutManager.DEFAULT_LAYOUT_ID)
+
+            val manager = freshLayoutManager(context, prefs)
+            val custom =
+                LayoutManager.buildDefaultLayout().copy(
+                    id = "custom_delete_layout",
+                    name = "Delete Layout",
+                )
+            assertEquals(LayoutValidationResult.Valid, manager.saveCustomLayout(custom))
+            val jsonFile = File(layoutsDir, "custom_delete_layout.json")
+            assertTrue(jsonFile.exists())
+            withTimeout(5_000L) {
+                manager.availableLayouts.first { list ->
+                    list.any { it.id == "custom_delete_layout" }
+                }
+            }
+
+            manager.deleteCustomLayout("custom_delete_layout")
+
+            withTimeout(5_000L) {
+                manager.availableLayouts.first { list ->
+                    list.none { it.id == "custom_delete_layout" }
+                }
+            }
+            assertFalse(jsonFile.exists())
+            assertTrue(
+                manager.availableLayouts.value.any { it.id == LayoutManager.DEFAULT_LAYOUT_ID },
+            )
+        }
+
+    @Test
+    fun `deleteCustomLayout falls back to preset qwerty when active custom layout is deleted`() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            File(context.filesDir, "layouts").deleteRecursively()
+            val prefs = KeyboardPreferences(context)
+            prefs.setActiveLayoutId(LayoutManager.DEFAULT_LAYOUT_ID)
+
+            val manager = freshLayoutManager(context, prefs)
+            val custom =
+                LayoutManager.buildDefaultLayout().copy(
+                    id = "custom_active_layout",
+                    name = "Active Custom Layout",
+                )
+            assertEquals(LayoutValidationResult.Valid, manager.saveCustomLayout(custom))
+            withTimeout(5_000L) {
+                manager.availableLayouts.first { list ->
+                    list.any { it.id == "custom_active_layout" }
+                }
+            }
+            prefs.setActiveLayoutId("custom_active_layout")
+            withTimeout(5_000L) {
+                manager.activeLayout.first { it.id == "custom_active_layout" }
+            }
+
+            manager.deleteCustomLayout("custom_active_layout")
+
+            withTimeout(5_000L) {
+                manager.activeLayout.first { it.id == LayoutManager.DEFAULT_LAYOUT_ID }
+            }
+            assertEquals(LayoutManager.DEFAULT_LAYOUT_ID, prefs.activeLayoutId.value)
+            assertEquals(LayoutManager.DEFAULT_LAYOUT_ID, manager.activeLayout.value.id)
+        }
+
+    @Test
+    fun `deleteCustomLayout ignores built in preset id`() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            File(context.filesDir, "layouts").deleteRecursively()
+            val prefs = KeyboardPreferences(context)
+            val manager = freshLayoutManager(context, prefs)
+
+            manager.deleteCustomLayout(LayoutManager.DEFAULT_LAYOUT_ID)
+
+            assertTrue(
+                manager.availableLayouts.value.any { it.id == LayoutManager.DEFAULT_LAYOUT_ID },
+            )
+        }
 }
