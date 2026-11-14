@@ -3,7 +3,12 @@ package com.uncoalesced.stickykeys.keyboardcore.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.test.core.app.ApplicationProvider
+import com.uncoalesced.stickykeys.keyboardcore.data.local.KeyboardPreferences
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -12,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 
 /**
  * The blank-canvas defence.
@@ -245,4 +251,106 @@ class ThemeFallbackTest {
         // key would light pixels it exists to keep dark.
         assertEquals(0f, shippedPreset("amoled_dark").keyStyle.hazeOpacity, 0.0001f)
     }
+
+    private suspend fun freshThemeManager(
+        context: android.content.Context,
+        prefs: KeyboardPreferences,
+    ): ThemeManager =
+        ThemeManager(context, prefs).also { manager ->
+            withTimeout(5_000L) {
+                manager.availableThemes.first { it.isNotEmpty() }
+            }
+        }
+
+    @Test
+    fun `deleteCustomTheme removes theme json and background files`() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val themesDir = File(context.filesDir, "themes").apply { deleteRecursively() }
+            val bgDir = File(context.filesDir, "theme_backgrounds").apply { deleteRecursively() }
+            val prefs = KeyboardPreferences(context)
+            prefs.setActiveThemeId(KeyboardTheme.FALLBACK_DARK_ID)
+
+            val manager = freshThemeManager(context, prefs)
+            val bgFile =
+                File(bgDir, "custom_delete_me.png").apply {
+                    parentFile?.mkdirs()
+                    writeBytes(byteArrayOf(1, 2, 3))
+                }
+            val custom =
+                shippedPreset("default_dark").copy(
+                    id = "custom_delete_me",
+                    name = "Delete Me",
+                    backgroundImagePath = bgFile.absolutePath,
+                )
+            manager.saveCustomTheme(custom)
+            val jsonFile = File(themesDir, "custom_delete_me.json")
+            assertTrue(jsonFile.exists())
+            assertTrue(bgFile.exists())
+            withTimeout(5_000L) {
+                manager.availableThemes.first { list -> list.any { it.id == "custom_delete_me" } }
+            }
+
+            manager.deleteCustomTheme("custom_delete_me")
+
+            withTimeout(5_000L) {
+                manager.availableThemes.first { list -> list.none { it.id == "custom_delete_me" } }
+            }
+            assertFalse(jsonFile.exists())
+            assertFalse(bgFile.exists())
+            assertTrue(
+                manager.availableThemes.value.any { it.id == KeyboardTheme.FALLBACK_DARK_ID },
+            )
+        }
+
+    @Test
+    fun `deleteCustomTheme falls back to default dark when active custom theme is deleted`() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            File(context.filesDir, "themes").deleteRecursively()
+            File(context.filesDir, "theme_backgrounds").deleteRecursively()
+            val prefs = KeyboardPreferences(context)
+            prefs.setActiveThemeId(KeyboardTheme.FALLBACK_DARK_ID)
+
+            val manager = freshThemeManager(context, prefs)
+            val custom =
+                shippedPreset("default_dark").copy(
+                    id = "custom_active_theme",
+                    name = "Active Custom",
+                )
+            manager.saveCustomTheme(custom)
+            withTimeout(5_000L) {
+                manager.availableThemes.first { list ->
+                    list.any { it.id == "custom_active_theme" }
+                }
+            }
+            prefs.setActiveThemeId("custom_active_theme")
+            withTimeout(5_000L) {
+                manager.activeTheme.first { it?.id == "custom_active_theme" }
+            }
+
+            manager.deleteCustomTheme("custom_active_theme")
+
+            withTimeout(5_000L) {
+                manager.activeTheme.first { it?.id == KeyboardTheme.FALLBACK_DARK_ID }
+            }
+            assertEquals(KeyboardTheme.FALLBACK_DARK_ID, prefs.activeThemeId.value)
+            assertEquals(KeyboardTheme.FALLBACK_DARK_ID, manager.activeTheme.value?.id)
+        }
+
+    @Test
+    fun `deleteCustomTheme ignores preset theme ids`() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            File(context.filesDir, "themes").deleteRecursively()
+            File(context.filesDir, "theme_backgrounds").deleteRecursively()
+            val prefs = KeyboardPreferences(context)
+            val manager = freshThemeManager(context, prefs)
+
+            manager.deleteCustomTheme(KeyboardTheme.FALLBACK_DARK_ID)
+
+            assertTrue(
+                manager.availableThemes.value.any { it.id == KeyboardTheme.FALLBACK_DARK_ID },
+            )
+        }
 }
