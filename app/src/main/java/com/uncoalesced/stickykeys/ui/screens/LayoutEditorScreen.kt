@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -25,6 +27,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -71,6 +74,40 @@ fun LayoutEditorScreen(
 
     var showRemapDialog by remember { mutableStateOf(false) }
     var remapTarget by remember { mutableStateOf<String?>(null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text(stringResource(R.string.title_delete_layout)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.msg_delete_layout_confirm,
+                        editingLayout.name,
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteCustomLayout(editingLayout.id)
+                        showDeleteDialog = false
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.text_delete),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text(stringResource(R.string.text_cancel))
+                }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -86,18 +123,18 @@ fun LayoutEditorScreen(
         ) {
             // Layout Selector
             Text(
-                text = "Saved Layouts",
+                text = stringResource(R.string.label_saved_layouts),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
-            Row(
+            LazyRow(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                availableLayouts.forEach { layout ->
+                items(availableLayouts, key = { it.id }) { layout ->
                     FilterChip(
                         selected = layout.id == editingLayout.id,
                         onClick = { viewModel.setActiveLayout(layout.id) },
@@ -109,11 +146,34 @@ fun LayoutEditorScreen(
             Divider()
 
             // Visual Layout Editor
-            Text(
-                text = "Editing: ${editingLayout.name}",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text =
+                        stringResource(
+                            R.string.label_editing_layout,
+                            editingLayout.name,
+                        ),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                if (!editingLayout.id.startsWith("preset_")) {
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription =
+                                stringResource(R.string.desc_delete_layout),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
 
             // Which plane is being edited. The symbol pages have been part of the saved
             // layout since v0.1.4 and were never reachable here, so a user could remap the
