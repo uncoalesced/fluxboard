@@ -215,13 +215,17 @@ internal class SpellingCorrector(
             cost: Int,
         ): Float {
             var baseScore = calcNormalizedScore(suggestion.score, cost, suggestion.word.length)
-            if (touches != null && touches.size == inputLen && suggestion.word.length == inputLen) {
-                var totalDist = 0f
-                for (idx in 0 until inputLen) {
-                    totalDist +=
-                        SmartKeyHitbox.euclideanDistance(touches[idx], suggestion.word[idx])
-                }
-                val avgDist = totalDist / inputLen
+            if (touches != null &&
+                touches.isNotEmpty() &&
+                touches.size == inputLen &&
+                suggestion.word.length == inputLen
+            ) {
+                val avgDist =
+                    BloomTriggerPredictor.alignedAverageTouchDistance(
+                        normalized,
+                        suggestion.word,
+                        touches,
+                    )
                 if (avgDist < 0.60f) {
                     baseScore *= (1.0f + (0.60f - avgDist) * 0.25f)
                 }
