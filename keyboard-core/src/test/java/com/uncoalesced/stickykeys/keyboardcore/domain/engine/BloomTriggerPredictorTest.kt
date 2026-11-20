@@ -242,4 +242,88 @@ class BloomTriggerPredictorTest {
         )
         assertTrue(decision.effectiveThreshold > BloomTriggerPredictor.BASE_MODEST_THRESHOLD)
     }
+
+    @Test
+    fun `adjacent transpositions with physical touch coordinates pass gate 5`() {
+        val tehTouches =
+            listOf(
+                TouchPoint('t', 0f, 0f, 1000L),
+                TouchPoint('e', 0f, 0f, 1090L),
+                TouchPoint('h', 0f, 0f, 1180L),
+            )
+        val tehCandidate =
+            ScoredCandidate(
+                word = "the",
+                cost = 3,
+                normalizedScore = 0.67f,
+                spatialScore = 0.67f,
+                bigramBoost = 0f,
+                finalScore = 0.67f,
+            )
+        val tehDecision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "teh",
+                topCandidate = tehCandidate,
+                touches = tehTouches,
+            )
+        assertTrue(
+            "teh -> the should pass touch coherence: ${tehDecision.reason}",
+            tehDecision.shouldAutoCommit,
+        )
+
+        val thierTouches =
+            listOf(
+                TouchPoint('t', 0f, 0f, 1000L),
+                TouchPoint('h', 0f, 0f, 1090L),
+                TouchPoint('i', 0f, 0f, 1180L),
+                TouchPoint('e', 0f, 0f, 1270L),
+                TouchPoint('r', 0f, 0f, 1360L),
+            )
+        val thierCandidate =
+            ScoredCandidate(
+                word = "their",
+                cost = 3,
+                normalizedScore = 0.65f,
+                spatialScore = 0.65f,
+                bigramBoost = 0f,
+                finalScore = 0.65f,
+            )
+        val thierDecision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "thier",
+                topCandidate = thierCandidate,
+                touches = thierTouches,
+            )
+        assertTrue(
+            "thier -> their should pass touch coherence: ${thierDecision.reason}",
+            thierDecision.shouldAutoCommit,
+        )
+    }
+
+    @Test
+    fun `distant non-transposed touches still fail gate 5`() {
+        val distantTouches =
+            listOf(
+                TouchPoint('z', 0f, 0f, 1000L),
+                TouchPoint('p', 0f, 0f, 1090L),
+                TouchPoint('m', 0f, 0f, 1180L),
+            )
+        val candidate =
+            ScoredCandidate(
+                word = "the",
+                cost = 5,
+                normalizedScore = 0.45f,
+                spatialScore = 0.45f,
+                bigramBoost = 0f,
+                finalScore = 0.45f,
+            )
+        val decision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "zpm",
+                topCandidate = candidate,
+                touches = distantTouches,
+            )
+        assertFalse(decision.shouldAutoCommit)
+        assertTrue(decision.reason.startsWith("Physical touch distance"))
+    }
 }
