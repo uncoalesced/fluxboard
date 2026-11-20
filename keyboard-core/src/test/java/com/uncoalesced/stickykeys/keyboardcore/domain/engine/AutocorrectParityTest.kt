@@ -220,4 +220,24 @@ class AutocorrectParityTest {
         runBlocking {
             assertEquals("their", engine.getAutoCorrection("thier"))
         }
+
+    @Test
+    fun `transposed words autocorrect when real touch points are supplied`() =
+        runBlocking {
+            mapOf(
+                "teh" to "the",
+                "thier" to "their",
+                "nad" to "and",
+            ).forEach { (typed, expected) ->
+                val touches =
+                    typed.mapIndexed { idx, ch ->
+                        TouchPoint(ch, 0f, 0f, 1000L + idx * 120L)
+                    }
+                assertEquals(
+                    "'$typed' with physical touches",
+                    expected,
+                    engine.getAutoCorrection(typed, touches = touches),
+                )
+            }
+        }
 }
