@@ -193,14 +193,11 @@ object BloomTriggerPredictor {
 
         // Gate 5: Physical Touch Coherence (if touches are present)
         if (touches != null &&
+            touches.isNotEmpty() &&
             touches.size == normalizedTyped.length &&
             candidateWord.length == normalizedTyped.length
         ) {
-            var totalDist = 0f
-            for (i in touches.indices) {
-                totalDist += SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i])
-            }
-            val avgDist = totalDist / touches.size
+            val avgDist = alignedAverageTouchDistance(normalizedTyped, candidateWord, touches)
             if (avgDist > 1.35f) {
                 return TriggerDecision(
                     shouldAutoCommit = false,
@@ -217,6 +214,35 @@ object BloomTriggerPredictor {
             effectiveThreshold = effectiveThreshold,
             reason = "Passed all Bloom Engine trigger criteria",
         )
+    }
+
+    /**
+     * Average 2D key-width distance between [touches] and [candidateWord], pairing swapped
+     * adjacent characters so transpositions are scored against the keys the user aimed for.
+     */
+    internal fun alignedAverageTouchDistance(
+        normalizedTyped: String,
+        candidateWord: String,
+        touches: List<TouchPoint>,
+    ): Float {
+        var totalDist = 0f
+        var i = 0
+        while (i < touches.size) {
+            if (i + 1 < touches.size &&
+                normalizedTyped[i] != candidateWord[i] &&
+                normalizedTyped[i] == candidateWord[i + 1] &&
+                normalizedTyped[i + 1] == candidateWord[i]
+            ) {
+                totalDist +=
+                    SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i + 1]) +
+                        SmartKeyHitbox.euclideanDistance(touches[i + 1], candidateWord[i])
+                i += 2
+            } else {
+                totalDist += SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i])
+                i += 1
+            }
+        }
+        return totalDist / touches.size
     }
 
     /**
