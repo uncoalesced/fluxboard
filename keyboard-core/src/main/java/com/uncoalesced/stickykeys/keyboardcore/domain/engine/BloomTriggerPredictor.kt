@@ -233,9 +233,8 @@ object BloomTriggerPredictor {
                 normalizedTyped[i] == candidateWord[i + 1] &&
                 normalizedTyped[i + 1] == candidateWord[i]
             ) {
-                totalDist +=
-                    SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i + 1]) +
-                        SmartKeyHitbox.euclideanDistance(touches[i + 1], candidateWord[i])
+                totalDist += SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i + 1])
+                totalDist += SmartKeyHitbox.euclideanDistance(touches[i + 1], candidateWord[i])
                 i += 2
             } else {
                 totalDist += SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i])
