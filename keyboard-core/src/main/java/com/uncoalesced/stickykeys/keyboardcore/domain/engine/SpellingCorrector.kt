@@ -492,7 +492,7 @@ internal class SpellingCorrector(
                 minOf(MAX_EDIT_COST, inputLen * MAX_COST_PER_LETTER)
             }
         val effectiveMaxCost = maxCostOverride ?: baseCap
-        val candidates = mutableListOf<Pair<Suggestion, Int>>()
+        val candidates = HashMap<String, Pair<Suggestion, Int>>(128)
         val touchCosts = buildTouchCostTable(normalized, touches)
         val poolDepth = inputLen + effectiveMaxCost + 4
         val rowPool = Array(poolDepth) { IntArray(inputLen + 1) }
@@ -501,11 +501,40 @@ internal class SpellingCorrector(
         }
         val wordBuf = CharArray(poolDepth)
         var readAny = false
+        var bestPrimaryCost = Int.MAX_VALUE
+        var bestPrimaryScore = 0f
+
+        fun mergeCandidate(
+            word: String,
+            score: Float,
+            dist: Int,
+        ) {
+            if (score <= 10f) return
+            val existing = candidates[word]
+            if (existing == null) {
+                candidates[word] = Suggestion(word, score) to dist
+            } else if (dist < existing.second || score > existing.first.score) {
+                candidates[word] =
+                    Suggestion(
+                        word,
+                        maxOf(existing.first.score, score),
+                    ) to minOf(existing.second, dist)
+            }
+        }
 
         dictionaries.forEachIndexed { dictIndex, dictProvider ->
             val buf = dictProvider() ?: return@forEachIndexed
             readAny = true
             val dictCandidates = mutableListOf<Pair<Suggestion, Int>>()
+            val dictMaxErrors =
+                if (dictIndex > 0 &&
+                    bestPrimaryCost <= COST_TRANSPOSE &&
+                    bestPrimaryScore > 0.60f
+                ) {
+                    minOf(effectiveMaxCost, COST_SUBSTITUTE)
+                } else {
+                    effectiveMaxCost
+                }
             try {
                 dfsEditDistance(
                     buf = buf,
@@ -515,7 +544,7 @@ internal class SpellingCorrector(
                     targetWord = normalized,
                     rowPool = rowPool,
                     prevChar = null,
-                    maxErrors = effectiveMaxCost,
+                    maxErrors = dictMaxErrors,
                     results = dictCandidates,
                     touches = touches,
                     touchCosts = touchCosts,
@@ -524,28 +553,26 @@ internal class SpellingCorrector(
                 // Safeguard against malformed offsets
             }
             if (dictIndex == 0) {
-                candidates.addAll(dictCandidates)
+                for ((sugg, dist) in dictCandidates) {
+                    if (sugg.score <= 10f) continue
+                    if (dist < bestPrimaryCost) bestPrimaryCost = dist
+                    val norm = calcNormalizedScore(sugg.score, dist, sugg.word.length)
+                    if (norm > bestPrimaryScore) bestPrimaryScore = norm
+                    mergeCandidate(sugg.word, sugg.score, dist)
+                }
             } else {
                 // Supplemental lexicon candidates receive a source discount when non-exact
                 // so obscure proper nouns do not outscore core English words at the same cost.
                 for ((sugg, dist) in dictCandidates) {
                     if (dist == 0 && !hasWord(sugg.word)) continue
                     val discountedScore = if (dist == 0) sugg.score else sugg.score * 0.82f
-                    candidates.add(Suggestion(sugg.word, discountedScore) to dist)
+                    mergeCandidate(sugg.word, discountedScore, dist)
                 }
             }
         }
         if (!readAny) return null
 
-        // Deduplicate candidates present in multiple lexicons, preserving the highest frequency and lowest cost
-        return candidates
-            .filter { it.first.score > 10f }
-            .groupBy { it.first.word }
-            .map { (word, list) ->
-                val minCost = list.minOf { it.second }
-                val maxScore = list.maxOf { it.first.score }
-                Pair(Suggestion(word, maxScore), minCost)
-            }
+        return candidates.values.toList()
     }
 
     /**
@@ -799,17 +826,11 @@ internal class SpellingCorrector(
         val prevRow = if (depth > 0) rowPool[depth - 1] else null
         val targetLen = targetWord.length
         val distance = currentRow[targetLen]
-        if (isTerminal == 1 && distance <= maxErrors) {
+        if (isTerminal == 1 && distance <= maxErrors && freq > 10) {
             results.add(Pair(Suggestion(String(wordBuf, 0, depth), freq.toFloat()), distance))
         }
 
         if (childCount == 0 || depth + 1 >= rowPool.size) return
-
-        var minInRow = Int.MAX_VALUE
-        for (v in currentRow) {
-            if (v < minInRow) minInRow = v
-        }
-        if (minInRow > maxErrors) return // prune branch entirely
 
         val nextRow = rowPool[depth + 1]
         val childrenStart = offset + 3
@@ -826,7 +847,9 @@ internal class SpellingCorrector(
                 } else {
                     COST_GAP
                 }
-            nextRow[0] = currentRow[0] + stepDeleteCost
+            val row0 = currentRow[0] + stepDeleteCost
+            nextRow[0] = row0
+            var minNext = row0
             val childAlphaIdx = childChar.code - 'a'.code
             val isAsciiLower = childAlphaIdx in 0..25
 
@@ -865,21 +888,24 @@ internal class SpellingCorrector(
                 }
 
                 nextRow[i] = cost
+                if (cost < minNext) minNext = cost
             }
-            wordBuf[depth] = childChar
-            dfsEditDistance(
-                buf = buf,
-                offset = childOffset,
-                depth = depth + 1,
-                wordBuf = wordBuf,
-                targetWord = targetWord,
-                rowPool = rowPool,
-                prevChar = childChar,
-                maxErrors = maxErrors,
-                results = results,
-                touches = touches,
-                touchCosts = touchCosts,
-            )
+            if (minNext <= maxErrors) {
+                wordBuf[depth] = childChar
+                dfsEditDistance(
+                    buf = buf,
+                    offset = childOffset,
+                    depth = depth + 1,
+                    wordBuf = wordBuf,
+                    targetWord = targetWord,
+                    rowPool = rowPool,
+                    prevChar = childChar,
+                    maxErrors = maxErrors,
+                    results = results,
+                    touches = touches,
+                    touchCosts = touchCosts,
+                )
+            }
         }
     }
 
