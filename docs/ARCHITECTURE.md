@@ -2,7 +2,7 @@
 
 # Architecture
 
-What the code actually does, as of `v0.1.5-BETA`. Where a decision looks odd, the
+What the code actually does, as of `v1.0.0-testing`. Where a decision looks odd, the
 reason is usually that the obvious version was tried and broke something.
 
 ## Principles
@@ -115,20 +115,42 @@ The dictionary is one shared `MappedByteBuffer`. Every read takes its own cursor
 via `duplicate()`, because navigating the shared instance's position corrupts
 concurrent lookups.
 
-`PredictionEngine` maps the dictionary, learns words and ranks completions. The
-glide decoder (`GlideDecoder`) and spelling correction (`SpellingCorrector`) are
-plain classes with no Android in them, built from a function that hands out
-cursors, so tests can run them on a JVM against the shipped `base_dict.bin`.
-`Flictionary.kt` describes the file format and holds the exact-word lookup they
-share.
+`PredictionEngine` maps the compiled dictionaries (`base_dict.bin`,
+`names_dict.bin`) and bigram model (`bigram_lm.bin`), coordinates
+`PersonalLearningEngine` across in-memory L1 caches (`BloomPersonalLexicon`,
+`BloomPersonalBigramCache`) and Room L2 storage (`PersonalWordEntity`,
+`PersonalBigramEntity` in `keyboard_database`), and ranks completions.
+`PersonalLearningEngine` isolates single-occurrence out-of-vocabulary typos via
+OOV typo quarantine until repeated and applies 14-day smooth exponential decay
+alongside capacity pruning.
 
-Edit costs are weighted by key geometry rather than uniform. Uniform costs make
-every one-edit candidate a tie, which hands the decision to raw frequency and
-picks the commoner word over the one the user's finger explains.
+On-device adaptive spatial, trajectory, and threshold modeling sits in
+`BloomSpatialProfile` (`bloom_profile.bin` per-key glide centroid offsets with
+snapshot/rollback on revert), `SmartKeyHitbox` (anisotropic 2D Gaussian tap
+centroids and X/Y variances in `bloom_tap_profile.bin`, plus context-weighted
+boundary hit-testing near key borders), `BloomMemoryVault` (`bloom_user_memory.bin`
+SHA-256-verified unified snapshot across app updates, deleted atomically with the
+other `.bin` stores via `BloomStateFiles` on clear), `BloomAdaptiveThreshold`
+(local autocorrect threshold calibration tuned from accept/revert feedback),
+`BloomTrajectoryAligner` and `BloomTypeDecoder` (48-point arc-length trajectory
+resampling and DTW glide beam search), `BloomTriggerPredictor` (multi-gate
+autocorrect commit scoring), and `BloomRevertHistory` (session-scoped undo
+suppression). The glide decoder (`GlideDecoder`) and spelling correction
+(`SpellingCorrector`) are plain Kotlin classes with no Android dependencies, built
+from a function that hands out cursors so JVM tests can run against the shipped
+dictionary binaries directly. `Flictionary.kt` describes the trie format and holds
+the exact-word lookup they share.
 
-Two things sit outside the edit-distance search because no such search can find
-them: case is restored from the typed word, and a key pressed instead of the space
-bar produces two valid words joined by junk.
+Edit costs are weighted by key geometry (`SmartKeyHitbox` and `KeyProximity`)
+rather than uniform, with branch-and-bound pruning inside `dfsEditDistance`.
+Uniform costs make every one-edit candidate a tie, which hands the decision to raw
+frequency and picks the commoner word over the one the user's finger explains.
+
+Several repairs sit outside the edit-distance trie walk: case is restored from the
+typed word, adjacent transpositions pair swapped touch coordinates, and compound
+run-on space splitting separates missing-space joins (`alot`, `thankyou`,
+`goodmorning`, `ofcourse`, `inorder`, and mispressed space-neighbour joins) with
+full multi-word Backspace and suggestion-chip undo.
 
 Key commits are synchronous. Space and word-ending punctuation commit first, then
 apply any correction as a follow-up edit guarded by a generation token. A key
@@ -145,8 +167,11 @@ text fields do not set it for passwords.
 
 Write gating and read gating are separate on purpose. Incognito suspends writes and
 leaves reads working, which is right for a field the host merely asked not to learn
-from and wrong for a password. A sensitive field suppresses suggestions, autocorrect,
-and glide decoding as well.
+from and wrong for a password. All privacy-gated states (password, PIN, and
+credential fields, `IME_FLAG_NO_PERSONALIZED_LEARNING`, and manual Private Mode)
+disable word/bigram learning, hitbox calibration, adaptive threshold updates, and
+context-weighted hit-testing; sensitive fields and manual Private Mode suppress
+suggestions, autocorrect, and glide decoding as well.
 
 ## Themes and layouts
 
