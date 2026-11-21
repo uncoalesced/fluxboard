@@ -279,6 +279,67 @@ class AutocorrectUndoTest {
         }
 
     @Test
+    fun `punctuation correction settled before trailing space keeps undo across space`() =
+        runTest(dispatcher) {
+            val controller = MutableBufferController()
+            "Recieve".forEach { ch -> pressKey(ch.toString(), controller, this) }
+            coEvery { engine.getAutoCorrection("Recieve", any(), any(), any()) } returns "Receive"
+
+            pressKey(".", controller, this)
+            advanceUntilIdle()
+
+            assertEquals("Receive.", controller.text)
+            assertEquals(
+                UndoAction("Recieve", "Receive", suffix = "."),
+                viewModel.undoState.value,
+            )
+
+            pressKey("SPACE", controller, this)
+            advanceUntilIdle()
+
+            assertEquals("Receive. ", controller.text)
+            val expectedUndo = UndoAction("Recieve", "Receive", suffix = ". ")
+            assertEquals(expectedUndo, viewModel.autocorrectToRevert(controller.text))
+
+            // Verify chip undo span covers both the word and its ". " suffix.
+            val chipController = MutableBufferController(controller.text)
+            val undo = viewModel.undoState.value!!
+            chipController.replaceTextBeforeCursor(
+                undo.corrected.length + undo.suffix.length,
+                undo.original + undo.suffix,
+            )
+            assertEquals("Recieve. ", chipController.text)
+
+            // Verify backspace reverts "Receive. " cleanly back to "Recieve".
+            pressKey("DEL", controller, this)
+            advanceUntilIdle()
+
+            assertEquals("Recieve", controller.text)
+            assertEquals("Recieve", viewModel.getCurrentWord())
+            assertNull(viewModel.undoState.value)
+
+            // A second consecutive space clears the carried punctuation undo state.
+            val secondController = MutableBufferController()
+            "Beacuse".forEach { ch -> pressKey(ch.toString(), secondController, this) }
+            coEvery { engine.getAutoCorrection("Beacuse", any(), any(), any()) } returns "Because"
+
+            pressKey(".", secondController, this)
+            advanceUntilIdle()
+            pressKey("SPACE", secondController, this)
+            advanceUntilIdle()
+            assertEquals(
+                UndoAction("Beacuse", "Because", suffix = ". "),
+                viewModel.autocorrectToRevert(secondController.text),
+            )
+
+            pressKey("SPACE", secondController, this)
+            advanceUntilIdle()
+
+            assertNull(viewModel.undoState.value)
+            assertNull(viewModel.autocorrectToRevert(secondController.text))
+        }
+
+    @Test
     fun `fast typing after space cancels rewrite without learning the typo`() =
         runTest(dispatcher) {
             val controller = MutableBufferController()
