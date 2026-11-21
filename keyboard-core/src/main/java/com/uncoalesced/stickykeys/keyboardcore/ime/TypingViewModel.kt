@@ -21,11 +21,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.abs
 
 data class UndoAction(
     val original: String,
     val corrected: String,
     val priorWord: String? = null,
+    val suffix: String = " ",
 )
 
 @HiltViewModel
@@ -79,6 +81,13 @@ class TypingViewModel
 
         val bloomTypeBiomechanicalLearning: StateFlow<Boolean> =
             keyboardPreferences.bloomTypeBiomechanicalLearning
+
+        private fun isBiomechanicalLearningEnabled(): Boolean {
+            // Tests using relaxed mock preferences omit stubbing this flow, whose erased
+            // StateFlow.value returns java.lang.Object instead of Boolean.
+            val flow: StateFlow<Any?> = keyboardPreferences.bloomTypeBiomechanicalLearning
+            return flow.value as? Boolean ?: false
+        }
 
         fun setBloomTypeBiomechanicalLearning(enabled: Boolean) {
             keyboardPreferences.setBloomTypeBiomechanicalLearning(enabled)
@@ -240,7 +249,9 @@ class TypingViewModel
             previousWord = null
             _suggestions.value = emptyList()
             _undoState.value = null
-            currentWordTouches.clear()
+            synchronized(currentWordTouches) {
+                currentWordTouches.clear()
+            }
             predictionEngine.clearReverts()
             generation++
             detectedFieldKind = fieldKind
@@ -292,7 +303,9 @@ class TypingViewModel
         fun onInputFinished() {
             detectedFieldKind = FieldKind.NORMAL
             hostNoLearning = false
-            currentWordTouches.clear()
+            synchronized(currentWordTouches) {
+                currentWordTouches.clear()
+            }
             predictionEngine.clearReverts()
             publishPrivacy()
         }
@@ -354,7 +367,7 @@ class TypingViewModel
             learn(word)
             if (stroke != null &&
                 !_fieldKind.value.isSensitive &&
-                keyboardPreferences.bloomTypeBiomechanicalLearning.value
+                isBiomechanicalLearningEnabled()
             ) {
                 val trajectory = stroke.bloomTrajectory
                 if (trajectory != null && stroke.keyCentroids.isNotEmpty()) {
@@ -500,6 +513,22 @@ class TypingViewModel
             typingStats.recordWord()
             if (incognitoState.active.value) return
             val prev = previousWord
+            if (word.contains(' ')) {
+                val parts = word.trim().split(' ').filter { it.isNotBlank() }
+                if (parts.isEmpty()) return
+                previousWord = parts.last().lowercase()
+                viewModelScope.launch {
+                    var p = prev
+                    for (part in parts) {
+                        predictionEngine.learnWord(part)
+                        if (!p.isNullOrBlank()) {
+                            predictionEngine.learnBigram(p, part)
+                        }
+                        p = part.lowercase()
+                    }
+                }
+                return
+            }
             previousWord = word.lowercase()
             viewModelScope.launch {
                 predictionEngine.learnWord(word)
@@ -507,6 +536,71 @@ class TypingViewModel
                     predictionEngine.learnBigram(prev, word)
                 }
             }
+        }
+
+        fun consumeWordTouches(): List<TouchPoint> =
+            synchronized(currentWordTouches) {
+                val snapshot = currentWordTouches.toList()
+                currentWordTouches.clear()
+                snapshot
+            }
+
+        /**
+         * Context-weighted spatial hit-testing: resolves an off-center border tap onto its
+         * nearest QWERTY neighbor when the current word prefix strongly supports that
+         * continuation over the nominally pressed key.
+         */
+        fun resolveContextWeightedKey(
+            keyLabel: String,
+            touchPoint: TouchPoint?,
+        ): Pair<String, TouchPoint?> {
+            if (touchPoint == null ||
+                keyLabel.length != 1 ||
+                !keyLabel[0].isLetter() ||
+                _fieldKind.value.isSensitive ||
+                !keyboardPreferences.autoCorrectEnabled.value ||
+                currentWord.isEmpty() ||
+                (abs(touchPoint.normalizedX) < 0.28f && abs(touchPoint.normalizedY) < 0.28f)
+            ) {
+                return keyLabel to touchPoint
+            }
+
+            val typedLower = keyLabel[0].lowercaseChar()
+            val (neighborChar, neighborDist) =
+                SmartKeyHitbox.nearestNeighborInDirection(
+                    typedLower,
+                    touchPoint,
+                    maxDist = 0.85f,
+                ) ?: return keyLabel to touchPoint
+
+            val scores =
+                predictionEngine.continuationScoresForPrefix(
+                    currentWord,
+                    listOf(typedLower, neighborChar),
+                )
+            val typedScore = scores[typedLower] ?: 0f
+            val neighborScore = scores[neighborChar] ?: 0f
+            val shouldFlip =
+                (typedScore <= 0f && neighborScore > 0f && neighborDist <= 0.82f) ||
+                    (
+                        typedScore > 0f &&
+                            neighborScore >= typedScore * 1.8f &&
+                            neighborScore >= 180f &&
+                            neighborDist <= 0.72f
+                    )
+            if (!shouldFlip) {
+                return keyLabel to touchPoint
+            }
+
+            val resolvedChar =
+                if (keyLabel[0].isUpperCase()) neighborChar.uppercaseChar() else neighborChar
+            val (adjX, adjY) = SmartKeyHitbox.reprojectTouchOffset(touchPoint, neighborChar)
+            return resolvedChar.toString() to
+                touchPoint.copy(
+                    char = resolvedChar,
+                    normalizedX = adjX,
+                    normalizedY = adjY,
+                )
         }
 
         fun performKeyPressHaptic() {
@@ -532,7 +626,9 @@ class TypingViewModel
             backspacedWord = null
             currentWord += char
             if (char.length == 1) {
-                currentWordTouches.add(touchPoint ?: TouchPoint(char[0], 0f, 0f))
+                synchronized(currentWordTouches) {
+                    currentWordTouches.add(touchPoint ?: TouchPoint(char[0], 0f, 0f))
+                }
             }
             _undoState.value = null // Typing clears undo state
             generation++
@@ -561,9 +657,11 @@ class TypingViewModel
          */
         fun onKeyRevoked(char: String) {
             currentWord = currentWord.dropLast(char.length)
-            repeat(char.length.coerceAtMost(currentWordTouches.size)) {
-                if (currentWordTouches.isNotEmpty()) {
-                    currentWordTouches.removeAt(currentWordTouches.size - 1)
+            synchronized(currentWordTouches) {
+                repeat(char.length.coerceAtMost(currentWordTouches.size)) {
+                    if (currentWordTouches.isNotEmpty()) {
+                        currentWordTouches.removeAt(currentWordTouches.size - 1)
+                    }
                 }
             }
             atSentenceStart = atSentenceStartBeforeKey
@@ -585,7 +683,9 @@ class TypingViewModel
          */
         fun onSymbolCommitted(text: String): Int {
             currentWord = ""
-            currentWordTouches.clear()
+            synchronized(currentWordTouches) {
+                currentWordTouches.clear()
+            }
             _suggestions.value = emptyList()
             _undoState.value = null
             // "." "!" "?" open a new sentence; anything else just continues.
@@ -667,8 +767,10 @@ class TypingViewModel
                     } else {
                         currentWord.dropLast(1)
                     }
-                if (currentWordTouches.isNotEmpty()) {
-                    currentWordTouches.removeAt(currentWordTouches.size - 1)
+                synchronized(currentWordTouches) {
+                    if (currentWordTouches.isNotEmpty()) {
+                        currentWordTouches.removeAt(currentWordTouches.size - 1)
+                    }
                 }
                 // Deleting back to nothing puts the caret where a sentence would start again,
                 // so capitalization has to come back with it. Forcing this false
@@ -742,6 +844,9 @@ class TypingViewModel
          */
         fun onSentenceStarted(): Int {
             currentWord = ""
+            synchronized(currentWordTouches) {
+                currentWordTouches.clear()
+            }
             // The last word of the previous sentence does not predict the first word of the
             // next one -- a bigram across a full stop is two unrelated words that happened to
             // be adjacent, which is exactly the pairing the corpus counts and the user did not
@@ -763,14 +868,18 @@ class TypingViewModel
         fun onWordAccepted(
             word: String,
             offerCorrections: Boolean = false,
+            touchesSnapshot: List<TouchPoint>? = null,
         ) {
             if (word.isNotBlank()) {
-                if (currentWordTouches.isNotEmpty()) {
-                    if (!_fieldKind.value.isSensitive) {
-                        SmartKeyHitbox.adaptWord(currentWordTouches)
+                val touches = touchesSnapshot ?: consumeWordTouches()
+                if (touches.isNotEmpty()) {
+                    if (!_fieldKind.value.isSensitive &&
+                        !incognitoState.active.value &&
+                        isBiomechanicalLearningEnabled()
+                    ) {
+                        SmartKeyHitbox.adaptWord(touches)
                         predictionEngine.saveBloomTapProfileAsync()
                     }
-                    currentWordTouches.clear()
                 }
                 learn(word)
                 if (offerCorrections && !_fieldKind.value.isSensitive) {
@@ -786,6 +895,10 @@ class TypingViewModel
                 // the strip with its own losing readings straight afterwards -- a refresh hidden
                 // in `learn` would dispatch under the same generation token and overwrite them.
                 updateSuggestions()
+            } else if (touchesSnapshot == null) {
+                synchronized(currentWordTouches) {
+                    currentWordTouches.clear()
+                }
             }
         }
 
@@ -837,26 +950,54 @@ class TypingViewModel
         suspend fun getAutoCorrectionFor(
             word: String,
             startsClause: Boolean = false,
+            touchesSnapshot: List<TouchPoint>? = null,
         ): String? {
             // Never on a secret, for two separate reasons: the lookup itself puts the password
             // through the dictionary, and a correction that fired would silently rewrite what
             // the user typed into a field where they cannot see it to check.
             if (_fieldKind.value.isSensitive) return null
             if (word.isBlank() || !keyboardPreferences.autoCorrectEnabled.value) return null
-            val touches = synchronized(currentWordTouches) { currentWordTouches.toList() }
+            val touches =
+                touchesSnapshot ?: synchronized(currentWordTouches) { currentWordTouches.toList() }
             return predictionEngine.getAutoCorrection(word, previousWord, startsClause, touches)
         }
 
         fun onAutoCorrected(
             original: String,
             corrected: String,
+            suffix: String = " ",
+            touchesSnapshot: List<TouchPoint>? = null,
         ) {
             usageLog.onAutocorrectAccepted()
             typingStats.recordAutocorrectAccepted()
-            _undoState.value = UndoAction(original, corrected, priorWord = previousWord)
+            val touches =
+                if (touchesSnapshot != null) {
+                    synchronized(currentWordTouches) {
+                        currentWordTouches.clear()
+                    }
+                    touchesSnapshot
+                } else {
+                    consumeWordTouches()
+                }
+            _undoState.value =
+                UndoAction(
+                    original = original,
+                    corrected = corrected,
+                    priorWord = previousWord,
+                    suffix = suffix,
+                )
             currentWord = ""
-            currentWordTouches.clear()
             _suggestions.value = emptyList()
+            if (!incognitoState.active.value) {
+                val learnSpatial =
+                    !_fieldKind.value.isSensitive &&
+                        isBiomechanicalLearningEnabled()
+                predictionEngine.recordAutoCorrectAccepted(
+                    touches = touches,
+                    targetWord = corrected,
+                    learnSpatial = learnSpatial,
+                )
+            }
             learn(corrected)
         }
 
@@ -874,11 +1015,12 @@ class TypingViewModel
             val undoneAction = _undoState.value
             _undoState.value = null
             if (undoneAction != null) {
-                predictionEngine.recordRevert(original)
-                predictionEngine.personalLearningEngine.onWordReverted(
-                    undoneAction.priorWord,
-                    undoneAction.corrected,
-                )
+                if (!incognitoState.active.value) {
+                    predictionEngine.recordAutoCorrectReverted(original)
+                } else {
+                    predictionEngine.recordRevert(original)
+                }
+                revertLearnedWords(undoneAction.priorWord, undoneAction.corrected)
             }
             keep(original)
             previousWord = original
@@ -889,17 +1031,18 @@ class TypingViewModel
          * delete.
          *
          * Only straight after the correction, while the text still ends in exactly what the
-         * space path wrote ("corrected "). Anything typed, deleted or moved since clears the
+         * trigger wrote (`corrected + suffix`). Anything typed, deleted or moved since clears the
          * undo state or changes that ending, so a later backspace is never mistaken for one.
          */
         fun autocorrectToRevert(textBeforeCursor: String): UndoAction? {
             val undo = _undoState.value ?: return null
-            return if (textBeforeCursor.endsWith(undo.corrected + " ")) undo else null
+            return if (textBeforeCursor.endsWith(undo.corrected + undo.suffix)) undo else null
         }
 
         /**
-         * A backspace took back a correction: the caller replaced "corrected " with [original],
-         * with the caret at the end of it, so the user can keep editing the word they typed.
+         * A backspace took back a correction: the caller replaced `corrected + suffix` with
+         * [original], with the caret at the end of it, so the user can keep editing the word they
+         * typed.
          *
          * Kept, like an undo from the chip, so pressing space again does not re-apply the same
          * correction. The word under the caret is [original] again, and the strip follows it.
@@ -916,19 +1059,38 @@ class TypingViewModel
             if (undoneAction != null) {
                 previousWord = undoneAction.priorWord
             }
-            currentWordTouches.clear()
+            synchronized(currentWordTouches) {
+                currentWordTouches.clear()
+            }
             generation++
             atSentenceStart = false
             publishAutoCapitalize()
-            predictionEngine.recordRevert(original)
+            if (!incognitoState.active.value) {
+                predictionEngine.recordAutoCorrectReverted(original)
+            } else {
+                predictionEngine.recordRevert(original)
+            }
             if (undoneAction != null) {
-                predictionEngine.personalLearningEngine.onWordReverted(
-                    undoneAction.priorWord,
-                    undoneAction.corrected,
-                )
+                revertLearnedWords(undoneAction.priorWord, undoneAction.corrected)
             }
             keep(original)
             updateSuggestions()
+        }
+
+        private fun revertLearnedWords(
+            priorWord: String?,
+            corrected: String,
+        ) {
+            if (!corrected.contains(' ')) {
+                predictionEngine.personalLearningEngine.onWordReverted(priorWord, corrected)
+                return
+            }
+            val parts = corrected.trim().split(' ').filter { it.isNotBlank() }
+            var prev = priorWord
+            for (part in parts) {
+                predictionEngine.personalLearningEngine.onWordReverted(prev, part)
+                prev = part.lowercase()
+            }
         }
 
         /** [PredictionEngine.keepWord] behind the same incognito gate as [learn]. */
@@ -978,7 +1140,9 @@ class TypingViewModel
          */
         fun onWordAbandoned() {
             currentWord = ""
-            currentWordTouches.clear()
+            synchronized(currentWordTouches) {
+                currentWordTouches.clear()
+            }
             _suggestions.value = emptyList()
         }
 
@@ -988,7 +1152,9 @@ class TypingViewModel
         fun onWordDeleted(remainingTextBeforeCursor: String) {
             currentWord = wordUnderCaret(remainingTextBeforeCursor)
             previousWord = precedingWord(remainingTextBeforeCursor)
-            currentWordTouches.clear()
+            synchronized(currentWordTouches) {
+                currentWordTouches.clear()
+            }
             backspacedWord = null
             _undoState.value = null
             generation++
@@ -1036,7 +1202,7 @@ class TypingViewModel
                 if (trajectory != null &&
                     stroke.keyCentroids.isNotEmpty() &&
                     !_fieldKind.value.isSensitive &&
-                    keyboardPreferences.bloomTypeBiomechanicalLearning.value
+                    isBiomechanicalLearningEnabled()
                 ) {
                     predictionEngine.correctGlideLearning(
                         wrongWord = wrongWord,
