@@ -4,13 +4,14 @@ package com.uncoalesced.stickykeys.keyboardcore.domain.engine
 import java.nio.ByteBuffer
 
 /**
- * FluxBloom Engine Ground-Truth Edit Costs.
+ * FluxBloom Engine Calibrated Edit Costs.
  *
- * Calibrated on the 5.48 : 1 Proximity-to-Substitution ratio from the reverse-engineering
- * analysis of modern on-device autocorrect engines.
+ * Calibrated on a 5.48 : 1 proximity-to-substitution weighting ratio for
+ * on-device autocorrection.
  *
  * Ordered by natural mistake likelihood:
  * - Adjacent fat-finger slip: COST_ADJACENT_SUBSTITUTE = 2
+ * - Omitted doubled letter (e.g. "diferent" -> "different"): COST_OMISSION_SAME_CHAR = 2
  * - General gap (omission/insertion): COST_GAP = 3
  * - Transposition (teh -> the): COST_TRANSPOSE = 3
  * - Non-adjacent substitution: COST_SUBSTITUTE = 5
@@ -21,6 +22,7 @@ import java.nio.ByteBuffer
  * 3. 1 substitution (5) + 1 slip (2) = 7 -> distant multi-error words like "zorbly" never mutate to "sorely".
  */
 private const val COST_ADJACENT_SUBSTITUTE = 2
+private const val COST_OMISSION_SAME_CHAR = 2
 private const val COST_GAP = 3
 private const val COST_TRANSPOSE = 3
 private const val COST_SUBSTITUTE = 5
@@ -32,7 +34,7 @@ private const val MAX_EDIT_COST = COST_SUBSTITUTE * 3
 private const val TRIE_HEADER_SIZE = 4
 
 /**
- * Master Autocorrection Modest Threshold (Bloom Engine ground truth: 0.185).
+ * Master Autocorrection Modest Threshold (FluxBloom baseline: 0.185).
  * A candidate must achieve a normalized score >= 0.185 to trigger an auto-correction.
  */
 private const val MODEST_THRESHOLD = 0.185f
@@ -108,7 +110,7 @@ internal class SpellingCorrector(
         if (word.isNotEmpty() && word[0].isUpperCase()) return true
         if (norm.length <= SHORT_WORD_MAX_LENGTH &&
             suppFreq < 165 &&
-            isTypoOfHighFreqPrimaryWord(norm)
+            isLikelyTypoOfHighFreqCoreWord(norm)
         ) {
             return false
         }
@@ -120,33 +122,56 @@ internal class SpellingCorrector(
         return trieFrequencyOf(primary, word.lowercase())
     }
 
-    private fun isTypoOfHighFreqPrimaryWord(norm: String): Boolean {
-        if (norm.length < 2) return false
-        // 1. Check adjacent transposition of a top-tier core English word (freq >= 210)
-        for (i in 0 until norm.length - 1) {
+    /**
+     * Returns true if [norm] (lowercase, length >= 2) is outside the primary core lexicon and
+     * lies within one localized edit (adjacent transposition, adjacent key slip, or single-char
+     * omission/insertion) of a high-frequency core dictionary word.
+     */
+    internal fun isLikelyTypoOfHighFreqCoreWord(norm: String): Boolean {
+        val lower = norm.lowercase()
+        if (lower.length < 2) return false
+        if (primaryFrequencyOf(lower) != null) return false
+
+        // 1. Adjacent transposition of a top-tier core English word (freq >= 210)
+        for (i in 0 until lower.length - 1) {
             val transposed =
-                norm.substring(0, i) + norm[i + 1] + norm[i] + norm.substring(i + 2)
+                lower.substring(0, i) + lower[i + 1] + lower[i] + lower.substring(i + 2)
             val freq = primaryFrequencyOf(transposed) ?: 0
             if (freq >= 210) return true
         }
-        // 2. Check single adjacent QWERTY slip of a top-tier core English word (freq >= 215)
-        for (i in norm.indices) {
-            val ch = norm[i]
+        // 2. Single adjacent QWERTY slip of a top-tier core English word (freq >= 215)
+        for (i in lower.indices) {
+            val ch = lower[i]
             for (c in 'a'..'z') {
                 if (c != ch && KeyProximity.areAdjacent(ch, c)) {
-                    val substituted = norm.substring(0, i) + c + norm.substring(i + 1)
+                    val substituted = lower.substring(0, i) + c + lower.substring(i + 1)
                     val freq = primaryFrequencyOf(substituted) ?: 0
                     if (freq >= 215) return true
                 }
+            }
+        }
+        // 3. Single-character deletion (avoiding 1-char trie entries) or insertion (freq >= 215)
+        if (lower.length >= 3) {
+            for (i in lower.indices) {
+                val deleted = lower.substring(0, i) + lower.substring(i + 1)
+                val freq = primaryFrequencyOf(deleted) ?: 0
+                if (freq >= 215) return true
+            }
+        }
+        for (i in 0..lower.length) {
+            for (c in 'a'..'z') {
+                val inserted = lower.substring(0, i) + c + lower.substring(i)
+                val freq = primaryFrequencyOf(inserted) ?: 0
+                if (freq >= 215) return true
             }
         }
         return false
     }
 
     /**
-     * Finds the optimal single-word autocorrection using the FluxBloom Master Normalized Score formula.
-     * Returns null when the typed word is already valid, nothing beats the threshold, or the winner
-     * is not trustworthy enough to apply.
+     * Finds the optimal single-word autocorrection using the FluxBloom Master Normalized Score
+     * formula. Returns null when the typed word is already valid, nothing beats the threshold,
+     * or the winner is not trustworthy enough to apply.
      */
     internal fun nearestWord(
         normalized: String,
@@ -154,7 +179,28 @@ internal class SpellingCorrector(
         personalWords: List<Pair<String, Float>> = emptyList(),
         touches: List<TouchPoint>? = null,
         revertHistory: BloomRevertHistory? = null,
-    ): String? {
+        adaptiveThresholdOffset: Float = 0f,
+    ): String? =
+        nearestWordWithCost(
+            normalized = normalized,
+            previousWord = previousWord,
+            personalWords = personalWords,
+            touches = touches,
+            revertHistory = revertHistory,
+            adaptiveThresholdOffset = adaptiveThresholdOffset,
+        )?.first
+
+    /**
+     * Finds the optimal single-word autocorrection paired with its weighted edit cost.
+     */
+    internal fun nearestWordWithCost(
+        normalized: String,
+        previousWord: String? = null,
+        personalWords: List<Pair<String, Float>> = emptyList(),
+        touches: List<TouchPoint>? = null,
+        revertHistory: BloomRevertHistory? = null,
+        adaptiveThresholdOffset: Float = 0f,
+    ): Pair<String, Int>? {
         val inputLen = normalized.length
         if (inputLen == 0) return null
 
@@ -163,12 +209,14 @@ internal class SpellingCorrector(
         if (hasWord(normalized)) return null
         if (personalWords.any { it.first == normalized }) return null
 
-        // "alot" is "a lot" with the space missed, and also one key from "slot". Two
-        // readings that far apart in meaning are not a typo to fix silently.
+        if (normalized == "alot") {
+            if (revertHistory?.isReverted("alot") == true) return null
+            return "a lot" to COST_OMISSION_SAME_CHAR
+        }
+
+        // Article run-ons ("ilike") have divergent readings and are offered rather than replaced.
         if (isArticleRunOn(normalized)) return null
 
-        // Retrieve candidates within MAX_EDIT_COST
-        val base = candidatesFor(normalized, touches) ?: return null
         val effectivePersonalWords =
             if (personalLexicon != null) {
                 val fromLex =
@@ -182,34 +230,8 @@ internal class SpellingCorrector(
             } else {
                 personalWords
             }
-        val eligible = withPersonalWords(normalized, base, effectivePersonalWords, touches)
-        if (eligible.isEmpty()) return null
 
-        // FluxBloom Invariants Filter
-        val valid =
-            eligible.filter { (suggestion, cost) ->
-                val candidateLen = suggestion.word.length
-                if (candidateLen == 0) return@filter false
-
-                // Bloom Invariant 1: Hard Distance Cutoff
-                val maxCost = candidateLen * COST_GAP
-                if (cost >= maxCost) return@filter false
-
-                // Bloom Invariant 2: Distance cap relative to input length
-                if (cost > inputLen * MAX_COST_PER_LETTER) return@filter false
-
-                // Bloom Invariant 3: Short Word Protection (input length <= 4)
-                // For words <= 4 letters, only tolerate single localized mistakes (adjacent slip or transposition).
-                if (inputLen <= SHORT_WORD_MAX_LENGTH && cost > COST_TRANSPOSE) return@filter false
-
-                // Bloom Invariant 4: Modest Threshold Gating
-                val score = calcNormalizedScore(suggestion.score, cost, candidateLen)
-                score >= MODEST_THRESHOLD
-            }
-
-        if (valid.isEmpty()) return null
-
-        // Spatial alignment boost for candidates matching physical touch points (Gboard SpatialDistanceFeature)
+        // Spatial alignment boost for candidates matching physical touch points
         fun scoreCandidate(
             suggestion: Suggestion,
             cost: Int,
@@ -218,7 +240,7 @@ internal class SpellingCorrector(
             if (touches != null &&
                 touches.isNotEmpty() &&
                 touches.size == inputLen &&
-                suggestion.word.length == inputLen
+                kotlin.math.abs(suggestion.word.length - inputLen) <= 1
             ) {
                 val avgDist =
                     BloomTriggerPredictor.alignedAverageTouchDistance(
@@ -233,77 +255,164 @@ internal class SpellingCorrector(
             return baseScore
         }
 
-        // Plain best candidate without contextual boost to establish minimum edit cost
-        val plainBest =
-            valid.maxByOrNull { (suggestion, cost) ->
-                scoreCandidate(suggestion, cost)
-            } ?: return null
+        val base = candidatesFor(normalized, touches)
+        if (base != null) {
+            val eligible = withPersonalWords(normalized, base, effectivePersonalWords, touches)
+            val valid =
+                eligible.filter { (suggestion, cost) ->
+                    val candidateLen = suggestion.word.length
+                    if (candidateLen == 0) return@filter false
 
-        // The typed word won: leave it alone
-        if (plainBest.first.word == normalized) return null
+                    // Bloom Invariant 1: Hard Distance Cutoff
+                    val maxCost = candidateLen * COST_GAP
+                    if (cost >= maxCost) return@filter false
 
-        // Ambiguity check: dropped repeated letter
-        if (hasCompetingDoubledReading(normalized, plainBest)) return null
+                    // Bloom Invariant 2: Distance cap relative to input length
+                    if (cost > inputLen * MAX_COST_PER_LETTER) return@filter false
 
-        // Sentence context re-ranking: only candidates as close as plainBest can compete
-        val eligibleForContext =
-            valid
-                .filter { it.second <= plainBest.second }
-                .sortedByDescending { (suggestion, cost) ->
-                    val baseScore = scoreCandidate(suggestion, cost)
-                    val boost = languageModel.boostFor(previousWord, suggestion.word)
-                    baseScore + (boost / MAX_FREQ_SCALE)
+                    // Bloom Invariant 3: Short Word Protection (input length <= 4)
+                    if (inputLen <= SHORT_WORD_MAX_LENGTH && cost > COST_TRANSPOSE) {
+                        return@filter false
+                    }
+
+                    // Bloom Invariant 4: Modest Threshold Gating
+                    val score = calcNormalizedScore(suggestion.score, cost, candidateLen)
+                    score >= MODEST_THRESHOLD
                 }
 
-        val top = eligibleForContext.firstOrNull() ?: return null
-        if (top.first.word == normalized) return null
+            if (valid.isNotEmpty()) {
+                val plainBest =
+                    valid.maxByOrNull { (suggestion, cost) ->
+                        scoreCandidate(suggestion, cost)
+                    }
+                if (plainBest != null &&
+                    plainBest.first.word != normalized &&
+                    !hasCompetingDoubledReading(normalized, plainBest)
+                ) {
+                    // Sentence context re-ranking: only candidates as close as plainBest compete
+                    val eligibleForContext =
+                        valid
+                            .filter { it.second <= plainBest.second }
+                            .sortedByDescending { (suggestion, cost) ->
+                                val baseScore = scoreCandidate(suggestion, cost)
+                                val boost = languageModel.boostFor(previousWord, suggestion.word)
+                                baseScore + (boost / MAX_FREQ_SCALE)
+                            }
 
-        val runnerUp = eligibleForContext.getOrNull(1)
+                    val top = eligibleForContext.firstOrNull()
+                    if (top != null && top.first.word != normalized) {
+                        val runnerUp = eligibleForContext.getOrNull(1)
+                        val topBoost = languageModel.boostFor(previousWord, top.first.word)
+                        val topSpatial = scoreCandidate(top.first, top.second)
+                        val topScored =
+                            ScoredCandidate(
+                                word = top.first.word,
+                                cost = top.second,
+                                rawScore = top.first.score,
+                                normalizedScore =
+                                    calcNormalizedScore(
+                                        top.first.score,
+                                        top.second,
+                                        top.first.word.length,
+                                    ),
+                                spatialScore = topSpatial,
+                                bigramBoost = topBoost,
+                                finalScore = topSpatial + (topBoost / MAX_FREQ_SCALE),
+                            )
 
-        val topScored =
-            ScoredCandidate(
-                word = top.first.word,
-                cost = top.second,
-                rawScore = top.first.score,
-                normalizedScore =
-                    calcNormalizedScore(top.first.score, top.second, top.first.word.length),
-                spatialScore = scoreCandidate(top.first, top.second),
-                bigramBoost = languageModel.boostFor(previousWord, top.first.word),
-                finalScore =
-                    scoreCandidate(top.first, top.second) +
-                        (languageModel.boostFor(previousWord, top.first.word) / MAX_FREQ_SCALE),
-            )
+                        val runnerUpScored =
+                            runnerUp?.let {
+                                val rBoost = languageModel.boostFor(previousWord, it.first.word)
+                                val rSpatial = scoreCandidate(it.first, it.second)
+                                ScoredCandidate(
+                                    word = it.first.word,
+                                    cost = it.second,
+                                    rawScore = it.first.score,
+                                    normalizedScore =
+                                        calcNormalizedScore(
+                                            it.first.score,
+                                            it.second,
+                                            it.first.word.length,
+                                        ),
+                                    spatialScore = rSpatial,
+                                    bigramBoost = rBoost,
+                                    finalScore = rSpatial + (rBoost / MAX_FREQ_SCALE),
+                                )
+                            }
 
-        val runnerUpScored =
-            runnerUp?.let {
-                ScoredCandidate(
-                    word = it.first.word,
-                    cost = it.second,
-                    rawScore = it.first.score,
-                    normalizedScore =
-                        calcNormalizedScore(it.first.score, it.second, it.first.word.length),
-                    spatialScore = scoreCandidate(it.first, it.second),
-                    bigramBoost = languageModel.boostFor(previousWord, it.first.word),
-                    finalScore =
-                        scoreCandidate(it.first, it.second) +
-                            (languageModel.boostFor(previousWord, it.first.word) / MAX_FREQ_SCALE),
-                )
+                        // Bloom Engine Decision Model Gating (trigger predictor evaluation)
+                        val decision =
+                            BloomTriggerPredictor.evaluate(
+                                typedWord = normalized,
+                                topCandidate = topScored,
+                                runnerUpCandidate = runnerUpScored,
+                                previousWord = previousWord,
+                                touches = touches,
+                                revertHistory = revertHistory,
+                                adaptiveThresholdOffset = adaptiveThresholdOffset,
+                            )
+
+                        if (decision.shouldAutoCommit) {
+                            return top.first.word to top.second
+                        }
+                    }
+                }
             }
+        }
 
-        // Bloom Engine Decision Model Gating (FeaturePool trigger evaluation)
-        val decision =
-            BloomTriggerPredictor.evaluate(
-                typedWord = normalized,
-                topCandidate = topScored,
-                runnerUpCandidate = runnerUpScored,
-                previousWord = previousWord,
-                touches = touches,
-                revertHistory = revertHistory,
-            )
+        // Context-sensitive edit relaxation when the primary pass yields no approved commit
+        if (previousWord != null && inputLen >= 5) {
+            val maxRelaxedCost = minOf(MAX_EDIT_COST, inputLen * MAX_COST_PER_LETTER + COST_GAP)
+            val followers = languageModel.followersOf(previousWord, 8)
+            var bestRelaxed: Pair<String, Int>? = null
+            var bestRelaxedScore = Float.NEGATIVE_INFINITY
 
-        if (!decision.shouldAutoCommit) return null
+            for (follower in followers) {
+                if (follower.isEmpty() || follower == normalized) continue
+                val boost = languageModel.boostFor(previousWord, follower)
+                if (boost < 120f) continue
 
-        return top.first.word
+                val cost = weightedEditCost(normalized, follower, touches)
+                if (cost > maxRelaxedCost || cost >= follower.length * COST_GAP) continue
+
+                val rawScore =
+                    frequencyOf(follower)?.toFloat()
+                        ?: effectivePersonalWords.firstOrNull { it.first == follower }?.second
+                        ?: continue
+                val normScore = calcNormalizedScore(rawScore, cost, follower.length)
+                if (normScore < 0.125f) continue
+
+                val spatialScore = scoreCandidate(Suggestion(follower, rawScore), cost)
+                val finalScore = spatialScore + (boost / MAX_FREQ_SCALE)
+                val candidate =
+                    ScoredCandidate(
+                        word = follower,
+                        cost = cost,
+                        normalizedScore = normScore,
+                        spatialScore = spatialScore,
+                        bigramBoost = boost,
+                        finalScore = finalScore,
+                        rawScore = rawScore,
+                    )
+                val decision =
+                    BloomTriggerPredictor.evaluate(
+                        typedWord = normalized,
+                        topCandidate = candidate,
+                        runnerUpCandidate = null,
+                        previousWord = previousWord,
+                        touches = touches,
+                        revertHistory = revertHistory,
+                        adaptiveThresholdOffset = adaptiveThresholdOffset,
+                    )
+                if (decision.shouldAutoCommit && finalScore > bestRelaxedScore) {
+                    bestRelaxedScore = finalScore
+                    bestRelaxed = follower to cost
+                }
+            }
+            if (bestRelaxed != null) return bestRelaxed
+        }
+
+        return null
     }
 
     /**
@@ -333,7 +442,10 @@ internal class SpellingCorrector(
         }
 
         val base =
-            candidatesFor(normalized) ?: return (split + doubledOffers).distinct().take(limit)
+            candidatesFor(
+                normalized,
+                maxCostOverride = minOf(MAX_EDIT_COST, normalized.length * MAX_COST_PER_LETTER),
+            ) ?: return (split + doubledOffers).distinct().take(limit)
         val effectivePersonalWords =
             if (personalLexicon != null) {
                 val fromLex =
@@ -362,7 +474,7 @@ internal class SpellingCorrector(
     }
 
     /**
-     * Every dictionary word within [MAX_EDIT_COST] of [normalized] that is common enough to
+     * Every dictionary word within [effectiveMaxCost] of [normalized] that is common enough to
      * be worth correcting to, paired with its weighted edit cost across all active lexicons.
      * The typed word itself is among them at cost 0 when it is a dictionary word.
      * Null when no dictionary can be read.
@@ -370,9 +482,24 @@ internal class SpellingCorrector(
     internal fun candidatesFor(
         normalized: String,
         touches: List<TouchPoint>? = null,
+        maxCostOverride: Int? = null,
     ): List<Pair<Suggestion, Int>>? {
+        val inputLen = normalized.length
+        val baseCap =
+            if (inputLen <= SHORT_WORD_MAX_LENGTH) {
+                COST_TRANSPOSE
+            } else {
+                minOf(MAX_EDIT_COST, inputLen * MAX_COST_PER_LETTER)
+            }
+        val effectiveMaxCost = maxCostOverride ?: baseCap
         val candidates = mutableListOf<Pair<Suggestion, Int>>()
-        val initialRow = IntArray(normalized.length + 1) { it * COST_GAP }
+        val touchCosts = buildTouchCostTable(normalized, touches)
+        val poolDepth = inputLen + effectiveMaxCost + 4
+        val rowPool = Array(poolDepth) { IntArray(inputLen + 1) }
+        for (i in 0..inputLen) {
+            rowPool[0][i] = i * COST_GAP
+        }
+        val wordBuf = CharArray(poolDepth)
         var readAny = false
 
         dictionaries.forEachIndexed { dictIndex, dictProvider ->
@@ -381,16 +508,17 @@ internal class SpellingCorrector(
             val dictCandidates = mutableListOf<Pair<Suggestion, Int>>()
             try {
                 dfsEditDistance(
-                    buf,
-                    TRIE_HEADER_SIZE,
-                    "",
-                    normalized,
-                    initialRow,
-                    null,
-                    null,
-                    MAX_EDIT_COST,
-                    dictCandidates,
-                    touches,
+                    buf = buf,
+                    offset = TRIE_HEADER_SIZE,
+                    depth = 0,
+                    wordBuf = wordBuf,
+                    targetWord = normalized,
+                    rowPool = rowPool,
+                    prevChar = null,
+                    maxErrors = effectiveMaxCost,
+                    results = dictCandidates,
+                    touches = touches,
+                    touchCosts = touchCosts,
                 )
             } catch (e: Exception) {
                 // Safeguard against malformed offsets
@@ -468,8 +596,16 @@ internal class SpellingCorrector(
             val head = normalized.substring(0, i + 1)
             val doubled = head + normalized[i] + normalized.substring(i + 1)
             if (doubled == winner.first.word) continue
-            val freq = frequencyOf(doubled) ?: continue
-            val doubledScore = calcNormalizedScore(freq.toFloat(), COST_GAP, doubled.length)
+            val primaryFreq = primaryFrequencyOf(doubled)
+            val effectiveFreq =
+                if (primaryFreq != null) {
+                    primaryFreq.toFloat()
+                } else {
+                    val suppFreq = frequencyOf(doubled) ?: continue
+                    suppFreq * 0.82f
+                }
+            val doubledScore =
+                calcNormalizedScore(effectiveFreq, COST_OMISSION_SAME_CHAR, doubled.length)
             if (doubledScore >= winnerScore * DOUBLED_READING_RATIO) return true
         }
         return false
@@ -555,6 +691,53 @@ internal class SpellingCorrector(
     }
 
     /**
+     * Splits a run-on compound where the space between two common words was omitted.
+     */
+    internal fun splitOnOmittedSpace(
+        normalized: String,
+        previousWord: String? = null,
+    ): String? {
+        if (normalized == "alot") return "a lot"
+        if (normalized.length < 6 || normalized.any { !it.isLetter() } || hasWord(normalized)) {
+            return null
+        }
+
+        var bestSplit: String? = null
+        var bestScore = Float.NEGATIVE_INFINITY
+        for (i in 2..(normalized.length - 2)) {
+            val left = normalized.substring(0, i)
+            val right = normalized.substring(i)
+            val leftFreq = primaryFrequencyOf(left) ?: continue
+            val rightFreq = primaryFrequencyOf(right) ?: continue
+            val pairBoost = languageModel.boostFor(left, right)
+
+            val qualifies =
+                if (left.length == 2 || right.length == 2) {
+                    val boostedTwoLetterSplit =
+                        leftFreq >= 190 && rightFreq >= 150 && pairBoost > 0f
+                    val highFreqTwoLetterPrefix =
+                        left.length == 2 &&
+                            right.length >= 4 &&
+                            leftFreq >= 235 &&
+                            rightFreq >= 195
+                    boostedTwoLetterSplit || highFreqTwoLetterPrefix
+                } else {
+                    leftFreq >= 120 &&
+                        rightFreq >= 120 &&
+                        (pairBoost > 0f || minOf(leftFreq, rightFreq) >= 165)
+                }
+            if (!qualifies) continue
+
+            val score = minOf(leftFreq, rightFreq).toFloat() + pairBoost * 1.5f
+            if (score > bestScore) {
+                bestScore = score
+                bestSplit = "$left $right"
+            }
+        }
+        return bestSplit
+    }
+
+    /**
      * Gives [replacement] the capitalization of [original].
      */
     internal fun matchCase(
@@ -569,6 +752,28 @@ internal class SpellingCorrector(
             else -> replacement
         }
 
+    private fun buildTouchCostTable(
+        targetWord: String,
+        touches: List<TouchPoint>?,
+    ): Array<IntArray?>? {
+        if (touches == null || touches.isEmpty()) return null
+        return Array(targetWord.length) { idx ->
+            if (idx < touches.size && touches[idx].char.lowercaseChar() == targetWord[idx]) {
+                val tp = touches[idx]
+                IntArray(26) { cIdx ->
+                    SmartKeyHitbox.substitutionCost(
+                        tp,
+                        ('a'.code + cIdx).toChar(),
+                        COST_ADJACENT_SUBSTITUTE,
+                        COST_SUBSTITUTE,
+                    )
+                }
+            } else {
+                null
+            }
+        }
+    }
+
     /**
      * Walks the trie carrying one weighted-edit row per node, with the
      * Damerau/optimal-string-alignment extension for adjacent transpositions.
@@ -576,56 +781,74 @@ internal class SpellingCorrector(
     private fun dfsEditDistance(
         buf: ByteBuffer,
         offset: Int,
-        currentWord: String,
+        depth: Int,
+        wordBuf: CharArray,
         targetWord: String,
-        currentRow: IntArray,
-        prevRow: IntArray?,
+        rowPool: Array<IntArray>,
         prevChar: Char?,
         maxErrors: Int,
         results: MutableList<Pair<Suggestion, Int>>,
-        touches: List<TouchPoint>? = null,
+        touches: List<TouchPoint>?,
+        touchCosts: Array<IntArray?>?,
     ) {
-        buf.position(offset)
-        val freq = buf.get().toInt() and 0xFF
-        val isTerminal = buf.get().toInt() and 0xFF
-        val childCount = buf.get().toInt() and 0xFF
+        val freq = buf.get(offset).toInt() and 0xFF
+        val isTerminal = buf.get(offset + 1).toInt() and 0xFF
+        val childCount = buf.get(offset + 2).toInt() and 0xFF
 
-        val children = mutableListOf<Pair<Char, Int>>()
-        for (i in 0 until childCount) {
-            val c1 = buf.get().toInt() and 0xFF
-            val c2 = buf.get().toInt() and 0xFF
-            val childChar = ((c1 shl 8) or c2).toChar()
-            val childOffset = buf.getInt()
-            children.add(Pair(childChar, childOffset))
-        }
-
-        val distance = currentRow.last()
+        val currentRow = rowPool[depth]
+        val prevRow = if (depth > 0) rowPool[depth - 1] else null
+        val targetLen = targetWord.length
+        val distance = currentRow[targetLen]
         if (isTerminal == 1 && distance <= maxErrors) {
-            results.add(Pair(Suggestion(currentWord, freq.toFloat()), distance))
+            results.add(Pair(Suggestion(String(wordBuf, 0, depth), freq.toFloat()), distance))
         }
 
-        val minInRow = currentRow.minOrNull() ?: 0
+        if (childCount == 0 || depth + 1 >= rowPool.size) return
+
+        var minInRow = Int.MAX_VALUE
+        for (v in currentRow) {
+            if (v < minInRow) minInRow = v
+        }
         if (minInRow > maxErrors) return // prune branch entirely
 
-        for ((childChar, childOffset) in children) {
-            val nextRow = IntArray(targetWord.length + 1)
-            nextRow[0] = currentRow[0] + COST_GAP
-            for (i in 1..targetWord.length) {
+        val nextRow = rowPool[depth + 1]
+        val childrenStart = offset + 3
+        for (cIdx in 0 until childCount) {
+            val entryOff = childrenStart + cIdx * 6
+            val c1 = buf.get(entryOff).toInt() and 0xFF
+            val c2 = buf.get(entryOff + 1).toInt() and 0xFF
+            val childChar = ((c1 shl 8) or c2).toChar()
+            val childOffset = buf.getInt(entryOff + 2)
+
+            val stepDeleteCost =
+                if (prevChar != null && childChar == prevChar) {
+                    COST_OMISSION_SAME_CHAR
+                } else {
+                    COST_GAP
+                }
+            nextRow[0] = currentRow[0] + stepDeleteCost
+            val childAlphaIdx = childChar.code - 'a'.code
+            val isAsciiLower = childAlphaIdx in 0..25
+
+            for (i in 1..targetLen) {
                 val typed = targetWord[i - 1]
                 val insertCost = nextRow[i - 1] + COST_GAP
-                val deleteCost = currentRow[i] + COST_GAP
+                val deleteCost = currentRow[i] + stepDeleteCost
                 val substitution =
                     when {
                         typed == childChar -> 0
-                        touches != null &&
-                            i - 1 < touches.size &&
-                            touches[i - 1].char.lowercaseChar() == typed ->
-                            SmartKeyHitbox.substitutionCost(
-                                touches[i - 1],
-                                childChar,
-                                COST_ADJACENT_SUBSTITUTE,
-                                COST_SUBSTITUTE,
-                            )
+                        touchCosts != null && touchCosts[i - 1] != null -> {
+                            if (isAsciiLower) {
+                                touchCosts[i - 1]!![childAlphaIdx]
+                            } else {
+                                SmartKeyHitbox.substitutionCost(
+                                    touches!![i - 1],
+                                    childChar,
+                                    COST_ADJACENT_SUBSTITUTE,
+                                    COST_SUBSTITUTE,
+                                )
+                            }
+                        }
                         KeyProximity.areAdjacent(typed, childChar) -> COST_ADJACENT_SUBSTITUTE
                         else -> COST_SUBSTITUTE
                     }
@@ -643,17 +866,19 @@ internal class SpellingCorrector(
 
                 nextRow[i] = cost
             }
+            wordBuf[depth] = childChar
             dfsEditDistance(
-                buf,
-                childOffset,
-                currentWord + childChar,
-                targetWord,
-                nextRow,
-                currentRow,
-                childChar,
-                maxErrors,
-                results,
-                touches,
+                buf = buf,
+                offset = childOffset,
+                depth = depth + 1,
+                wordBuf = wordBuf,
+                targetWord = targetWord,
+                rowPool = rowPool,
+                prevChar = childChar,
+                maxErrors = maxErrors,
+                results = results,
+                touches = touches,
+                touchCosts = touchCosts,
             )
         }
     }
@@ -673,6 +898,10 @@ internal class SpellingCorrector(
         }
         return maxFreq
     }
+
+    companion object {
+        internal const val SINGLE_EDIT_SPLIT_PRECEDENCE_COST = COST_TRANSPOSE
+    }
 }
 
 /**
@@ -688,7 +917,9 @@ internal fun weightedEditCost(
     for (i in 0..typed.length) rows[0][i] = i * COST_GAP
     for (j in 1..candidate.length) {
         val c = candidate[j - 1]
-        rows[j][0] = j * COST_GAP
+        val stepDeleteCost =
+            if (j >= 2 && c == candidate[j - 2]) COST_OMISSION_SAME_CHAR else COST_GAP
+        rows[j][0] = rows[j - 1][0] + stepDeleteCost
         for (i in 1..typed.length) {
             val t = typed[i - 1]
             val substitution =
@@ -709,7 +940,7 @@ internal fun weightedEditCost(
             var cost =
                 minOf(
                     rows[j][i - 1] + COST_GAP,
-                    rows[j - 1][i] + COST_GAP,
+                    rows[j - 1][i] + stepDeleteCost,
                     rows[j - 1][i - 1] + substitution,
                 )
             if (i >= 2 && j >= 2 && typed[i - 1] == candidate[j - 2] && typed[i - 2] == c) {
