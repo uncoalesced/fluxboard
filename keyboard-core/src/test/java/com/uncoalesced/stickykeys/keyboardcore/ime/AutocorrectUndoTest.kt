@@ -54,6 +54,7 @@ class AutocorrectUndoTest {
         every { prefs.autoCapitalizeEnabled } returns MutableStateFlow(true)
         every { prefs.autoCorrectEnabled } returns MutableStateFlow(true)
         every { prefs.privateModeEnabled } returns MutableStateFlow(false)
+        every { prefs.doubleSpacePeriodEnabled } returns MutableStateFlow(false)
         incognito = IncognitoState()
         viewModel =
             TypingViewModel(
