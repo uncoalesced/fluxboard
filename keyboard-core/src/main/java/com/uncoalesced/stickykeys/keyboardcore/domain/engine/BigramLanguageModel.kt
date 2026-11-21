@@ -165,7 +165,7 @@ class BigramLanguageModel
                 } ?: 0f
             val personalBoost =
                 if (previousWord != null) {
-                    (personalBigramCache?.boostFor(previousWord, candidate) ?: 0f) *
+                    (personalBigramCache?.effectiveBoostFor(previousWord, candidate) ?: 0f) *
                         MAX_LANGUAGE_MODEL_BOOST
                 } else {
                     0f
@@ -180,7 +180,9 @@ class BigramLanguageModel
             if (limit <= 0) return emptyList()
             val personalFollowers =
                 if (previousWord != null) {
-                    personalBigramCache?.followersOf(previousWord, limit)?.map { it.first }
+                    personalBigramCache
+                        ?.followersOf(previousWord, limit, minCount = 2)
+                        ?.map { it.first }
                         ?: emptyList()
                 } else {
                     emptyList()
