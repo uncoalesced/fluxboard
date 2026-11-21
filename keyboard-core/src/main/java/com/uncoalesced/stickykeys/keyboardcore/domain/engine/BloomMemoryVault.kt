@@ -65,7 +65,7 @@ internal fun writeFileAtomically(
  */
 object BloomMemoryVault {
     private const val MAGIC = 0x424D454D // "BMEM"
-    private const val VERSION = 1
+    private const val VERSION = 2
     private const val NUM_FLOATS = 52
     private const val THIRTY_DAYS_MS = 30L * 24 * 60 * 60 * 1000
 
@@ -89,6 +89,10 @@ object BloomMemoryVault {
         val tapOffsets: FloatArray,
         val unigrams: List<PersonalWordEntity>,
         val bigrams: List<PersonalBigramEntity>,
+        val tapVariances: FloatArray = FloatArray(NUM_FLOATS),
+        val actAcceptCount: Int = 0,
+        val actRevertCount: Int = 0,
+        val adaptiveThresholdOffset: Float = 0f,
     )
 
     /**
@@ -100,9 +104,28 @@ object BloomMemoryVault {
         tapOffsets: FloatArray,
         unigrams: List<PersonalWordEntity>,
         bigrams: List<PersonalBigramEntity>,
+        tapVariances: FloatArray = FloatArray(NUM_FLOATS),
+        actAcceptCount: Int = 0,
+        actRevertCount: Int = 0,
+        adaptiveThresholdOffset: Float = 0f,
     ) {
-        if (glideOffsets.size != NUM_FLOATS || tapOffsets.size != NUM_FLOATS) return
-        val bytes = encode(glideOffsets, tapOffsets, unigrams, bigrams)
+        if (glideOffsets.size != NUM_FLOATS ||
+            tapOffsets.size != NUM_FLOATS ||
+            tapVariances.size != NUM_FLOATS
+        ) {
+            return
+        }
+        val bytes =
+            encode(
+                glideOffsets = glideOffsets,
+                tapOffsets = tapOffsets,
+                unigrams = unigrams,
+                bigrams = bigrams,
+                tapVariances = tapVariances,
+                actAcceptCount = actAcceptCount,
+                actRevertCount = actRevertCount,
+                adaptiveThresholdOffset = adaptiveThresholdOffset,
+            )
         synchronized(ioLock) {
             writeFileAtomically(file, bytes)
             remember(unigrams, bigrams)
@@ -142,6 +165,10 @@ object BloomMemoryVault {
         tapOffsets: FloatArray,
         unigrams: List<PersonalWordEntity>,
         bigrams: List<PersonalBigramEntity>,
+        tapVariances: FloatArray = FloatArray(NUM_FLOATS),
+        actAcceptCount: Int = 0,
+        actRevertCount: Int = 0,
+        adaptiveThresholdOffset: Float = 0f,
     ): ByteArray {
         val payloadStream = ByteArrayOutputStream(4096)
         val payloadOut = DataOutputStream(payloadStream)
@@ -175,6 +202,13 @@ object BloomMemoryVault {
             payloadOut.writeInt(b.count)
             payloadOut.writeLong(b.lastUsedTimestamp)
         }
+
+        for (f in tapVariances) {
+            payloadOut.writeInt(java.lang.Float.floatToIntBits(f))
+        }
+        payloadOut.writeInt(actAcceptCount)
+        payloadOut.writeInt(actRevertCount)
+        payloadOut.writeInt(java.lang.Float.floatToIntBits(adaptiveThresholdOffset))
         payloadOut.flush()
 
         val payloadBytes = payloadStream.toByteArray()
@@ -277,11 +311,36 @@ object BloomMemoryVault {
                 )
             }
 
+            var tapVariances = FloatArray(NUM_FLOATS)
+            var actAcceptCount = 0
+            var actRevertCount = 0
+            var adaptiveThresholdOffset = 0f
+            if (version >= 2 && pBuf.remaining() >= NUM_FLOATS * 4 + 12) {
+                tapVariances =
+                    finiteOrZero(FloatArray(NUM_FLOATS) { Float.fromBits(pBuf.int) })
+                actAcceptCount = pBuf.int.coerceAtLeast(0)
+                actRevertCount = pBuf.int.coerceAtLeast(0)
+                val rawOffset = Float.fromBits(pBuf.int)
+                adaptiveThresholdOffset =
+                    if (rawOffset.isFinite()) {
+                        rawOffset.coerceIn(
+                            BloomAdaptiveThreshold.MIN_OFFSET,
+                            BloomAdaptiveThreshold.MAX_OFFSET,
+                        )
+                    } else {
+                        0f
+                    }
+            }
+
             Snapshot(
                 glideOffsets = glideOffsets,
                 tapOffsets = tapOffsets,
                 unigrams = unigrams,
                 bigrams = bigrams,
+                tapVariances = tapVariances,
+                actAcceptCount = actAcceptCount,
+                actRevertCount = actRevertCount,
+                adaptiveThresholdOffset = adaptiveThresholdOffset,
             )
         } catch (e: Exception) {
             null
@@ -310,6 +369,7 @@ object BloomMemoryVault {
         personalBigramDao: PersonalBigramDao?,
         learningEngine: PersonalLearningEngine,
         glideProfile: BloomSpatialProfile,
+        adaptiveThreshold: BloomAdaptiveThreshold? = null,
     ) {
         val now = System.currentTimeMillis()
         val cutoff = now - THIRTY_DAYS_MS
@@ -342,6 +402,29 @@ object BloomMemoryVault {
                     SmartKeyHitbox.save(tapFile)
                 } catch (e: Exception) {
                 }
+            }
+        }
+
+        val currentVariances = SmartKeyHitbox.varianceSnapshot()
+        if (existingVault != null &&
+            currentVariances.all { it == 0f } &&
+            existingVault.tapVariances.any { it > 0f }
+        ) {
+            SmartKeyHitbox.restoreVariances(existingVault.tapVariances)
+        }
+
+        if (existingVault != null && adaptiveThreshold != null) {
+            val (curAccepts, curReverts, curOffset) = adaptiveThreshold.snapshot()
+            val hasVaultAct =
+                existingVault.actAcceptCount > 0 ||
+                    existingVault.actRevertCount > 0 ||
+                    existingVault.adaptiveThresholdOffset != 0f
+            if (curAccepts == 0 && curReverts == 0 && curOffset == 0f && hasVaultAct) {
+                adaptiveThreshold.restore(
+                    existingVault.actAcceptCount,
+                    existingVault.actRevertCount,
+                    existingVault.adaptiveThresholdOffset,
+                )
             }
         }
 
@@ -438,6 +521,7 @@ object BloomMemoryVault {
             glideProfile = glideProfile,
             dbUnigrams = dbUnigrams.values.toList(),
             dbBigrams = dbBigrams.values.toList(),
+            adaptiveThreshold = adaptiveThreshold,
         )
     }
 
@@ -454,10 +538,14 @@ object BloomMemoryVault {
         glideProfile: BloomSpatialProfile,
         dbUnigrams: List<PersonalWordEntity>? = null,
         dbBigrams: List<PersonalBigramEntity>? = null,
+        adaptiveThreshold: BloomAdaptiveThreshold? = null,
     ) {
         try {
             val glide = glideProfile.snapshot()
             val tap = SmartKeyHitbox.snapshot()
+            val tapVariances = SmartKeyHitbox.varianceSnapshot()
+            val (actAccepts, actReverts, actOffset) =
+                adaptiveThreshold?.snapshot() ?: Triple(0, 0, 0f)
             synchronized(ioLock) {
                 if (knownUnigrams == null || knownBigrams == null) {
                     // First save in this process: seed timestamps from what is on disk.
@@ -484,8 +572,25 @@ object BloomMemoryVault {
                                 )
                             }
                         }
-                if (glide.size != NUM_FLOATS || tap.size != NUM_FLOATS) return
-                writeFileAtomically(vaultFile, encode(glide, tap, unigrams, bigrams))
+                if (glide.size != NUM_FLOATS ||
+                    tap.size != NUM_FLOATS ||
+                    tapVariances.size != NUM_FLOATS
+                ) {
+                    return
+                }
+                writeFileAtomically(
+                    vaultFile,
+                    encode(
+                        glideOffsets = glide,
+                        tapOffsets = tap,
+                        unigrams = unigrams,
+                        bigrams = bigrams,
+                        tapVariances = tapVariances,
+                        actAcceptCount = actAccepts,
+                        actRevertCount = actReverts,
+                        adaptiveThresholdOffset = actOffset,
+                    ),
+                )
                 remember(unigrams, bigrams)
             }
         } catch (e: Exception) {

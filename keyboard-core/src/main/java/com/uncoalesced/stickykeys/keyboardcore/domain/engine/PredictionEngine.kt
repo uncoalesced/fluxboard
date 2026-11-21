@@ -52,6 +52,9 @@ private const val MAX_SUGGESTION_NODES = 20_000
 /** Longest completion worth offering; past this the strip cannot show it anyway. */
 private const val MAX_SUGGESTION_WORD = 24
 
+/** Max trie nodes inspected per candidate character during continuation scoring. */
+private const val MAX_CONTINUATION_PROBE_NODES = 16
+
 data class Suggestion(
     val word: String,
     val score: Float,
@@ -81,6 +84,9 @@ class PredictionEngine
             if (languageModel is BigramLanguageModel) {
                 languageModel.personalBigramCache = personalLearningEngine.bigramCache
             }
+            personalLearningEngine.isLikelyCoreTypo = {
+                spellingCorrector.isLikelyTypoOfHighFreqCoreWord(it)
+            }
             personalLearningEngine.onMemoryMutated = {
                 syncMemoryVaultAsync()
             }
@@ -107,6 +113,8 @@ class PredictionEngine
 
         /** Bloom in-memory revert memory for immediate undo suppression. */
         private val revertHistory = BloomRevertHistory()
+
+        internal val adaptiveThreshold = BloomAdaptiveThreshold()
 
         val bloomSpatialProfile = BloomSpatialProfile()
 
@@ -195,6 +203,7 @@ class PredictionEngine
                     personalBigramDao = personalLearningEngine.bigramDao,
                     learningEngine = personalLearningEngine,
                     glideProfile = bloomSpatialProfile,
+                    adaptiveThreshold = adaptiveThreshold,
                 )
             } catch (e: Exception) {
             }
@@ -209,6 +218,7 @@ class PredictionEngine
                         vaultFile = File(context.filesDir, "bloom_user_memory.bin"),
                         learningEngine = personalLearningEngine,
                         glideProfile = bloomSpatialProfile,
+                        adaptiveThreshold = adaptiveThreshold,
                     )
                 }
             } catch (e: Exception) {
@@ -224,6 +234,7 @@ class PredictionEngine
                         vaultFile = File(context.filesDir, "bloom_user_memory.bin"),
                         learningEngine = personalLearningEngine,
                         glideProfile = bloomSpatialProfile,
+                        adaptiveThreshold = adaptiveThreshold,
                     )
                 }
             } catch (e: Exception) {
@@ -249,6 +260,7 @@ class PredictionEngine
                         vaultFile = File(context.filesDir, "bloom_user_memory.bin"),
                         learningEngine = personalLearningEngine,
                         glideProfile = bloomSpatialProfile,
+                        adaptiveThreshold = adaptiveThreshold,
                     )
                 } catch (e: Exception) {
                 }
@@ -264,6 +276,7 @@ class PredictionEngine
         fun resetBloomSpatialProfile() {
             bloomSpatialProfile.reset()
             SmartKeyHitbox.resetCentroids()
+            adaptiveThreshold.reset()
             // Each delete takes its store's I/O lock, so a save already in flight on the
             // background scope cannot write the file back after the user cleared it.
             try {
@@ -506,7 +519,7 @@ class PredictionEngine
         /** The glide decoder, reading the same mapping through its own cursors. */
         private val glideDecoder = GlideDecoder(::reader, languageModel)
 
-        /** GBoard-adjacent continuous trajectory decoder. */
+        /** Continuous spatial trajectory decoder. */
         private val bloomTypeDecoder =
             BloomTypeDecoder(
                 dictionary = ::reader,
@@ -695,6 +708,130 @@ class PredictionEngine
         }
 
         /**
+         * Synchronously scores candidate next characters following [prefix] using the base
+         * dictionary trie (with a bounded shallow subtree probe) and shielded personal words.
+         */
+        fun continuationScoresForPrefix(
+            prefix: String,
+            candidates: List<Char>,
+        ): Map<Char, Float> {
+            val p = prefix.lowercase().trim()
+            if (p.isEmpty() || candidates.isEmpty()) return emptyMap()
+            val result = mutableMapOf<Char, Float>()
+            val candidateMap = candidates.associateBy { it.lowercaseChar() }
+
+            try {
+                val buf = reader()
+                if (buf != null) {
+                    var currentOffset = TRIE_ROOT_OFFSET
+                    var foundPrefix = true
+                    for (ch in p) {
+                        buf.position(currentOffset)
+                        buf.get()
+                        buf.get()
+                        val childCount = buf.get().toInt() and 0xFF
+                        var nextOffset = -1
+                        for (i in 0 until childCount) {
+                            val c1 = buf.get().toInt() and 0xFF
+                            val c2 = buf.get().toInt() and 0xFF
+                            val childChar = ((c1 shl 8) or c2).toChar()
+                            val offset = buf.getInt()
+                            if (childChar == ch) {
+                                nextOffset = offset
+                                break
+                            }
+                        }
+                        if (nextOffset < 0) {
+                            foundPrefix = false
+                            break
+                        }
+                        currentOffset = nextOffset
+                    }
+
+                    if (foundPrefix) {
+                        buf.position(currentOffset)
+                        buf.get()
+                        buf.get()
+                        val childCount = buf.get().toInt() and 0xFF
+                        val matchedChildren = mutableListOf<Pair<Char, Int>>()
+                        for (i in 0 until childCount) {
+                            val c1 = buf.get().toInt() and 0xFF
+                            val c2 = buf.get().toInt() and 0xFF
+                            val childChar = ((c1 shl 8) or c2).toChar()
+                            val offset = buf.getInt()
+                            val originalKey = candidateMap[childChar]
+                            if (originalKey != null) {
+                                matchedChildren.add(originalKey to offset)
+                            }
+                        }
+                        for ((candKey, childOffset) in matchedChildren) {
+                            val trieScore = probeCandidateSubtree(buf, childOffset)
+                            if (trieScore > 0f) {
+                                result[candKey] = trieScore
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+            }
+
+            for (cand in candidates) {
+                val lowerCand = cand.lowercaseChar()
+                val personalMatches =
+                    personalLearningEngine.lexicon
+                        .wordsMatchingPrefix(p + lowerCand, 2)
+                        .filter { it.second >= BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD }
+                if (personalMatches.isNotEmpty()) {
+                    val topCount = personalMatches.first().second
+                    val personalBoost =
+                        (PERSONAL_TARGET_BASE + topCount * PERSONAL_WEIGHT)
+                            .coerceAtMost(MAX_FREQUENCY)
+                    result[cand] = (result[cand] ?: 0f) + personalBoost
+                }
+            }
+            return result
+        }
+
+        private fun probeCandidateSubtree(
+            buf: ByteBuffer,
+            rootOffset: Int,
+        ): Float {
+            val queue = ArrayDeque<Int>()
+            queue.add(rootOffset)
+            var visited = 0
+            var directFreq = 0f
+            var maxDescendantFreq = 0f
+
+            while (queue.isNotEmpty() && visited < MAX_CONTINUATION_PROBE_NODES) {
+                val offset = queue.removeFirst()
+                buf.position(offset)
+                val freq = buf.get().toInt() and 0xFF
+                val isTerminal = buf.get().toInt() and 0xFF
+                val childCount = buf.get().toInt() and 0xFF
+
+                if (visited == 0) {
+                    if (isTerminal == 1) {
+                        directFreq = freq.toFloat()
+                    }
+                } else if (isTerminal == 1) {
+                    maxDescendantFreq = maxOf(maxDescendantFreq, freq.toFloat())
+                }
+                visited++
+
+                if (visited + queue.size >= MAX_CONTINUATION_PROBE_NODES) continue
+                for (i in 0 until childCount) {
+                    buf.get()
+                    buf.get()
+                    val nextOffset = buf.getInt()
+                    if (visited + queue.size < MAX_CONTINUATION_PROBE_NODES) {
+                        queue.add(nextOffset)
+                    }
+                }
+            }
+            return maxOf(directFreq, maxDescendantFreq * 0.85f)
+        }
+
+        /**
          * The correction to apply to [typedWord], or null to leave it alone. [startsClause] is
          * true when the word follows a comma, a sentence end or similar; it only affects the
          * contractions whose bare form is also a word (see ContractionRules).
@@ -743,16 +880,35 @@ class PredictionEngine
                     return@withContext null
                 }
 
-                val corrected =
+                if (normalized == "alot") {
+                    return@withContext spellingCorrector.matchCase(trimmed, "a lot")
+                }
+
+                val directRepair =
                     spellingCorrector.restoreApostrophe(normalized)
                         ?: spellingCorrector.splitOnMispressedSpace(normalized)
-                        ?: spellingCorrector.nearestWord(
-                            normalized,
-                            previousWord,
-                            personalCorrectionTargets(),
-                            touches,
-                            revertHistory,
-                        )
+                if (directRepair != null) {
+                    return@withContext spellingCorrector.matchCase(trimmed, directRepair)
+                }
+
+                val singleMatch =
+                    spellingCorrector.nearestWordWithCost(
+                        normalized = normalized,
+                        previousWord = previousWord,
+                        personalWords = personalCorrectionTargets(),
+                        touches = touches,
+                        revertHistory = revertHistory,
+                        adaptiveThresholdOffset = adaptiveThreshold.currentOffset(),
+                    )
+                if (singleMatch != null &&
+                    singleMatch.second <= SpellingCorrector.SINGLE_EDIT_SPLIT_PRECEDENCE_COST
+                ) {
+                    return@withContext spellingCorrector.matchCase(trimmed, singleMatch.first)
+                }
+
+                val corrected =
+                    spellingCorrector.splitOnOmittedSpace(normalized, previousWord)
+                        ?: singleMatch?.first
                         ?: return@withContext null
 
                 // Restore the shape the user typed. Auto-capitalize means the first word of
@@ -760,6 +916,48 @@ class PredictionEngine
                 // form would silently un-capitalize the start of most sentences it fixed.
                 return@withContext spellingCorrector.matchCase(trimmed, corrected)
             }
+
+        /**
+         * Records that an autocorrection was accepted, updating adaptive trigger restraint and,
+         * when [learnSpatial] is true, adapting spatial hitbox centroids and variances.
+         */
+        fun recordAutoCorrectAccepted(
+            touches: List<TouchPoint>,
+            targetWord: String,
+            learnSpatial: Boolean,
+        ) {
+            adaptiveThreshold.recordAccept()
+            if (learnSpatial && touches.isNotEmpty()) {
+                SmartKeyHitbox.adaptCorrectedWord(touches, targetWord)
+                saveBloomTapProfileAsync()
+            } else if (personalLearningEngine.isEnabled &&
+                !personalLearningEngine.isIncognitoOrPassword
+            ) {
+                syncMemoryVaultAsync()
+            }
+        }
+
+        /**
+         * Records that an autocorrection was reverted back to [original], suppressing future
+         * re-correction, tightening adaptive threshold restraint, and rolling back the most
+         * recent spatial hitbox adaptation.
+         */
+        fun recordAutoCorrectReverted(original: String) {
+            recordRevert(original)
+            adaptiveThreshold.recordRevert()
+            SmartKeyHitbox.rollbackLastAdaptation()
+            saveBloomTapProfileAsync()
+        }
+
+        /**
+         * Returns true if [word] is outside the primary core dictionary and lies within one
+         * localized edit of a high-frequency core word.
+         */
+        fun isLikelyOneEditTypoOfCoreWord(word: String): Boolean {
+            val normalized = word.lowercase().trim()
+            if (normalized.isEmpty()) return false
+            return spellingCorrector.isLikelyTypoOfHighFreqCoreWord(normalized)
+        }
 
         /**
          * Corrections to offer in the strip for a word [getAutoCorrection] left alone.

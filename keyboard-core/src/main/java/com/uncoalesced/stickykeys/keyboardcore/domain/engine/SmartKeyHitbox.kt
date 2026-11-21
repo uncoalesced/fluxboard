@@ -6,18 +6,18 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
+import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
  * SmartKeys 2D Spatial Touch Calibration and Gaussian Hitbox Engine.
  *
- * Re-engineered from libjni_latinime.so (sub_0xe5ba4) and Delight5 binary disassembly:
- * Evaluates continuous 2D Euclidean distance and Gaussian spatial probability between physical
+ * Evaluates continuous 2D Euclidean and anisotropic Mahalanobis distance between physical
  * finger touch coordinates and keyboard key centers, modulating dynamic programming edit costs.
  */
 internal object SmartKeyHitbox {
-    /** Running centroid exponential moving average decay factor (Delight5: alpha = 0.95). */
+    /** Running centroid and variance exponential moving average decay factor. */
     const val ALPHA: Float = 0.95f
 
     const val MAX_SPATIAL_DISTANCE_CAP: Float = 1.20f
@@ -27,6 +27,14 @@ internal object SmartKeyHitbox {
     const val BASE_PROXIMITY_INTERIOR: Float = 0.0694f
     const val BASE_PROXIMITY_INITIAL: Float = 0.0779f
     const val DISTANCE_WEIGHT_LENGTH: Float = 0.1524f
+
+    const val DEFAULT_VAR: Float = 0.25f
+    const val MIN_VAR: Float = 0.09f
+    const val MAX_VAR: Float = 0.64f
+    private const val BASE_STD: Float = 0.50f
+    private const val MIN_SCALE: Float = 0.65f
+    private const val MAX_SCALE: Float = 1.35f
+    private const val MAX_RETARGET_DISTANCE: Float = 1.35f
 
     private const val MAGIC = 0x42544150 // "BTAP"
     private const val VERSION = 1
@@ -61,6 +69,12 @@ internal object SmartKeyHitbox {
     /** Running touch offset centroids per key: char -> (meanOffsetX, meanOffsetY). */
     private val runningCentroids = mutableMapOf<Char, Pair<Float, Float>>()
 
+    /** Running anisotropic touch variances per key: char -> (varX, varY). */
+    private val runningVariances = mutableMapOf<Char, Pair<Float, Float>>()
+
+    private var lastCentroidsSnapshot: Map<Char, Pair<Float, Float>>? = null
+    private var lastVariancesSnapshot: Map<Char, Pair<Float, Float>>? = null
+
     /**
      * Serialises file I/O. Deliberately not the object monitor that guards [runningCentroids]:
      * holding that across a disk write would stall every key press waiting on [getCentroid].
@@ -70,15 +84,43 @@ internal object SmartKeyHitbox {
     @Synchronized
     fun resetCentroids() {
         runningCentroids.clear()
+        runningVariances.clear()
+        lastCentroidsSnapshot = null
+        lastVariancesSnapshot = null
     }
 
     @Synchronized
     fun getCentroid(char: Char): Pair<Float, Float> =
         runningCentroids[char.lowercaseChar()] ?: (0f to 0f)
 
+    @Synchronized
+    fun getVariance(char: Char): Pair<Float, Float> =
+        runningVariances[char.lowercaseChar()] ?: (DEFAULT_VAR to DEFAULT_VAR)
+
+    /** Captures a rollback snapshot of current learned centroids and variances. */
+    @Synchronized
+    fun saveSnapshot() {
+        lastCentroidsSnapshot = HashMap(runningCentroids)
+        lastVariancesSnapshot = HashMap(runningVariances)
+    }
+
+    /** Restores the most recent snapshot captured before adaptation, returning true if present. */
+    @Synchronized
+    fun rollbackLastAdaptation(): Boolean {
+        val centroidsSnap = lastCentroidsSnapshot
+        val variancesSnap = lastVariancesSnapshot
+        if (centroidsSnap == null && variancesSnap == null) return false
+        runningCentroids.clear()
+        centroidsSnap?.let { runningCentroids.putAll(it) }
+        runningVariances.clear()
+        variancesSnap?.let { runningVariances.putAll(it) }
+        lastCentroidsSnapshot = null
+        lastVariancesSnapshot = null
+        return true
+    }
+
     /**
-     * Adapts running key centroid with a valid typed touch:
-     * \mu_{k}^{(n)} = \alpha \cdot \mu_{k}^{(n-1)} + (1 - \alpha) \cdot \mathbf{x}_{\text{touch}}
+     * Adapts running key centroid and anisotropic variance with a valid typed touch.
      */
     @Synchronized
     fun adaptCentroid(
@@ -91,6 +133,8 @@ internal object SmartKeyHitbox {
         // NaN passes coerceIn untouched and would then poison every distance for this key.
         if (!offsetX.isFinite() || !offsetY.isFinite()) return
         val current = runningCentroids[lower] ?: (0f to 0f)
+        val dx = offsetX - current.first
+        val dy = offsetY - current.second
         val newX =
             (ALPHA * current.first + (1f - ALPHA) * offsetX)
                 .coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
@@ -98,14 +142,80 @@ internal object SmartKeyHitbox {
             (ALPHA * current.second + (1f - ALPHA) * offsetY)
                 .coerceIn(-MAX_DRIFT_KEY_WIDTH, MAX_DRIFT_KEY_WIDTH)
         runningCentroids[lower] = (newX to newY)
+
+        val curVar = runningVariances[lower] ?: (DEFAULT_VAR to DEFAULT_VAR)
+        val newVarX =
+            (ALPHA * curVar.first + (1f - ALPHA) * dx * dx).coerceIn(MIN_VAR, MAX_VAR)
+        val newVarY =
+            (ALPHA * curVar.second + (1f - ALPHA) * dy * dy).coerceIn(MIN_VAR, MAX_VAR)
+        runningVariances[lower] = (newVarX to newVarY)
     }
 
     /**
      * Adapts a sequence of touch points for an accepted word.
      */
+    @Synchronized
     fun adaptWord(touches: List<TouchPoint>) {
+        saveSnapshot()
         for (tp in touches) {
             adaptCentroid(tp.char, tp.normalizedX, tp.normalizedY)
+        }
+    }
+
+    /**
+     * Adapts centroids and anisotropic variances against an accepted autocorrection target,
+     * aligning adjacent transpositions so touches update the intended target keys.
+     */
+    @Synchronized
+    fun adaptCorrectedWord(
+        touches: List<TouchPoint>,
+        targetWord: String,
+    ) {
+        saveSnapshot()
+        if (touches.isEmpty() || touches.size != targetWord.length) return
+        var i = 0
+        while (i < touches.size) {
+            val tCur = touches[i].char.lowercaseChar()
+            val wCur = targetWord[i].lowercaseChar()
+            if (i + 1 < touches.size &&
+                tCur != wCur &&
+                tCur == targetWord[i + 1].lowercaseChar() &&
+                touches[i + 1].char.lowercaseChar() == wCur
+            ) {
+                adaptTouchToTarget(touches[i], targetWord[i + 1])
+                adaptTouchToTarget(touches[i + 1], targetWord[i])
+                i += 2
+            } else {
+                adaptTouchToTarget(touches[i], targetWord[i])
+                i += 1
+            }
+        }
+    }
+
+    private fun adaptTouchToTarget(
+        touch: TouchPoint,
+        targetChar: Char,
+    ) {
+        val typedLower = touch.char.lowercaseChar()
+        val targetLower = targetChar.lowercaseChar()
+        val typedPos = nominalPositions[typedLower] ?: return
+        val candPos = nominalPositions[targetLower] ?: return
+        if (!touch.normalizedX.isFinite() || !touch.normalizedY.isFinite()) return
+
+        val offsetX: Float
+        val offsetY: Float
+        if (typedLower == targetLower) {
+            offsetX = touch.normalizedX
+            offsetY = touch.normalizedY
+        } else {
+            val (meanXTyped, meanYTyped) = getCentroid(typedLower)
+            val touchX = typedPos.x + (touch.normalizedX - meanXTyped)
+            val touchY = typedPos.y + (touch.normalizedY - meanYTyped)
+            offsetX = touchX - candPos.x
+            offsetY = touchY - candPos.y
+        }
+        if (hypot(offsetX, offsetY) <= MAX_RETARGET_DISTANCE) {
+            adaptCentroid(targetLower, offsetX, offsetY)
         }
     }
 
@@ -120,6 +230,41 @@ internal object SmartKeyHitbox {
             out[i * 2 + 1] = pair.second
         }
         return out
+    }
+
+    /** Returns a 52-float snapshot (varX, varY for 'a'..'z') of learned tap variances. */
+    @Synchronized
+    fun varianceSnapshot(): FloatArray {
+        val out = FloatArray(NUM_FLOATS)
+        for (i in 0 until 26) {
+            val ch = ('a'.code + i).toChar()
+            val pair = runningVariances[ch] ?: continue
+            out[i * 2] = pair.first
+            out[i * 2 + 1] = pair.second
+        }
+        return out
+    }
+
+    /**
+     * Restores learned tap variances from a 52-float array.
+     * Unadapted `0f` pairs remain absent and fall back to [DEFAULT_VAR].
+     */
+    @Synchronized
+    fun restoreVariances(data: FloatArray): Boolean {
+        if (data.size != NUM_FLOATS) return false
+        if (!data.all { it.isFinite() }) return false
+        runningVariances.clear()
+        for (i in 0 until 26) {
+            val rawX = data[i * 2]
+            val rawY = data[i * 2 + 1]
+            if (rawX > 0f || rawY > 0f) {
+                val vx = if (rawX > 0f) rawX.coerceIn(MIN_VAR, MAX_VAR) else DEFAULT_VAR
+                val vy = if (rawY > 0f) rawY.coerceIn(MIN_VAR, MAX_VAR) else DEFAULT_VAR
+                val ch = ('a'.code + i).toChar()
+                runningVariances[ch] = vx to vy
+            }
+        }
+        return true
     }
 
     /**
@@ -231,14 +376,104 @@ internal object SmartKeyHitbox {
     }
 
     /**
-     * Ground-Truth Gboard Spatial Cost (from sub_0xe5ba4 in libjni_latinime.so).
+     * Returns the anisotropic Mahalanobis distance between [touch] and [candidateChar],
+     * scaling horizontal and vertical residuals by each key's learned spread. When
+     * unadapted (`varX = varY = 0.25f`), this matches [euclideanDistance].
+     */
+    fun mahalanobisDistance(
+        touch: TouchPoint,
+        candidateChar: Char,
+    ): Float {
+        val typedLower = touch.char.lowercaseChar()
+        val candLower = candidateChar.lowercaseChar()
+
+        val typedPos = nominalPositions[typedLower] ?: return Float.MAX_VALUE
+        val candPos = nominalPositions[candLower] ?: return Float.MAX_VALUE
+
+        val (meanX, meanY) = getCentroid(typedLower)
+        val touchX = typedPos.x + (touch.normalizedX - meanX)
+        val touchY = typedPos.y + (touch.normalizedY - meanY)
+
+        val dx = touchX - candPos.x
+        val dy = touchY - candPos.y
+        val (varX, varY) = getVariance(candLower)
+        val scaleX = (sqrt(varX) / BASE_STD).coerceIn(MIN_SCALE, MAX_SCALE)
+        val scaleY = (sqrt(varY) / BASE_STD).coerceIn(MIN_SCALE, MAX_SCALE)
+        val normDx = dx / scaleX
+        val normDy = dy / scaleY
+        return sqrt(normDx * normDx + normDy * normDy)
+    }
+
+    /**
+     * Returns the closest QWERTY neighbor key in the direction of [touch] within [maxDist],
+     * or null when no adjacent key is closer than the cutoff.
+     */
+    fun nearestNeighborInDirection(
+        typedChar: Char,
+        touch: TouchPoint,
+        maxDist: Float = 0.85f,
+    ): Pair<Char, Float>? {
+        if (!touch.normalizedX.isFinite() || !touch.normalizedY.isFinite()) return null
+        val typedLower = typedChar.lowercaseChar()
+        val typedPos = nominalPositions[typedLower] ?: return null
+        val (meanX, meanY) = getCentroid(typedLower)
+        val touchX = typedPos.x + (touch.normalizedX - meanX)
+        val touchY = typedPos.y + (touch.normalizedY - meanY)
+
+        var bestChar: Char? = null
+        var bestDist = Float.MAX_VALUE
+        for ((cand, pos) in nominalPositions) {
+            if (cand == typedLower) continue
+            val dist = hypot(touchX - pos.x, touchY - pos.y)
+            if (dist < bestDist) {
+                bestDist = dist
+                bestChar = cand
+            }
+        }
+        return if (bestChar != null && bestDist <= maxDist) {
+            bestChar to bestDist
+        } else {
+            null
+        }
+    }
+
+    /**
+     * Reprojects [touch] from `touch.char` into the local coordinate frame of [resolvedChar],
+     * clamped to `[-0.5f, 0.5f]`.
+     */
+    fun reprojectTouchOffset(
+        touch: TouchPoint,
+        resolvedChar: Char,
+    ): Pair<Float, Float> {
+        if (!touch.normalizedX.isFinite() || !touch.normalizedY.isFinite()) return 0f to 0f
+        val typedLower = touch.char.lowercaseChar()
+        val resolvedLower = resolvedChar.lowercaseChar()
+        val typedPos = nominalPositions[typedLower]
+        val resolvedPos = nominalPositions[resolvedLower]
+        if (typedPos == null || resolvedPos == null) {
+            return (
+                touch.normalizedX.coerceIn(-0.5f, 0.5f) to
+                    touch.normalizedY.coerceIn(-0.5f, 0.5f)
+            )
+        }
+        val (meanX, meanY) = getCentroid(typedLower)
+        val (resolvedMeanX, resolvedMeanY) = getCentroid(resolvedLower)
+        val physX = typedPos.x + (touch.normalizedX - meanX)
+        val physY = typedPos.y + (touch.normalizedY - meanY)
+        val outX = (physX - resolvedPos.x + resolvedMeanX).coerceIn(-0.5f, 0.5f)
+        val outY = (physY - resolvedPos.y + resolvedMeanY).coerceIn(-0.5f, 0.5f)
+        return outX to outY
+    }
+
+    /**
+     * Calibrated SmartKeys Spatial Cost with inner sweet-spot damping.
      */
     fun spatialCostFloat(
         touch: TouchPoint,
         candidateChar: Char,
         isInitialChar: Boolean = false,
     ): Float {
-        val d = euclideanDistance(touch, candidateChar)
+        val d = mahalanobisDistance(touch, candidateChar)
         val fd =
             if (d <= SWEET_SPOT_RADIUS) {
                 SWEET_SPOT_MULTIPLIER * d
@@ -251,7 +486,7 @@ internal object SmartKeyHitbox {
 
     /**
      * Discrete integer edit cost for Bloom DP trie traversal and Levenshtein alignment.
-     * Maps continuous Euclidean distance into calibrated edit costs:
+     * Maps continuous Mahalanobis distance into calibrated edit costs:
      * - Direct hit on same char: 0
      * - Near-center hit on adjacent char (d <= 0.60): 1 or 2
      * - Outer edge adjacent (0.60 < d <= 1.10): defaultAdjacentCost (2)
@@ -268,7 +503,7 @@ internal object SmartKeyHitbox {
         val candLower = candidateChar.lowercaseChar()
         if (typedLower == candLower) return 0
 
-        val d = euclideanDistance(touch, candLower)
+        val d = mahalanobisDistance(touch, candLower)
         return when {
             d <= 0.60f -> 1 // Extremely close to candidate key border
             d <= 1.10f -> defaultAdjacentCost // Adjacent key body

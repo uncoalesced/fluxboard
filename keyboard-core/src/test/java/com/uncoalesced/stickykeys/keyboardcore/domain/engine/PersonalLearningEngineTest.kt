@@ -323,6 +323,53 @@ class PersonalLearningEngineTest {
                 tempDir.deleteRecursively()
             }
         }
+
+    @Test
+    fun quarantineRule_requiresThreeStrikesForCoreTypoWhileNovelWordsTakeTwo() =
+        testScope.runTest {
+            engine.isLikelyCoreTypo = { it == "teh" }
+
+            // Novel word still activates normally (1 -> staged, 2 -> shielded)
+            engine.onWordCommitted(null, "zixor")
+            advanceUntilIdle()
+            assertEquals(1, engine.lexicon.countOf("zixor"))
+            assertFalse(engine.lexicon.isShielded("zixor"))
+            engine.onWordCommitted(null, "zixor")
+            advanceUntilIdle()
+            assertEquals(2, engine.lexicon.countOf("zixor"))
+            assertTrue(engine.lexicon.isShielded("zixor"))
+
+            // Core typo "teh" is quarantined for strikes 1 and 2
+            engine.onWordCommitted(null, "teh")
+            engine.onWordCommitted(null, "teh")
+            advanceUntilIdle()
+            assertEquals(0, engine.lexicon.countOf("teh"))
+            assertFalse(engine.lexicon.isShielded("teh"))
+            assertEquals(null, fakePersonalDao.getWord("teh"))
+
+            // Strike 3 promotes "teh" with frequency 3
+            engine.onWordCommitted(null, "teh")
+            advanceUntilIdle()
+            assertEquals(3, engine.lexicon.countOf("teh"))
+            assertTrue(engine.lexicon.isShielded("teh"))
+            assertEquals(3, fakePersonalDao.getWord("teh")?.frequency)
+        }
+
+    @Test
+    fun onWordKept_bypassesCoreTypoQuarantineImmediately() =
+        testScope.runTest {
+            engine.isLikelyCoreTypo = { it == "teh" }
+
+            engine.onWordCommitted(null, "teh")
+            advanceUntilIdle()
+            assertEquals(0, engine.lexicon.countOf("teh"))
+
+            engine.onWordKept("teh")
+            advanceUntilIdle()
+            assertEquals(2, engine.lexicon.countOf("teh"))
+            assertTrue(engine.lexicon.isShielded("teh"))
+            assertEquals(2, fakePersonalDao.getWord("teh")?.frequency)
+        }
 }
 
 private class FakePersonalDictionaryDao : PersonalDictionaryDao {

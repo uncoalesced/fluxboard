@@ -119,4 +119,41 @@ class BloomPersonalBigramCacheTest {
         assertEquals(0, cache.totalTransitionsCount())
         assertEquals(0f, cache.boostFor("a", "b"), 0.001f)
     }
+
+    @Test
+    fun effectiveBoostFor_decaysWithFourteenDayHalfLifeAndTenPercentFloor() {
+        val t0 = 1_000_000_000L
+        val dayMs = 86_400_000L
+        cache.recordTransitionAt("meet", "rahul", increment = 2, timestampMs = t0)
+        val base = cache.boostFor("meet", "rahul")
+
+        assertEquals(base, cache.effectiveBoostFor("meet", "rahul", nowMs = t0), 1e-5f)
+        assertEquals(
+            base * 0.5f,
+            cache.effectiveBoostFor("meet", "rahul", nowMs = t0 + 14 * dayMs),
+            1e-4f,
+        )
+        assertEquals(
+            base * 0.25f,
+            cache.effectiveBoostFor("meet", "rahul", nowMs = t0 + 28 * dayMs),
+            1e-4f,
+        )
+        assertEquals(
+            base * 0.1f,
+            cache.effectiveBoostFor("meet", "rahul", nowMs = t0 + 120 * dayMs),
+            1e-4f,
+        )
+    }
+
+    @Test
+    fun followersOf_filtersByMinCount() {
+        cache.recordTransition("order", "pizza")
+        cache.recordTransition("order", "shawarma")
+        cache.recordTransition("order", "shawarma")
+
+        val confirmed = cache.followersOf("order", limit = 5, minCount = 2)
+        assertEquals(1, confirmed.size)
+        assertEquals("shawarma", confirmed[0].first)
+        assertEquals(2, confirmed[0].second)
+    }
 }

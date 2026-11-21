@@ -63,7 +63,7 @@ class SmartKeyHitboxTest {
     }
 
     @Test
-    fun `spatial cost follows gboard sweet spot formula`() {
+    fun `spatial cost follows calibrated sweet spot formula`() {
         // Inner sweet spot: d <= 0.25 -> 0.96 * d
         val touchSweet = TouchPoint('g', 0.10f, 0f)
         val costSweet = SmartKeyHitbox.spatialCostFloat(touchSweet, 'g', isInitialChar = false)
@@ -175,6 +175,85 @@ class SmartKeyHitboxTest {
         SmartKeyHitbox.delete(file)
 
         assertFalse(file.exists())
+    }
+
+    @Test
+    fun `mahalanobisDistance equals euclideanDistance when unadapted`() {
+        val touch = TouchPoint('o', 0.35f, -0.15f)
+        assertEquals(
+            SmartKeyHitbox.euclideanDistance(touch, 'p'),
+            SmartKeyHitbox.mahalanobisDistance(touch, 'p'),
+            1e-6f,
+        )
+    }
+
+    @Test
+    fun `adaptCorrectedWord updates centroids and anisotropic variances and supports rollback`() {
+        assertFalse(SmartKeyHitbox.rollbackLastAdaptation())
+
+        // 'e' is at x=2.0, 'w' is at x=1.0; normalizedX=-0.4f lands at 1.6 (dx=+0.6f from 'w')
+        val touches =
+            listOf(
+                TouchPoint('e', -0.4f, 0f),
+                TouchPoint('o', 0f, 0f),
+                TouchPoint('r', 0f, 0f),
+                TouchPoint('k', 0f, 0f),
+            )
+        SmartKeyHitbox.adaptCorrectedWord(touches, "work")
+
+        val (meanXw, _) = SmartKeyHitbox.getCentroid('w')
+        assertTrue("Expected 'w' centroid to shift right towards 0.6", meanXw > 0f)
+
+        val (varXw, varYw) = SmartKeyHitbox.getVariance('w')
+        assertTrue("Expected horizontal variance to expand above default", varXw > 0.25f)
+        assertTrue("Expected vertical variance to tighten below default", varYw < 0.25f)
+
+        assertTrue(SmartKeyHitbox.rollbackLastAdaptation())
+        assertEquals(0f to 0f, SmartKeyHitbox.getCentroid('w'))
+        assertEquals(0.25f to 0.25f, SmartKeyHitbox.getVariance('w'))
+        assertFalse(SmartKeyHitbox.rollbackLastAdaptation())
+    }
+
+    @Test
+    fun `adaptCorrectedWord aligns adjacent transpositions onto target keys`() {
+        val touches =
+            listOf(
+                TouchPoint('t', 0.2f, 0f),
+                TouchPoint('e', 0.1f, 0f),
+                TouchPoint('h', -0.1f, 0f),
+            )
+        SmartKeyHitbox.adaptCorrectedWord(touches, "the")
+
+        // Transposition pairs touches[1] ('e') onto target 'e' and touches[2] ('h') onto target 'h'
+        assertTrue(SmartKeyHitbox.getCentroid('e').first > 0f)
+        assertTrue(SmartKeyHitbox.getCentroid('h').first < 0f)
+    }
+
+    @Test
+    fun `varianceSnapshot and restoreVariances round-trip and reject non-finite values`() {
+        val data = FloatArray(52)
+        data[0] = 0.42f // 'a' varX
+        data[1] = 0.12f // 'a' varY
+        assertTrue(SmartKeyHitbox.restoreVariances(data))
+        assertEquals(0.42f to 0.12f, SmartKeyHitbox.getVariance('a'))
+        assertEquals(0.25f to 0.25f, SmartKeyHitbox.getVariance('b'))
+        assertArrayEquals(data, SmartKeyHitbox.varianceSnapshot(), 0f)
+
+        assertFalse(SmartKeyHitbox.restoreVariances(FloatArray(52).also { it[2] = Float.NaN }))
+        assertEquals(0.42f to 0.12f, SmartKeyHitbox.getVariance('a'))
+    }
+
+    @Test
+    fun `nearestNeighborInDirection and reprojectTouchOffset resolve edge taps cleanly`() {
+        // 'o' is at x=8, 'p' is at x=9 -> right edge +0.4f is 0.60 key widths from 'p'
+        val edgeTouch = TouchPoint('o', 0.4f, 0f)
+        val neighbor = SmartKeyHitbox.nearestNeighborInDirection('o', edgeTouch)
+        assertTrue(neighbor != null && neighbor.first == 'p')
+        assertEquals(0.6f, neighbor!!.second, 0.001f)
+
+        val (rx, ry) = SmartKeyHitbox.reprojectTouchOffset(edgeTouch, 'p')
+        assertEquals(-0.5f, rx, 0.001f)
+        assertEquals(0f, ry, 0.001f)
     }
 
     private companion object {

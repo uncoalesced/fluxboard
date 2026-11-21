@@ -242,4 +242,188 @@ class BloomTriggerPredictorTest {
         )
         assertTrue(decision.effectiveThreshold > BloomTriggerPredictor.BASE_MODEST_THRESHOLD)
     }
+
+    @Test
+    fun `adjacent transpositions with physical touch coordinates pass gate 5`() {
+        val tehTouches =
+            listOf(
+                TouchPoint('t', 0f, 0f, 1000L),
+                TouchPoint('e', 0f, 0f, 1090L),
+                TouchPoint('h', 0f, 0f, 1180L),
+            )
+        val tehCandidate =
+            ScoredCandidate(
+                word = "the",
+                cost = 3,
+                normalizedScore = 0.67f,
+                spatialScore = 0.67f,
+                bigramBoost = 0f,
+                finalScore = 0.67f,
+            )
+        val tehDecision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "teh",
+                topCandidate = tehCandidate,
+                touches = tehTouches,
+            )
+        assertTrue(
+            "teh -> the should pass touch coherence: ${tehDecision.reason}",
+            tehDecision.shouldAutoCommit,
+        )
+
+        val thierTouches =
+            listOf(
+                TouchPoint('t', 0f, 0f, 1000L),
+                TouchPoint('h', 0f, 0f, 1090L),
+                TouchPoint('i', 0f, 0f, 1180L),
+                TouchPoint('e', 0f, 0f, 1270L),
+                TouchPoint('r', 0f, 0f, 1360L),
+            )
+        val thierCandidate =
+            ScoredCandidate(
+                word = "their",
+                cost = 3,
+                normalizedScore = 0.65f,
+                spatialScore = 0.65f,
+                bigramBoost = 0f,
+                finalScore = 0.65f,
+            )
+        val thierDecision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "thier",
+                topCandidate = thierCandidate,
+                touches = thierTouches,
+            )
+        assertTrue(
+            "thier -> their should pass touch coherence: ${thierDecision.reason}",
+            thierDecision.shouldAutoCommit,
+        )
+    }
+
+    @Test
+    fun `distant non-transposed touches still fail gate 5`() {
+        val distantTouches =
+            listOf(
+                TouchPoint('z', 0f, 0f, 1000L),
+                TouchPoint('p', 0f, 0f, 1090L),
+                TouchPoint('m', 0f, 0f, 1180L),
+            )
+        val candidate =
+            ScoredCandidate(
+                word = "the",
+                cost = 5,
+                normalizedScore = 0.45f,
+                spatialScore = 0.45f,
+                bigramBoost = 0f,
+                finalScore = 0.45f,
+            )
+        val decision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "zpm",
+                topCandidate = candidate,
+                touches = distantTouches,
+            )
+        assertFalse(decision.shouldAutoCommit)
+        assertTrue(decision.reason.startsWith("Physical touch distance"))
+    }
+
+    @Test
+    fun `single omission with physical touch coordinates passes gate 5`() {
+        val sholdTouches =
+            listOf(
+                TouchPoint('s', 0f, 0f, 1000L),
+                TouchPoint('h', 0f, 0f, 1090L),
+                TouchPoint('o', 0f, 0f, 1180L),
+                TouchPoint('l', 0f, 0f, 1270L),
+                TouchPoint('d', 0f, 0f, 1360L),
+            )
+        val candidate =
+            ScoredCandidate(
+                word = "should",
+                cost = 3,
+                normalizedScore = 0.65f,
+                spatialScore = 0.65f,
+                bigramBoost = 0f,
+                finalScore = 0.65f,
+            )
+        val decision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "shold",
+                topCandidate = candidate,
+                touches = sholdTouches,
+            )
+        assertTrue(
+            "shold -> should should pass omission touch alignment: ${decision.reason}",
+            decision.shouldAutoCommit,
+        )
+    }
+
+    @Test
+    fun `single insertion with physical touch coordinates passes gate 5`() {
+        val abboutTouches =
+            listOf(
+                TouchPoint('a', 0f, 0f, 1000L),
+                TouchPoint('b', 0f, 0f, 1090L),
+                TouchPoint('b', 0f, 0f, 1180L),
+                TouchPoint('o', 0f, 0f, 1270L),
+                TouchPoint('u', 0f, 0f, 1360L),
+                TouchPoint('t', 0f, 0f, 1450L),
+            )
+        val candidate =
+            ScoredCandidate(
+                word = "about",
+                cost = 3,
+                normalizedScore = 0.68f,
+                spatialScore = 0.68f,
+                bigramBoost = 0f,
+                finalScore = 0.68f,
+            )
+        val decision =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "abbout",
+                topCandidate = candidate,
+                touches = abboutTouches,
+            )
+        assertTrue(
+            "abbout -> about should pass insertion touch alignment: ${decision.reason}",
+            decision.shouldAutoCommit,
+        )
+    }
+
+    @Test
+    fun `adaptiveThresholdOffset modulates gate 3 restraint cleanly`() {
+        val candidate =
+            ScoredCandidate(
+                word = "word",
+                cost = 2,
+                normalizedScore = 0.195f,
+                spatialScore = 0.195f,
+                bigramBoost = 0f,
+                finalScore = 0.195f,
+            )
+
+        val positiveOffset =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "wrod",
+                topCandidate = candidate,
+                adaptiveThresholdOffset = 0.030f,
+            )
+        assertFalse(
+            "Positive adaptive offset should withhold borderline score",
+            positiveOffset.shouldAutoCommit,
+        )
+        assertEquals(0.215f, positiveOffset.effectiveThreshold, 1e-4f)
+
+        val negativeOffset =
+            BloomTriggerPredictor.evaluate(
+                typedWord = "wrod",
+                topCandidate = candidate.copy(finalScore = 0.170f, normalizedScore = 0.170f),
+                adaptiveThresholdOffset = -0.025f,
+            )
+        assertTrue(
+            "Negative adaptive offset should allow score above lowered threshold",
+            negativeOffset.shouldAutoCommit,
+        )
+        assertEquals(0.160f, negativeOffset.effectiveThreshold, 1e-4f)
+    }
 }

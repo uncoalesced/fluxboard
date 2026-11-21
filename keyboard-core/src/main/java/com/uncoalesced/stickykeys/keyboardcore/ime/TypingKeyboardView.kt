@@ -416,11 +416,10 @@ fun TypingKeyboardView(
                                         announce = true,
                                         onClick = {
                                             // Corrected -> original, one round-trip.
-                                            // +1 covers the trailing space.
-                                            val span = undo.corrected.length + 1
+                                            val span = undo.corrected.length + undo.suffix.length
                                             keyboardController.replaceTextBeforeCursor(
                                                 span,
-                                                undo.original + " ",
+                                                undo.original + undo.suffix,
                                             )
                                             typingViewModel.onUndoApplied(undo.original)
                                         },

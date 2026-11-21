@@ -2,6 +2,7 @@
 package com.uncoalesced.stickykeys.keyboardcore.domain.engine
 
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.pow
 
 /**
  * In-memory L1 cache for dynamic user bigram transitions.
@@ -14,6 +15,7 @@ class BloomPersonalBigramCache(
 ) {
     // previousWord -> Map<nextWord, count>
     private val transitions = ConcurrentHashMap<String, ConcurrentHashMap<String, Int>>()
+    private val lastUsedTimestamps = ConcurrentHashMap<String, ConcurrentHashMap<String, Long>>()
 
     /**
      * Records a transition from [prev] to [next].
@@ -23,6 +25,16 @@ class BloomPersonalBigramCache(
         prev: String,
         next: String,
         increment: Int = 1,
+    ): Int = recordTransitionAt(prev, next, increment, System.currentTimeMillis())
+
+    /**
+     * Records a transition from [prev] to [next] with an explicit [timestampMs] for recency decay.
+     */
+    internal fun recordTransitionAt(
+        prev: String,
+        next: String,
+        increment: Int = 1,
+        timestampMs: Long = System.currentTimeMillis(),
     ): Int {
         val p = prev.lowercase().trim()
         val n = next.lowercase().trim()
@@ -32,6 +44,8 @@ class BloomPersonalBigramCache(
             prune(maxCapacity - maxOf(1, maxCapacity / 20)) // prune lowest 5%
         }
 
+        val tsMap = lastUsedTimestamps.computeIfAbsent(p) { ConcurrentHashMap() }
+        tsMap[n] = timestampMs
         val nextMap = transitions.computeIfAbsent(p) { ConcurrentHashMap() }
         return nextMap.compute(n) { _, count ->
             val updated = (count ?: 0) + increment
@@ -57,6 +71,7 @@ class BloomPersonalBigramCache(
             val updated = (count ?: 1) - 1
             if (updated <= 0) {
                 remaining = 0
+                lastUsedTimestamps[p]?.remove(n)
                 null
             } else {
                 remaining = updated
@@ -65,6 +80,7 @@ class BloomPersonalBigramCache(
         }
         if (nextMap.isEmpty()) {
             transitions.remove(p)
+            lastUsedTimestamps.remove(p)
         }
         return remaining
     }
@@ -91,17 +107,38 @@ class BloomPersonalBigramCache(
     }
 
     /**
-     * Returns the recorded followers of [prev], sorted by frequency descending.
+     * Returns the recency-decayed effective boost for [next] following [prev] using a 14-day
+     * half-life floored at 10% of [boostFor].
+     */
+    fun effectiveBoostFor(
+        prev: String,
+        next: String,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Float {
+        val base = boostFor(prev, next)
+        if (base <= 0f) return 0f
+        val p = prev.lowercase().trim()
+        val n = next.lowercase().trim()
+        val lastTs = lastUsedTimestamps[p]?.get(n) ?: nowMs
+        val ageDays = (nowMs - lastTs).coerceAtLeast(0L).toDouble() / MS_PER_DAY
+        val decay = 2.0.pow(-ageDays / HALF_LIFE_DAYS).coerceIn(MIN_DECAY_FACTOR, 1.0)
+        return (base * decay).toFloat()
+    }
+
+    /**
+     * Returns the recorded followers of [prev] with count >= [minCount], sorted descending.
      */
     fun followersOf(
         prev: String,
         limit: Int = 8,
+        minCount: Int = 1,
     ): List<Pair<String, Int>> {
         val nextMap = transitions[prev.lowercase().trim()] ?: return emptyList()
         if (limit <= 0) return emptyList()
 
         return nextMap.entries
             .asSequence()
+            .filter { it.value >= minCount }
             .sortedByDescending { it.value }
             .take(limit)
             .map { it.key to it.value }
@@ -115,11 +152,17 @@ class BloomPersonalBigramCache(
             for ((next, _) in nextMap) {
                 nextMap.compute(next) { _, current ->
                     val updated = (current ?: 0) - amount
-                    if (updated <= 0) null else updated
+                    if (updated <= 0) {
+                        lastUsedTimestamps[prev]?.remove(next)
+                        null
+                    } else {
+                        updated
+                    }
                 }
             }
             if (nextMap.isEmpty()) {
                 transitions.remove(prev)
+                lastUsedTimestamps.remove(prev)
             }
         }
     }
@@ -148,8 +191,10 @@ class BloomPersonalBigramCache(
             val nextMap = transitions[prev]
             if (nextMap != null) {
                 nextMap.remove(next)
+                lastUsedTimestamps[prev]?.remove(next)
                 if (nextMap.isEmpty()) {
                     transitions.remove(prev)
+                    lastUsedTimestamps.remove(prev)
                 }
             }
         }
@@ -158,6 +203,7 @@ class BloomPersonalBigramCache(
     /** Drops all cached bigrams. */
     fun clear() {
         transitions.clear()
+        lastUsedTimestamps.clear()
     }
 
     /** Returns an immutable snapshot copy of current transitions. */
@@ -165,5 +211,8 @@ class BloomPersonalBigramCache(
 
     companion object {
         const val MAX_BIGRAMS = 10000
+        private const val HALF_LIFE_DAYS = 14.0
+        private const val MS_PER_DAY = 86_400_000.0
+        private const val MIN_DECAY_FACTOR = 0.1
     }
 }

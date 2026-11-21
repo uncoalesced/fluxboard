@@ -18,7 +18,7 @@ private data class BloomBeam(
 )
 
 /**
- * GBoard-adjacent continuous spatial trajectory decoder for BloomType.
+ * Continuous spatial trajectory decoder for BloomType.
  *
  * Replaces discrete-key subsequence scanning with a continuous curve-to-polyline
  * trajectory aligner over multi-lexicon binary prefix tries and personal dictionaries.

@@ -129,4 +129,16 @@ class BloomPersonalLexiconTest {
         assertFalse(lexicon.hasWord("hello"))
         assertFalse(lexicon.hasWord("world"))
     }
+
+    @Test
+    fun effectiveFrequency_decaysWithFourteenDayHalfLifeAndTenPercentFloor() {
+        val t0 = 1_000_000_000L
+        val dayMs = 86_400_000L
+        lexicon.recordOccurrenceAt("fluxboard", increment = 10, timestampMs = t0)
+
+        assertEquals(10f, lexicon.effectiveFrequency("fluxboard", nowMs = t0), 1e-4f)
+        assertEquals(5f, lexicon.effectiveFrequency("fluxboard", nowMs = t0 + 14 * dayMs), 1e-3f)
+        assertEquals(2.5f, lexicon.effectiveFrequency("fluxboard", nowMs = t0 + 28 * dayMs), 1e-3f)
+        assertEquals(1.0f, lexicon.effectiveFrequency("fluxboard", nowMs = t0 + 120 * dayMs), 1e-3f)
+    }
 }
