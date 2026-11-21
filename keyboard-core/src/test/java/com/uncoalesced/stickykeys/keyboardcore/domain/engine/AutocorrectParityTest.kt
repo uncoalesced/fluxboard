@@ -9,6 +9,7 @@ import com.uncoalesced.stickykeys.keyboardcore.data.local.entity.PersonalWordEnt
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -63,15 +64,36 @@ class AutocorrectParityTest {
     // --- Restraint: a wrong correction costs a rewrite, a missed one costs a typo ------------
 
     @Test
-    fun `alot is left alone rather than becoming slot`() =
+    fun `alot becomes a lot`() =
         runBlocking {
-            assertNull(engine.getAutoCorrection("alot"))
+            assertEquals("a lot", engine.getAutoCorrection("alot"))
+            assertEquals("A lot", engine.getAutoCorrection("Alot"))
         }
 
     @Test
-    fun `alot in a sentence is left alone rather than becoming not`() =
+    fun `alot in a sentence becomes a lot rather than not`() =
         runBlocking {
-            assertNull(contextEngine.getAutoCorrection("alot", previousWord = "thanks"))
+            assertEquals("a lot", contextEngine.getAutoCorrection("alot", previousWord = "thanks"))
+        }
+
+    @Test
+    fun `space-omission compounds split back into two words`() =
+        runBlocking {
+            mapOf(
+                "thankyou" to "thank you",
+                "goodmorning" to "good morning",
+                "ofcourse" to "of course",
+                "inorder" to "in order",
+                "Alot" to "A lot",
+                "Thankyou" to "Thank you",
+            ).forEach { (typed, expected) ->
+                assertEquals("engine '$typed'", expected, engine.getAutoCorrection(typed))
+                assertEquals(
+                    "contextEngine '$typed'",
+                    expected,
+                    contextEngine.getAutoCorrection(typed),
+                )
+            }
         }
 
     @Test
@@ -239,5 +261,109 @@ class AutocorrectParityTest {
                     engine.getAutoCorrection(typed, touches = touches),
                 )
             }
+        }
+
+    @Test
+    fun `capitalized transpositions with real touch points autocorrect within 25ms after warmup`() =
+        runBlocking {
+            val warmupTouches =
+                listOf(
+                    TouchPoint('f', 0f, 0f, 900L),
+                    TouchPoint('r', 0f, 0f, 1000L),
+                    TouchPoint('e', 0f, 0f, 1100L),
+                    TouchPoint('i', 0f, 0f, 1200L),
+                    TouchPoint('n', 0f, 0f, 1300L),
+                    TouchPoint('d', 0f, 0f, 1400L),
+                )
+            engine.getAutoCorrection("freind", touches = warmupTouches)
+
+            mapOf(
+                "Freind" to "Friend",
+                "Thier" to "Their",
+                "Recieve" to "Receive",
+            ).forEach { (typed, expected) ->
+                val touches =
+                    typed.lowercase().mapIndexed { idx, ch ->
+                        TouchPoint(ch, 0f, 0f, 1000L + idx * 110L)
+                    }
+                val startNs = System.nanoTime()
+                val actual = engine.getAutoCorrection(typed, touches = touches)
+                val elapsedMs = (System.nanoTime() - startNs) / 1_000_000.0
+                println("TIMING $typed -> $actual in ${"%.2f".format(elapsedMs)} ms")
+                assertEquals("'$typed' with physical touches", expected, actual)
+                assertTrue(
+                    "Expected '$typed' lookup under 25ms, took ${elapsedMs}ms",
+                    elapsedMs < 25.0,
+                )
+            }
+        }
+
+    @Test
+    fun `context edit relaxation recovers high-confidence follower beyond base length cap`() =
+        runBlocking {
+            assertNull(engine.getAutoCorrection("mrnngg"))
+            assertNull(contextEngine.getAutoCorrection("mrnngg"))
+            assertEquals(
+                "morning",
+                contextEngine.getAutoCorrection("mrnngg", previousWord = "good"),
+            )
+        }
+
+    @Test
+    fun `continuationScoresForPrefix scores dictionary and shielded personal continuations`() =
+        runBlocking {
+            val baseScores = engine.continuationScoresForPrefix("th", listOf('e', 'a', 'z'))
+            assertTrue("Expected positive score for 'e'", (baseScores['e'] ?: 0f) > 0f)
+            assertTrue("Expected positive score for 'a'", (baseScores['a'] ?: 0f) > 0f)
+            assertEquals(0f, baseScores['z'] ?: 0f, 0f)
+
+            engine.learnWord("zixor")
+            engine.learnWord("zixor")
+            val personalScores = engine.continuationScoresForPrefix("zix", listOf('o', 'a'))
+            assertTrue("Expected personal boost for 'o'", (personalScores['o'] ?: 0f) > 0f)
+            assertEquals(0f, personalScores['a'] ?: 0f, 0f)
+        }
+
+    @Test
+    fun `recordAutoCorrectAccepted and recordAutoCorrectReverted update adaptive threshold`() =
+        runBlocking {
+            SmartKeyHitbox.resetCentroids()
+            val beforeOffset = engine.adaptiveThreshold.currentOffset()
+            assertEquals(0f, beforeOffset, 0f)
+
+            val touches =
+                listOf(
+                    TouchPoint('e', -0.4f, 0f),
+                    TouchPoint('o', 0f, 0f),
+                    TouchPoint('r', 0f, 0f),
+                    TouchPoint('k', 0f, 0f),
+                )
+            engine.recordAutoCorrectAccepted(touches, "work", learnSpatial = true)
+            assertTrue(engine.adaptiveThreshold.currentOffset() < 0f)
+            assertTrue(SmartKeyHitbox.getCentroid('w').first > 0f)
+
+            engine.recordAutoCorrectReverted("eork")
+            assertTrue(engine.adaptiveThreshold.currentOffset() > 0f)
+            assertTrue(engine.isReverted("eork"))
+            assertEquals(0f to 0f, SmartKeyHitbox.getCentroid('w'))
+            assertTrue(engine.isLikelyOneEditTypoOfCoreWord("teh"))
+            assertFalse(engine.isLikelyOneEditTypoOfCoreWord("zorbly"))
+        }
+
+    @Test
+    fun `next word suggestions require confirmed personal bigrams with count at least two`() =
+        runBlocking {
+            contextEngine.learnBigram("unseenanchor", "onetime")
+            assertTrue(
+                "One-off personal bigram should not enter next-word suggestions",
+                "onetime" !in contextEngine.getNextWordSuggestions("unseenanchor"),
+            )
+
+            contextEngine.learnBigram("unseenanchor", "confirmedpair")
+            contextEngine.learnBigram("unseenanchor", "confirmedpair")
+            assertEquals(
+                listOf("confirmedpair"),
+                contextEngine.getNextWordSuggestions("unseenanchor"),
+            )
         }
 }
