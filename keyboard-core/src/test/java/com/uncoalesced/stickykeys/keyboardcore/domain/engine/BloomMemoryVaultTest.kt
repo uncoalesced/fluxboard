@@ -203,6 +203,92 @@ class BloomMemoryVaultTest {
         assertNull(BloomMemoryVault.load(vaultFile))
     }
 
+    @Test
+    fun `v2 vault round-trips tap variances and adaptive threshold state`() {
+        val glide = FloatArray(52) { it * 0.001f }
+        val tap = FloatArray(52) { -it * 0.001f }
+        val variances = FloatArray(52) { if (it < 2) 0.45f else 0f }
+        BloomMemoryVault.save(
+            file = vaultFile,
+            glideOffsets = glide,
+            tapOffsets = tap,
+            unigrams = listOf(PersonalWordEntity("zixor", 3, 1_000L)),
+            bigrams = emptyList(),
+            tapVariances = variances,
+            actAcceptCount = 14,
+            actRevertCount = 2,
+            adaptiveThresholdOffset = 0.012f,
+        )
+
+        val loaded = BloomMemoryVault.load(vaultFile)
+        assertNotNull(loaded)
+        assertArrayEquals(variances, loaded!!.tapVariances, 0f)
+        assertEquals(14, loaded.actAcceptCount)
+        assertEquals(2, loaded.actRevertCount)
+        assertEquals(0.012f, loaded.adaptiveThresholdOffset, 1e-6f)
+    }
+
+    @Test
+    fun `legacy v1 vault loads cleanly with default v2 fields`() {
+        val glide = FloatArray(52) { 0.05f }
+        val tap = FloatArray(52) { -0.05f }
+        writeRawVault(
+            vaultFile,
+            glide,
+            tap,
+            listOf(PersonalWordEntity("legacyword", 3, 5_000L)),
+        )
+
+        val loaded = BloomMemoryVault.load(vaultFile)
+        assertNotNull(loaded)
+        assertArrayEquals(glide, loaded!!.glideOffsets, 0f)
+        assertArrayEquals(tap, loaded.tapOffsets, 0f)
+        assertTrue(loaded.tapVariances.all { it == 0f })
+        assertEquals(0, loaded.actAcceptCount)
+        assertEquals(0, loaded.actRevertCount)
+        assertEquals(0f, loaded.adaptiveThresholdOffset, 0f)
+        assertEquals(listOf(PersonalWordEntity("legacyword", 3, 5_000L)), loaded.unigrams)
+    }
+
+    @Test
+    fun `saveCurrentState persists and reconciles adaptive threshold and tap variances`() {
+        val engine = PersonalLearningEngine(personalDao = noOpDao())
+        val threshold = BloomAdaptiveThreshold()
+        threshold.recordRevert()
+        threshold.recordAccept()
+        SmartKeyHitbox.restoreVariances(
+            FloatArray(52).apply {
+                this[0] = 0.51f
+                this[1] = 0.14f
+            },
+        )
+
+        BloomMemoryVault.saveCurrentState(
+            vaultFile = vaultFile,
+            learningEngine = engine,
+            glideProfile = BloomSpatialProfile(),
+            adaptiveThreshold = threshold,
+        )
+
+        SmartKeyHitbox.resetCentroids()
+        val restoredThreshold = BloomAdaptiveThreshold()
+        BloomMemoryVault.reconcileAndSync(
+            vaultFile = vaultFile,
+            glideFile = null,
+            tapFile = null,
+            personalDao = noOpDao(),
+            personalBigramDao = null,
+            learningEngine = engine,
+            glideProfile = BloomSpatialProfile(),
+            adaptiveThreshold = restoredThreshold,
+        )
+
+        assertEquals(0.51f to 0.14f, SmartKeyHitbox.getVariance('a'))
+        assertEquals(threshold.snapshot().first, restoredThreshold.snapshot().first)
+        assertEquals(threshold.snapshot().second, restoredThreshold.snapshot().second)
+        assertEquals(threshold.currentOffset(), restoredThreshold.currentOffset(), 1e-6f)
+    }
+
     private fun tmpFile() = File(vaultFile.parentFile, "${vaultFile.name}.tmp")
 
     private fun saveWords(
