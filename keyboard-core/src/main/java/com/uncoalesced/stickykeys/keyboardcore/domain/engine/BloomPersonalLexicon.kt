@@ -2,6 +2,7 @@
 package com.uncoalesced.stickykeys.keyboardcore.domain.engine
 
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.pow
 
 /**
  * Thread-safe, allocation-free in-memory user vocabulary cache.
@@ -15,6 +16,7 @@ class BloomPersonalLexicon(
     private val maxCapacity: Int = MAX_UNIGRAMS,
 ) {
     private val wordCounts = ConcurrentHashMap<String, Int>()
+    private val lastUsedTimestamps = ConcurrentHashMap<String, Long>()
 
     /**
      * Records occurrence of a word.
@@ -23,6 +25,15 @@ class BloomPersonalLexicon(
     fun recordOccurrence(
         word: String,
         increment: Int = 1,
+    ): Int = recordOccurrenceAt(word, increment, System.currentTimeMillis())
+
+    /**
+     * Records occurrence of [word] with an explicit [timestampMs] for recency decay tracking.
+     */
+    internal fun recordOccurrenceAt(
+        word: String,
+        increment: Int = 1,
+        timestampMs: Long = System.currentTimeMillis(),
     ): Int {
         val lower = word.lowercase().trim()
         if (lower.isEmpty()) return 0
@@ -31,6 +42,7 @@ class BloomPersonalLexicon(
             prune(maxCapacity - maxOf(1, maxCapacity / 20)) // prune lowest 5%
         }
 
+        lastUsedTimestamps[lower] = timestampMs
         return wordCounts.compute(lower) { _, current ->
             val updated = (current ?: 0) + increment
             minOf(255, updated)
@@ -50,6 +62,7 @@ class BloomPersonalLexicon(
             val updated = (current ?: 1) - 1
             if (updated <= 0) {
                 remaining = 0
+                lastUsedTimestamps.remove(lower)
                 null
             } else {
                 remaining = updated
@@ -61,6 +74,22 @@ class BloomPersonalLexicon(
 
     /** Returns the frequency count of [word], or 0 if unknown. */
     fun countOf(word: String): Int = wordCounts[word.lowercase().trim()] ?: 0
+
+    /**
+     * Returns the recency-decayed effective frequency of [word] using a 14-day half-life
+     * floored at 10% of the stored occurrence count.
+     */
+    fun effectiveFrequency(
+        word: String,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Float {
+        val lower = word.lowercase().trim()
+        val count = wordCounts[lower] ?: return 0f
+        val lastTs = lastUsedTimestamps[lower] ?: nowMs
+        val ageDays = (nowMs - lastTs).coerceAtLeast(0L).toDouble() / MS_PER_DAY
+        val decay = 2.0.pow(-ageDays / HALF_LIFE_DAYS).coerceIn(MIN_DECAY_FACTOR, 1.0)
+        return (count * decay).toFloat()
+    }
 
     /**
      * Two-strike unigram activation rule:
@@ -99,7 +128,12 @@ class BloomPersonalLexicon(
         for ((word, _) in wordCounts) {
             wordCounts.compute(word) { _, current ->
                 val updated = (current ?: 0) - amount
-                if (updated <= 0) null else updated
+                if (updated <= 0) {
+                    lastUsedTimestamps.remove(word)
+                    null
+                } else {
+                    updated
+                }
             }
         }
     }
@@ -116,12 +150,14 @@ class BloomPersonalLexicon(
                 .take(excess)
         for (entry in lowest) {
             wordCounts.remove(entry.key)
+            lastUsedTimestamps.remove(entry.key)
         }
     }
 
     /** Drops all entries. */
     fun clear() {
         wordCounts.clear()
+        lastUsedTimestamps.clear()
     }
 
     /** Returns an immutable copy of the active lexicon. */
@@ -133,5 +169,8 @@ class BloomPersonalLexicon(
     companion object {
         const val MAX_UNIGRAMS = 5000
         const val SHIELD_STRIKE_THRESHOLD = 2
+        private const val HALF_LIFE_DAYS = 14.0
+        private const val MS_PER_DAY = 86_400_000.0
+        private const val MIN_DECAY_FACTOR = 0.1
     }
 }
