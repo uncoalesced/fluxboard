@@ -138,13 +138,16 @@ fun KeyboardSettingsScreen(
             val labelAutoCorrect = stringResource(R.string.text_auto_correction)
             val labelGlideTyping = stringResource(R.string.text_glide_typing)
             val summaryGlideTyping = stringResource(R.string.text_glide_typing_summary)
-            val labelBloomTypeLearning = "BloomType adaptive learning"
+            val labelBloomTypeLearning =
+                stringResource(R.string.settings_bloom_learning_title)
             val summaryBloomTypeLearning =
-                "Adapts key touch targets to your personal glide trajectory on-device. 100% private."
-            val labelPersonalizedLearning = "Personalized learning"
+                stringResource(R.string.settings_bloom_learning_summary)
+            val labelPersonalizedLearning =
+                stringResource(R.string.settings_personalized_learning_title)
             val summaryPersonalizedLearning =
-                "Learn words and phrases privately on-device to improve predictions. Never leaves your phone."
-            val labelClearLearnedData = "Clear learned data"
+                stringResource(R.string.settings_personalized_learning_summary)
+            val labelClearLearnedData =
+                stringResource(R.string.settings_clear_learned_data)
             val labelDoubleSpace = stringResource(R.string.text_double_space_period)
             val summaryDoubleSpace = stringResource(R.string.text_double_space_period_summary)
 
@@ -214,7 +217,7 @@ fun KeyboardSettingsScreen(
                 // out from under their thumb on the first keystroke.
                 run {
                     SettingsGroup(
-                        title = "Your typing",
+                        title = stringResource(R.string.settings_group_your_typing),
                         icon = ImageVector.vectorResource(R.drawable.ic_stats),
                     ) {
                         // The two counts as figures rather than rows: they are what the panel
@@ -304,7 +307,10 @@ fun KeyboardSettingsScreen(
                         labelPersonalizedLearning,
                     )
                 ) {
-                    SettingsGroup(title = "Typing", icon = keyboardIcon) {
+                    SettingsGroup(
+                        title = stringResource(R.string.settings_group_typing),
+                        icon = keyboardIcon,
+                    ) {
                         if (matches(labelAutoCap)) {
                             SettingsSwitchRow(
                                 title = labelAutoCap,
@@ -361,7 +367,10 @@ fun KeyboardSettingsScreen(
 
                 // SIZE & FEEL
                 if (matches(labelHeight, labelKeySize, labelVibration, labelBottomPadding)) {
-                    SettingsGroup(title = "Size & feel", icon = tuneIcon) {
+                    SettingsGroup(
+                        title = stringResource(R.string.settings_group_size_and_feel),
+                        icon = tuneIcon,
+                    ) {
                         if (matches(labelHeight, summaryHeight)) {
                             SettingsSliderRow(
                                 title = labelHeight,
@@ -454,7 +463,10 @@ fun KeyboardSettingsScreen(
 
                 // APPEARANCE
                 if (matches(labelTheme, labelLayout, labelNumberRow, labelKeyHints)) {
-                    SettingsGroup(title = "Appearance", icon = themeIcon) {
+                    SettingsGroup(
+                        title = stringResource(R.string.text_appearance),
+                        icon = themeIcon,
+                    ) {
                         var themeDropdownExpanded by remember { mutableStateOf(false) }
                         var layoutDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -592,7 +604,10 @@ fun KeyboardSettingsScreen(
 
                 // PRIVACY
                 if (matches(labelPrivateMode, labelClearClipboard, labelClearLearnedData)) {
-                    SettingsGroup(title = "Privacy", icon = Icons.Outlined.Lock) {
+                    SettingsGroup(
+                        title = stringResource(R.string.settings_group_privacy),
+                        icon = Icons.Outlined.Lock,
+                    ) {
                         if (matches(labelPrivateMode, summaryPrivateMode)) {
                             SettingsSwitchRow(
                                 title = labelPrivateMode,
@@ -629,12 +644,16 @@ fun KeyboardSettingsScreen(
                 }
 
                 if (showClearLearnedDataDialog) {
+                    val learnedDataClearedMessage =
+                        stringResource(R.string.settings_learned_data_cleared)
                     AlertDialog(
                         onDismissRequest = { showClearLearnedDataDialog = false },
-                        title = { Text("Clear learned data?") },
+                        title = {
+                            Text(stringResource(R.string.settings_clear_learned_data_title))
+                        },
                         text = {
                             Text(
-                                "Reset learned vocabulary and phrase patterns? This cannot be undone.",
+                                stringResource(R.string.settings_clear_learned_data_message),
                             )
                         },
                         confirmButton = {
@@ -645,7 +664,7 @@ fun KeyboardSettingsScreen(
                                     Toast
                                         .makeText(
                                             context,
-                                            "Learned data cleared",
+                                            learnedDataClearedMessage,
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                 },
@@ -710,7 +729,10 @@ fun KeyboardSettingsScreen(
                 // layout does to the renderer, throwing both away returns the user to a
                 // keyboard that is known to draw.
                 if (matches(labelResetAppearance, summaryResetAppearance)) {
-                    SettingsGroup(title = "If something breaks", icon = Icons.Outlined.Refresh) {
+                    SettingsGroup(
+                        title = stringResource(R.string.settings_group_troubleshooting),
+                        icon = Icons.Outlined.Refresh,
+                    ) {
                         Text(
                             summaryResetAppearance,
                             style = MaterialTheme.typography.bodySmall,
@@ -765,11 +787,16 @@ fun KeyboardSettingsScreen(
                 // compile-time false there, so this whole block folds away rather than
                 // showing a control for a file that is never written.
                 if (viewModel.usageLoggingEnabled) {
-                    SettingsGroup(title = "Diagnostics", icon = Icons.Outlined.Info) {
+                    val noUsageRecordedMessage =
+                        stringResource(R.string.settings_diagnostics_no_usage)
+                    val shareUsageLogTitle =
+                        stringResource(R.string.settings_diagnostics_share_usage)
+                    SettingsGroup(
+                        title = stringResource(R.string.settings_group_diagnostics),
+                        icon = Icons.Outlined.Info,
+                    ) {
                         Text(
-                            "This build keeps a local file of session lengths and key counts. " +
-                                "No typed text is recorded, and nothing is ever sent anywhere " +
-                                "unless you share it yourself below.",
+                            stringResource(R.string.settings_diagnostics_description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
@@ -785,7 +812,7 @@ fun KeyboardSettingsScreen(
                                     Toast
                                         .makeText(
                                             context,
-                                            "No usage recorded yet",
+                                            noUsageRecordedMessage,
                                             Toast.LENGTH_SHORT,
                                         ).show()
                                 } else {
@@ -799,14 +826,14 @@ fun KeyboardSettingsScreen(
                                     // tester's choice every single time, and FluxBoard
                                     // never has one.
                                     context.startActivity(
-                                        Intent.createChooser(send, "Share usage log"),
+                                        Intent.createChooser(send, shareUsageLogTitle),
                                     )
                                 }
                             }) {
-                                Text("Share usage log")
+                                Text(shareUsageLogTitle)
                             }
                             OutlinedButton(onClick = { viewModel.clearUsageLog() }) {
-                                Text("Clear")
+                                Text(stringResource(R.string.text_clear))
                             }
                         }
                     }

@@ -7,6 +7,7 @@ import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutManager
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutValidationResult
 import com.uncoalesced.stickykeys.keyboardcore.layout.LayoutValidator
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -222,5 +223,17 @@ class LayoutEditorViewModelTest {
             assertEquals(LayoutManager.buildDefaultLayout(), vm.editingLayout.value)
             assertTrue(vm.validationErrors.value.isEmpty())
             assertFalse(vm.saveSuccess.value)
+        }
+
+    @Test
+    fun `deleteCustomLayout delegates deletion to layoutManager`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            advanceUntilIdle()
+
+            vm.deleteCustomLayout("custom_dvorak")
+            advanceUntilIdle()
+
+            coVerify { layoutManager.deleteCustomLayout("custom_dvorak") }
         }
 }
