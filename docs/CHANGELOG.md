@@ -16,11 +16,106 @@ Two version boundaries are worth knowing about. `v0.1.2-ALPHA` was never tagged,
 so read that section as everything after the `v0.1.1-ALPHA` tag. `v0.1.3` and
 `v0.1.5` were skipped as alpha numbers; `v0.1.5` was held back for the first beta.
 
-## [v1.0.0-testing] - Unreleased
+## [v1.0.0-testing] - 2026-11-21
 
-The version string in the build is already `v1.0.0-testing` (versionCode 16), so
-development builds show no pre-release badge. The release itself, with its tag and
-signed APK, has not been made. Nothing under this heading has shipped.
+### Upgrading from v0.1.7.5-BETA
+
+`v1.0.0-testing` is signed with a rotated release key
+(`SHA-256: 3aa818c7bc42aa8a8a5bc67367aa48ff61ea5f9fa19ff003ad9b0364a9a10d7a`),
+so Android will not install it directly over `v0.1.7.5-BETA` or earlier builds.
+Before updating, open Settings and use LAN Device Transfer over Wi-Fi to back up
+your stickers, categories, themes, layouts, and personal dictionary, then perform
+a one-time uninstall of the older beta and install `v1.0.0-testing`.
+
+### Added
+
+- **BloomType glide and adaptive spatial engine:** Added 48-point arc-length
+  trajectory resampling (`BloomTrajectory`), DTW glide matching
+  (`BloomTrajectoryAligner`), on-device key centroid adaptation
+  (`BloomSpatialProfile` persisted in `bloom_profile.bin` with snapshot and
+  rollback on backspace revert), 2D key hitbox adaptation (`SmartKeyHitbox` with
+  anisotropic X/Y variance adaptation persisted in `bloom_tap_profile.bin`),
+  context-weighted boundary hit-testing, `BloomTypeDecoder`, dynamic autocorrect
+  commit scoring (`BloomTriggerPredictor`), `BloomAdaptiveThreshold` on-device
+  accept/revert tuning, and the BloomType adaptive learning toggle in Keyboard
+  Settings.
+- **BloomMemoryVault v2 durable persistence and store hardening:** Added
+  `BloomMemoryVault` v2 unified `.bin` snapshot persistence (`bloom_user_memory.bin`)
+  preserving learned unigrams, bigrams, last-used timestamps, glide offsets, tap
+  centroids and anisotropic variances, and local adaptive calibration across APK
+  updates; `BloomStateFiles` atomic locked deletion of all three `.bin` stores
+  (`bloom_profile.bin`, `bloom_tap_profile.bin`, `bloom_user_memory.bin`) when
+  "Clear learned data" runs, even if `PredictionEngine` has not been initialized in
+  that process; and thread-safe I/O locking, atomic `Files.move` writes, and
+  `NaN`/non-finite payload rejection across all three binary stores.
+- **Compound run-on space splitting with full undo:** Added compound
+  space-omission run-on splitting (covering missing-space pairs such as `alot`,
+  `thankyou`, `goodmorning`, `ofcourse`, `inorder`, and mispressed space-neighbour
+  joins) paired with full multi-word Backspace and suggestion-chip undo.
+- **OOV typo quarantine, smooth decay, and expanded vocabulary:** Added OOV
+  1-edit typo quarantine and 14-day smooth exponential decay in
+  `PersonalLearningEngine`, `BloomRevertHistory` undo suppression, `names_dict.bin`
+  (over 22,000 Indian, global, and cultural words and names with typo blocklist
+  filtering), expanded conversational entries in `bigram_lm.bin`, and upgraded
+  `keyboard_database` to schema version 3 with `PersonalBigramEntity` and
+  `PersonalBigramDao`.
+- **Custom theme and layout deletion (`4Q.6`):** Added delete actions with
+  confirmation dialogs for custom themes in Theme Editor and custom layouts in
+  Layout Editor (guarding `preset_*` built-ins and falling back to built-in defaults
+  if the active item is deleted), plus a horizontally scrollable chip row for saved
+  layouts.
+- **Baseline profiles and modular refactoring:** Added the `baselineprofile` module
+  and split monolithic IME and editor files (`TypingKeyboardView`, `KeyHandlers`,
+  `KeyGestures`, `GlideDecoder`, `Flictionary`, `SpellingCorrector`,
+  `TextBeforeCursor`, `ImeViewModelFactory`, `StickerCommit`, and dedicated screen
+  ViewModels) under ADR 0001.
+
+### Changed
+
+- **Mosaic Watermelon redesign and simplified navigation:** Applied the Mosaic
+  Watermelon palette, bundled `JetBrains Mono` and `IBM Plex Sans` variable
+  typography, added an adaptive vector launcher icon, consolidated top-level
+  navigation to three tabs (`Keyboard`, `Stickers`, `Customize` with Device Transfer
+  inside Settings), moved typing stats to the top of Keyboard Settings, disabled
+  animated IME height transitions for reduced-motion compliance, and extracted
+  Keyboard Settings section titles and Diagnostics strings into string resources
+  (`4Q.5`).
+- **Autocorrect restraint and suggestion behaviour:** Held back ambiguous corrections
+  in favour of suggestion-strip undo chips, preserved typed casing on suggested
+  completions, and persisted the last opened symbols page and emoji picker tab.
+- **Key edge targeting and digit-row auto-cap guard:** Extended outer row margins
+  to the nearest key and kept the optional number row on digits under
+  sentence-start Shift.
+
+### Fixed
+
+- **Sticker crop, eraser, text, EXIF, stream leaks, and PNG delivery fallback:**
+  Fixed crop framing mismatches, downsampled large photo imports, applied manual
+  brush eraser strokes (with undo) to saved stickers, fixed exported text overlay
+  placement and size parity, made text color swatches fully visible, honoured EXIF
+  orientation consistently, closed opened URI input streams through a consolidated
+  bitmap loader, reported batch import failures cleanly, guarded API 28+
+  `ImageDecoder` calls, derived `StickerFileProvider` authority from package name
+  with strict magic-byte sniffing, stopped silent crashes on image decode failures,
+  and added `StickerCommit` PNG delivery fallback (transcoding still WebP stickers
+  to `cacheDir/sticker_transcode/`, capped at 25 entries, when the target field
+  refuses `image/webp` but accepts `image/png`).
+- **First-glide `LETTERS_UPPER` and rapid backspace word-context regressions:** Kept
+  the initial glide gesture alive when sentence-start `LETTERS_UPPER` auto-capitalize
+  is armed, tracked all pending carets in an `ArrayDeque` so rapid
+  `W, H, E -> DEL -> A` sequences stay in sync and roll back learned bigrams
+  cleanly on undo, gave backspace its own repeat hold threshold while setting key
+  long-press to `200 ms`, kept `names_dict` entries from vetoing common
+  `base_dict` typo corrections, and normalized DTW glide cost by summed sample
+  weights (`weightSum`).
+- **Fast `dfsEditDistance` pruning and `.`+Space punctuation autocorrect race:**
+  Tightened branch-and-bound pruning in `dfsEditDistance` and resolved the `.`+Space
+  punctuation autocorrect race so word-ending punctuation lookups finish cleanly
+  without colliding with subsequent keystrokes.
+- **Transposition touch-coherence scoring:** Paired adjacent swapped key touches in
+  `BloomTriggerPredictor` Gate 5 and `SpellingCorrector` spatial scoring so real
+  touch sequences such as `teh` (`the`), `thier` (`their`), and `nad` (`and`) pass
+  touch-coherence gating instead of failing index-by-index key distance checks.
 
 ## [v0.1.7.5-BETA] - 2026-08-29
 
