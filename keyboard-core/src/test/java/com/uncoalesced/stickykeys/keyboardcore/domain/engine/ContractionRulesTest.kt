@@ -46,8 +46,9 @@ class ContractionRulesTest {
         assertEquals(2, weightedEditCost("vall", "call"))
         // One transposition, not two substitutions.
         assertEquals(3, weightedEditCost("teh", "the"))
-        // One letter dropped.
-        assertEquals(3, weightedEditCost("helo", "hello"))
+        // One letter dropped (general gap vs omitted doubled character).
+        assertEquals(3, weightedEditCost("shold", "should"))
+        assertEquals(2, weightedEditCost("helo", "hello"))
         // i and y are not neighbours, so this is a full substitution.
         assertEquals(5, weightedEditCost("zorbli", "zorbly"))
     }
