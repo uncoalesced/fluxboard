@@ -25,11 +25,10 @@ data class ScoredCandidate(
 )
 
 /**
- * Bloom Engine Ground-Truth Autocorrect Trigger Predictor.
+ * Bloom Engine Autocorrect Trigger Predictor.
  *
- * Implements the decision model decompiled from Gboard (Delight5) and LatinIME.
- * Autocorrection is NOT simply choosing the highest-frequency candidate; it is gated by a
- * multi-feature decision forest (`FeaturePool`) evaluating:
+ * Evaluates whether a candidate should trigger auto-commit using FluxBoard's original
+ * multi-feature Bloom trigger decision model:
  *
  * 1. Runner-up score margin (delta and ratio): ambiguous candidates are withheld from auto-commit.
  * 2. Typing speed / cadence modulation: rapid burst typing lowers the trigger threshold;
@@ -44,7 +43,7 @@ data class ScoredCandidate(
  * 7. Revert history suppression: recently reverted words are strictly blocked from auto-commit.
  */
 object BloomTriggerPredictor {
-    /** Baseline Modest Threshold (Delight5 ground truth: 0.185). */
+    /** Baseline modest confidence threshold (0.185). */
     const val BASE_MODEST_THRESHOLD = 0.185f
 
     /** Minimum score ratio over runner-up required for auto-commit when edit costs are equal. */
@@ -75,6 +74,7 @@ object BloomTriggerPredictor {
         previousWord: String? = null,
         touches: List<TouchPoint>? = null,
         revertHistory: BloomRevertHistory? = null,
+        adaptiveThresholdOffset: Float = 0f,
     ): TriggerDecision {
         val normalizedTyped = typedWord.lowercase().trim()
         val candidateWord = topCandidate.word.lowercase().trim()
@@ -153,6 +153,11 @@ object BloomTriggerPredictor {
             effectiveThreshold += LENGTH_EXPANSION_PENALTY
         }
 
+        if (adaptiveThresholdOffset.isFinite()) {
+            effectiveThreshold =
+                (effectiveThreshold + adaptiveThresholdOffset).coerceIn(0.110f, 0.300f)
+        }
+
         // Gate 3: Effective Threshold Comparison
         if (topCandidate.finalScore < effectiveThreshold) {
             return TriggerDecision(
@@ -195,7 +200,7 @@ object BloomTriggerPredictor {
         if (touches != null &&
             touches.isNotEmpty() &&
             touches.size == normalizedTyped.length &&
-            candidateWord.length == normalizedTyped.length
+            kotlin.math.abs(candidateWord.length - normalizedTyped.length) <= 1
         ) {
             val avgDist = alignedAverageTouchDistance(normalizedTyped, candidateWord, touches)
             if (avgDist > 1.35f) {
@@ -217,31 +222,77 @@ object BloomTriggerPredictor {
     }
 
     /**
-     * Average 2D key-width distance between [touches] and [candidateWord], pairing swapped
-     * adjacent characters so transpositions are scored against the keys the user aimed for.
+     * Average 2D anisotropic Mahalanobis distance between [touches] and [candidateWord],
+     * pairing swapped adjacent characters and aligning single omissions or insertions so
+     * physical taps are scored against the keys the user aimed for.
      */
     internal fun alignedAverageTouchDistance(
         normalizedTyped: String,
         candidateWord: String,
         touches: List<TouchPoint>,
     ): Float {
-        var totalDist = 0f
-        var i = 0
-        while (i < touches.size) {
-            if (i + 1 < touches.size &&
-                normalizedTyped[i] != candidateWord[i] &&
-                normalizedTyped[i] == candidateWord[i + 1] &&
-                normalizedTyped[i + 1] == candidateWord[i]
-            ) {
-                totalDist += SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i + 1])
-                totalDist += SmartKeyHitbox.euclideanDistance(touches[i + 1], candidateWord[i])
-                i += 2
-            } else {
-                totalDist += SmartKeyHitbox.euclideanDistance(touches[i], candidateWord[i])
-                i += 1
+        if (touches.isEmpty()) return 0f
+        val typedLen = normalizedTyped.length
+        val candLen = candidateWord.length
+        if (touches.size != typedLen) return Float.MAX_VALUE
+
+        if (candLen == typedLen) {
+            var totalDist = 0f
+            var i = 0
+            while (i < typedLen) {
+                if (i + 1 < typedLen &&
+                    normalizedTyped[i] != candidateWord[i] &&
+                    normalizedTyped[i] == candidateWord[i + 1] &&
+                    normalizedTyped[i + 1] == candidateWord[i]
+                ) {
+                    totalDist +=
+                        SmartKeyHitbox.mahalanobisDistance(touches[i], candidateWord[i + 1])
+                    totalDist +=
+                        SmartKeyHitbox.mahalanobisDistance(touches[i + 1], candidateWord[i])
+                    i += 2
+                } else {
+                    totalDist += SmartKeyHitbox.mahalanobisDistance(touches[i], candidateWord[i])
+                    i += 1
+                }
             }
+            return totalDist / touches.size
         }
-        return totalDist / touches.size
+
+        if (candLen == typedLen + 1) {
+            var minTotalDist = Float.MAX_VALUE
+            for (skip in 0 until candLen) {
+                var totalDist = 0f
+                for (tIdx in 0 until typedLen) {
+                    val cIdx = if (tIdx < skip) tIdx else tIdx + 1
+                    totalDist +=
+                        SmartKeyHitbox.mahalanobisDistance(touches[tIdx], candidateWord[cIdx])
+                }
+                if (totalDist < minTotalDist) {
+                    minTotalDist = totalDist
+                }
+            }
+            return minTotalDist / touches.size
+        }
+
+        if (typedLen == candLen + 1 && candLen > 0) {
+            var minTotalDist = Float.MAX_VALUE
+            for (extra in 0 until typedLen) {
+                var totalDist = 0f
+                var cIdx = 0
+                for (tIdx in 0 until typedLen) {
+                    if (tIdx == extra) continue
+                    totalDist +=
+                        SmartKeyHitbox.mahalanobisDistance(touches[tIdx], candidateWord[cIdx])
+                    cIdx++
+                }
+                if (totalDist < minTotalDist) {
+                    minTotalDist = totalDist
+                }
+            }
+            return minTotalDist / candLen
+        }
+
+        return Float.MAX_VALUE
     }
 
     /**
