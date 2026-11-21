@@ -2,7 +2,7 @@
 
 # Privacy policy
 
-Last updated 10 August 2026. Applies to FluxBoard `v0.1.5-BETA` and later.
+Last updated 21 November 2026. Applies to FluxBoard `v1.0.0-testing` and later.
 
 A keyboard sees everything you type. Passwords, one-time codes, messages you
 would not repeat to anyone. That is the whole reason this app is built the way it
@@ -23,15 +23,47 @@ read it, and it is deleted when you uninstall.
 
 | What | Where | Notes |
 |---|---|---|
-| Personal dictionary | `keyboard_database` | Words you have typed, and how often. Built as you type. |
+| Personal dictionary and bigrams | `keyboard_database` (Room v3: `PersonalWordEntity`, `PersonalBigramEntity`) | Words and word pairs you have typed, and how often, subject to 14-day smooth exponential decay and OOV typo quarantine. Built as you type. |
+| BloomType spatial glide profile | `files/bloom_profile.bin` | On-device key centroid offsets adapted from your glide strokes, checked with a SHA-256 digest. |
+| Adaptive tap hitbox profile | `files/bloom_tap_profile.bin` | On-device `SmartKeyHitbox` 2D tap centroids and anisotropic variances, checked with a SHA-256 digest. |
+| Unified learned memory vault | `files/bloom_user_memory.bin` | On-device `BloomMemoryVault` unified snapshot storing learned unigrams, bigrams, glide offsets, tap centroids and anisotropic variances, and local adaptive autocorrect calibration (`BloomAdaptiveThreshold`), checked with a SHA-256 digest. |
 | Clipboard history | `keyboard_database` | Only cleared when you clear it. See below for what never gets captured. |
 | Stickers | `files/stickers/` | The image bytes. |
 | Sticker index, categories, favourites | `stickykeys_db` | Metadata only; the bytes stay on disk. |
 | Themes, layouts, background images | `files/themes/`, `files/layouts/`, `files/theme_backgrounds/` | Including any you make. |
-| Settings | `shared_prefs/` | Sizes, toggles, which theme is active. |
+| Settings | `shared_prefs/` | Sizes, toggles, which theme and layout are active. |
 | Recently used emoji | `shared_prefs/` | A short ordered list, rewritten as you use it. |
 
 None of this is transmitted anywhere.
+
+## Controlling or clearing what is learned
+
+Under **Keyboard Settings > Typing**:
+
+- **BloomType adaptive learning** turns on-device spatial key target adaptation on or
+  off. Turning it off stops updating your glide geometry offsets and tap hitbox
+  calibration.
+- **Personalized learning** stops recording new words and phrase pairs while
+  typing.
+
+Under **Keyboard Settings > Privacy**:
+
+- **Private mode** switches on the manual privacy lock (also reachable from the
+  keyboard toolbar), disabling learning, bigram recording, hitbox calibration,
+  adaptive threshold updates, context-weighted hit-testing, and clipboard capture.
+- **Clear learned data** purges learned words and bigrams immediately from both the
+  in-memory prediction caches and `keyboard_database` (`PersonalWordEntity` and
+  `PersonalBigramEntity`), atomically deletes all three `.bin` stores
+  (`files/bloom_profile.bin`, `files/bloom_tap_profile.bin`, and
+  `files/bloom_user_memory.bin`) via `BloomStateFiles` even if `PredictionEngine`
+  has not started in that process, and resets local adaptive calibration
+  (`BloomAdaptiveThreshold`, `BloomSpatialProfile`, and `SmartKeyHitbox`).
+  Uninstalling the app removes all files in private storage.
+
+When you immediately tap backspace or an undo chip to revert an autocorrection or
+glide commit, `BloomSpatialProfile`, `BloomAdaptiveThreshold`, and
+`PersonalLearningEngine` roll back the spatial offset, adaptive calibration, and
+learned word/bigram updates from that committed word.
 
 ## When the keyboard stops learning
 
@@ -39,21 +71,23 @@ The dictionary only gets better if it learns. There are cases where learning
 would be a liability, so it stops. These are behaviours in the code, not
 preferences you have to find:
 
-- **Password fields, detected from the field's own input type.** Not from
-  `IME_FLAG_NO_PERSONALIZED_LEARNING`, which the app you are typing into has to
-  set and which Android's own text fields do not set for passwords. All three
-  text password variations are covered, including visible-password fields, plus
-  numeric PINs.
-- **Any field where the host app does set that flag**, such as a private browsing
-  tab.
-- **While you have the manual privacy switch on**, which is on the keyboard's
-  toolbar and stays on until you turn it off.
+- **Password, PIN, and credential fields, detected from the field's own input
+  type.** Not from `IME_FLAG_NO_PERSONALIZED_LEARNING`, which the app you are
+  typing into has to set and which Android's own text fields do not set for
+  passwords. All three text password variations are covered, including
+  visible-password fields, plus numeric PINs and credential inputs.
+- **Any field where the host app does set `IME_FLAG_NO_PERSONALIZED_LEARNING`**,
+  such as a private browsing tab.
+- **While you have manual Private Mode on**, from the keyboard's toolbar or
+  Keyboard Settings, which stays on until you turn it off.
 
-In those cases the keyboard also stops suggesting words, stops autocorrecting,
-stops decoding glide strokes, and stops capturing anything you copy. Suppressing
-suggestions matters as much as suppressing learning: the suggestion strip draws
-completions of the word you are typing above the keyboard, where anyone looking
-at your screen can read them.
+In all three states, the keyboard strictly disables learning, bigram recording,
+hitbox calibration, adaptive threshold updates, context-weighted hit-testing, and
+clipboard capture. In password, PIN, and credential fields and in manual Private
+Mode, it also stops suggesting words, stops autocorrecting, and stops decoding
+glide strokes. Suppressing suggestions matters as much as suppressing learning: the
+suggestion strip draws completions of the word you are typing above the keyboard,
+where anyone looking at your screen can read them.
 
 Auto-capitalize is switched off on password and PIN fields as well. In a masked
 field you cannot see that the first character is not what you pressed.
@@ -95,10 +129,13 @@ theming, not sticker creation, not GIF conversion.
 |---|---|---|
 | `INTERNET`, `ACCESS_NETWORK_STATE` | Device-to-device transfer on your own network | Not a prompted permission |
 | `VIBRATE` | Keyboard haptics | Not a prompted permission |
-| `READ_MEDIA_IMAGES` (Android 13+) | Reading a screenshot or photo you chose to import | When you tap the import button |
+| `READ_MEDIA_IMAGES` (Android 13+) | Reading a screenshot or photo you chose to import | When you tap Extract Screenshot or import |
 | `READ_MEDIA_VISUAL_USER_SELECTED` (Android 14+) | Lets you grant access to specific photos instead of all of them | Same prompt |
-| `READ_EXTERNAL_STORAGE` (Android 12 and below only) | The older equivalent of the above | When you tap the import button |
+| `READ_EXTERNAL_STORAGE` (Android 12 and below only, capped at API 32) | The older equivalent of the above | When you tap Extract Screenshot or import |
 | `CAMERA` | Scanning the pairing QR code during device transfer. Declared by the ZXing scanning library rather than by this app directly. | When you start a device pairing |
+| `com.uncoalesced.stickykeys.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | Internal signature-level permission generated by AndroidX Core so runtime broadcast receivers stay private to this app | Not a prompted permission |
+
+No other `<uses-permission>` entries appear in the merged application manifest.
 
 Media access is requested at the button, never at launch. Granting access to only
 some photos is treated as access, not as a refusal.
@@ -111,8 +148,9 @@ Android's automatic backup is enabled, but scoped. The scoping is the mechanism,
 so it is worth being precise: both rule files are include-only, and once a scope
 contains any include, everything not listed is already excluded.
 
-`keyboard_database` appears in neither list. That is what keeps your personal
-dictionary and clipboard history off Google's servers.
+Neither `keyboard_database` nor the three `.bin` learning stores appear in
+either list. That is what keeps your personal dictionary, bigrams, spatial and
+threshold calibration, and clipboard history off Google's servers.
 
 Sticker bytes and the sticker index are left out of cloud backup together. The
 25 MB cloud quota does not degrade gracefully, and an index restored without its
