@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Phase 4 Coordinator: Continuous On-Device N-gram Personalization & Dynamic User Dictionary Learning.
@@ -69,6 +70,11 @@ class PersonalLearningEngine(
 
     @Volatile
     internal var onMemoryCleared: (() -> Unit)? = null
+
+    @Volatile
+    internal var isLikelyCoreTypo: ((String) -> Boolean)? = null
+
+    private val quarantinedTypos = ConcurrentHashMap<String, Int>()
 
     internal val bigramDao: PersonalBigramDao?
         get() = personalBigramDao
@@ -139,11 +145,29 @@ class PersonalLearningEngine(
             return
         }
 
-        val newCount = lexicon.recordOccurrence(word)
+        val lower = word.lowercase()
+        if (isLikelyCoreTypo?.invoke(lower) == true && !lexicon.isShielded(lower)) {
+            val strikes =
+                quarantinedTypos.compute(lower) { _, count -> (count ?: 0) + 1 } ?: 1
+            if (strikes < QUARANTINE_STRIKE_THRESHOLD) {
+                return
+            }
+            quarantinedTypos.remove(lower)
+            val newCount = lexicon.recordOccurrence(lower, QUARANTINE_STRIKE_THRESHOLD)
+            persistUnigramAsync(lower, newCount)
+            return
+        }
 
+        val newCount = lexicon.recordOccurrence(lower)
+        persistUnigramAsync(lower, newCount)
+    }
+
+    private fun persistUnigramAsync(
+        lower: String,
+        newCount: Int,
+    ) {
         scope.launch {
             try {
-                val lower = word.lowercase()
                 val dbFreq = personalDao.getWord(lower)?.frequency ?: 0
                 val mergedFreq = maxOf(newCount, dbFreq + 1).coerceAtMost(255)
                 if (mergedFreq > newCount) {
@@ -236,6 +260,10 @@ class PersonalLearningEngine(
         if (!isEnabled || isIncognitoOrPassword) return
         val word = revertedWord.trim()
         if (word.isEmpty()) return
+        val lower = word.lowercase()
+        quarantinedTypos.computeIfPresent(lower) { _, count ->
+            if (count <= 1) null else count - 1
+        }
 
         // Decrement in L1 lexicon
         val remaining = lexicon.decrementOrRemove(word)
@@ -299,6 +327,7 @@ class PersonalLearningEngine(
         }
 
         val current = lexicon.countOf(trimmed)
+        quarantinedTypos.remove(trimmed.lowercase())
         val newCount = maxOf(current + 1, BloomPersonalLexicon.SHIELD_STRIKE_THRESHOLD)
         lexicon.recordOccurrence(trimmed, newCount - current)
 
@@ -365,6 +394,7 @@ class PersonalLearningEngine(
     fun clearAll() {
         lexicon.clear()
         bigramCache.clear()
+        quarantinedTypos.clear()
         // Not left to onMemoryCleared alone: that hook exists only once PredictionEngine has
         // been created in this process, and a vault left on disk restores every cleared word.
         stateDir?.let { dir ->
@@ -385,5 +415,6 @@ class PersonalLearningEngine(
 
     companion object {
         private const val THIRTY_DAYS_MS = 30L * 24 * 60 * 60 * 1000
+        const val QUARANTINE_STRIKE_THRESHOLD = 3
     }
 }
