@@ -1,12 +1,17 @@
-FluxBoard is an open-source Android keyboard that brings an iOS-level sticker and emoji experience to your device. 
+FluxBoard is an open-source Android keyboard with a full sticker studio and an offline, self-learning typing engine. It has no telemetry, no analytics, no Google Play Services dependency, and no account.
 
-Built with privacy as its absolute core principle, FluxBoard operates entirely on-device with zero telemetry, zero analytics, and zero tracking.
+Keyboard and typing
+- Local Bloom autocorrect and glide decoding backed by compiled dictionaries and a local bigram model.
+- BloomType adaptive touch and glide geometry learning, kept on your device with quick revert recovery when you backspace a correction.
+- Custom key layouts and keyboard themes with background images, opacity controls, and live previews.
+- Local clipboard history that skips password fields, incognito fields, private mode, and Android-flagged sensitive content.
 
-Key Features:
-- **Instant Sticker Creation**: Create stickers from your photos using on-device ML segmentation. No cloud processing.
-- **GIF/WebP Conversion**: Seamlessly import and trim videos, converting them into optimized animated stickers.
-- **Intelligent Keyboard**: A fully customizable typing experience with a self-learning predictive text engine that never leaves your phone.
-- **Persistent Clipboard**: Keep track of your copied text history safely and locally.
-- **LAN Sharing**: Securely migrate your stickers and dictionary to another device over your local network using ephemeral P2P links.
+Stickers and media
+- Import photos into your sticker library, crop framing manually, erase backgrounds with a brush eraser and undo, and add styled text overlays.
+- Trim imported videos into animated GIF or WebP stickers directly on your phone.
+- Organize stickers into categories, mark favorites, and insert them from the keyboard into any app that accepts images.
 
-FluxBoard respects your data and requires no internet permission for core features.
+Device migration
+- Move your sticker library, categories, favorites, custom layouts, themes, and optional clipboard history to a new phone over your local Wi-Fi network by scanning a QR pairing code, with no cloud server in the middle.
+
+Typing, prediction learning, and sticker editing never leave your device. Network access is used only during a user-initiated local Wi-Fi transfer.
