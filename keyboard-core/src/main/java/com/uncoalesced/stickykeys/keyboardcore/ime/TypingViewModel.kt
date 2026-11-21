@@ -821,7 +821,16 @@ class TypingViewModel
             backspacedWord = null
             currentWord = ""
             _suggestions.value = emptyList()
-            _undoState.value = null
+            val pendingUndo = _undoState.value
+            _undoState.value =
+                if (pendingUndo != null &&
+                    pendingUndo.suffix.length == 1 &&
+                    endsAWord(pendingUndo.suffix)
+                ) {
+                    pendingUndo.copy(suffix = pendingUndo.suffix + " ")
+                } else {
+                    null
+                }
             // atSentenceStart is deliberately left alone. A space does not begin a word, it
             // ends one, so it carries whatever the preceding character decided: after "." it
             // must stay true. Clearing it here was why the letter following a full stop was
