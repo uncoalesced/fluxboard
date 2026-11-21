@@ -15,6 +15,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PersonalLearningEngineTest {
@@ -95,6 +97,7 @@ class PersonalLearningEngineTest {
             assertEquals(1, engine.lexicon.countOf("rahul"))
             assertFalse(engine.lexicon.isShielded("rahul"))
             assertEquals(1, engine.bigramCache.countFor("meet", "rahul"))
+            assertEquals(1, fakeBigramDao.getBigram("meet", "rahul")?.count)
         }
 
     @Test
@@ -186,6 +189,139 @@ class PersonalLearningEngineTest {
             assertEquals(0, engine.bigramCache.totalTransitionsCount())
             assertEquals(0, fakePersonalDao.getAll(10).size)
             assertEquals(0, fakeBigramDao.getAllRecent(10).size)
+        }
+
+    /**
+     * "Clear learned data" can run before PredictionEngine exists in the process, so the
+     * onMemoryCleared hook is unset. The .bin stores must still go, or the vault restores
+     * every cleared word into Room on the next keyboard start.
+     */
+    @Test
+    fun clearAll_deletesBloomStateFiles_withoutPredictionEngine() =
+        testScope.runTest {
+            val dir = Files.createTempDirectory("clear-learned").toFile()
+            try {
+                val stores =
+                    listOf(
+                        BloomStateFiles.GLIDE_PROFILE,
+                        BloomStateFiles.TAP_PROFILE,
+                        BloomStateFiles.USER_MEMORY,
+                    ).map { File(dir, it) }
+                val tmp = File(dir, "${BloomStateFiles.USER_MEMORY}.tmp")
+                (stores + tmp).forEach { it.writeBytes(byteArrayOf(1, 2, 3)) }
+                val withDir =
+                    PersonalLearningEngine(
+                        personalDao = fakePersonalDao,
+                        personalBigramDao = fakeBigramDao,
+                        scope = testScope,
+                        stateDir = dir,
+                    )
+
+                withDir.clearAll()
+                advanceUntilIdle()
+
+                (stores + tmp).forEach { assertFalse("${it.name} survived", it.exists()) }
+            } finally {
+                dir.deleteRecursively()
+            }
+        }
+
+    @Test
+    fun startupPrewarmAndMaintenance_preservesLearnedCountsAcrossRestarts() =
+        testScope.runTest {
+            val now = System.currentTimeMillis()
+            fakePersonalDao.insertOrUpdate(PersonalWordEntity("fluxboard", 2, now))
+            fakePersonalDao.insertOrUpdate(PersonalWordEntity("newterm", 1, now))
+            fakeBigramDao.upsertBigram(PersonalBigramEntity("open", "fluxboard", 1, now))
+
+            // Simulate repeated version upgrades / process startups
+            repeat(3) {
+                engine.prewarmSync()
+                engine.runDecayMaintenanceSync()
+            }
+
+            assertEquals(2, engine.lexicon.countOf("fluxboard"))
+            assertTrue(engine.lexicon.isShielded("fluxboard"))
+            assertEquals(1, engine.lexicon.countOf("newterm"))
+            assertEquals(1, engine.bigramCache.countFor("open", "fluxboard"))
+        }
+
+    @Test
+    fun bloomMemoryVault_carriesOverAllMemoryAcrossVersionUpdate() =
+        testScope.runTest {
+            val tempDir = Files.createTempDirectory("bloom_vault_test").toFile()
+            try {
+                val vaultFile = File(tempDir, "bloom_user_memory.bin")
+                val glideFile = File(tempDir, "bloom_profile.bin")
+                val tapFile = File(tempDir, "bloom_tap_profile.bin")
+
+                // 1. User learns unigrams, bigrams, glide offsets, and tap offsets in v1
+                engine.onWordCommitted("hey", "joel")
+                engine.onWordCommitted("hey", "joel")
+                advanceUntilIdle()
+
+                val v1GlideProfile = BloomSpatialProfile()
+                v1GlideProfile.learnObservation(
+                    char = 'w',
+                    nominalX = 100f,
+                    nominalY = 200f,
+                    observedX = 112f,
+                    observedY = 194f,
+                    isSensitive = false,
+                )
+                SmartKeyHitbox.resetCentroids()
+                SmartKeyHitbox.adaptCentroid('a', 0.20f, -0.15f)
+                val expectedTapA = SmartKeyHitbox.getCentroid('a')
+                val expectedGlideW = v1GlideProfile.getOffset('w')
+
+                BloomMemoryVault.reconcileAndSync(
+                    vaultFile = vaultFile,
+                    glideFile = glideFile,
+                    tapFile = tapFile,
+                    personalDao = fakePersonalDao,
+                    personalBigramDao = fakeBigramDao,
+                    learningEngine = engine,
+                    glideProfile = v1GlideProfile,
+                )
+
+                // 2. Simulate version upgrade where in-memory caches and DB were reset
+                SmartKeyHitbox.resetCentroids()
+                val v2PersonalDao = FakePersonalDictionaryDao()
+                val v2BigramDao = FakePersonalBigramDao()
+                val v2Engine =
+                    PersonalLearningEngine(
+                        personalDao = v2PersonalDao,
+                        personalBigramDao = v2BigramDao,
+                        lexicon = BloomPersonalLexicon(),
+                        bigramCache = BloomPersonalBigramCache(),
+                        scope = testScope,
+                    )
+                val v2GlideProfile = BloomSpatialProfile()
+
+                BloomMemoryVault.reconcileAndSync(
+                    vaultFile = vaultFile,
+                    glideFile = glideFile,
+                    tapFile = tapFile,
+                    personalDao = v2PersonalDao,
+                    personalBigramDao = v2BigramDao,
+                    learningEngine = v2Engine,
+                    glideProfile = v2GlideProfile,
+                )
+
+                // Verify all 4 memory stores carried over intact into v2
+                assertEquals(2, v2Engine.lexicon.countOf("joel"))
+                assertTrue(v2Engine.lexicon.isShielded("joel"))
+                assertEquals(2, v2PersonalDao.getWord("joel")?.frequency)
+                assertEquals(2, v2Engine.bigramCache.countFor("hey", "joel"))
+                assertEquals(2, v2BigramDao.getBigram("hey", "joel")?.count)
+                assertEquals(expectedGlideW.first, v2GlideProfile.getOffset('w').first, 1e-4f)
+                assertEquals(expectedGlideW.second, v2GlideProfile.getOffset('w').second, 1e-4f)
+                assertEquals(expectedTapA.first, SmartKeyHitbox.getCentroid('a').first, 1e-4f)
+                assertEquals(expectedTapA.second, SmartKeyHitbox.getCentroid('a').second, 1e-4f)
+            } finally {
+                SmartKeyHitbox.resetCentroids()
+                tempDir.deleteRecursively()
+            }
         }
 }
 

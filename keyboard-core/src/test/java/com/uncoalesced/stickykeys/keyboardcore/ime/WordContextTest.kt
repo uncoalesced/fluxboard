@@ -345,6 +345,27 @@ class WordContextTest {
             viewModel.onKeyPressed("a")
             assertFalse(viewModel.isCurrent(token))
         }
+
+    @Test
+    fun `typing W H E then backspace then A preserves Wha and preceding word context`() =
+        runTest(dispatcher) {
+            viewModel.onWordAccepted("first")
+            viewModel.onWordAccepted("second")
+            viewModel.onKeyPressed("W")
+            viewModel.onKeyPressed("h")
+            viewModel.onKeyPressed("e")
+            assertEquals("Whe", viewModel.getCurrentWord())
+
+            // Simulate even a cleared mirror before backspace (e.g. symbol/space/desync)
+            viewModel.onWordAbandoned()
+            viewModel.onDelete("first second Whe")
+            assertEquals("Wh", viewModel.getCurrentWord())
+
+            viewModel.onKeyPressed("a")
+            assertEquals("Wha", viewModel.getCurrentWord())
+            advanceUntilIdle()
+            coVerify { engine.getSuggestions("Wha", "second") }
+        }
 }
 
 /** Records what was asked for, so the bounded-read requirement is assertable. */

@@ -21,7 +21,7 @@ import kotlin.math.hypot
  * the scrub's 18dp would turn that ordinary drift into a word delete, which regresses every
  * plain backspace hold rather than only adding a new gesture.
  */
-internal const val WORD_DELETE_ACTIVATION_DP = 24f
+internal const val WORD_DELETE_ACTIVATION_DP = 36f
 
 /**
  * Further leftward travel per word deleted, once word mode is active.
@@ -67,7 +67,17 @@ internal fun wordDeleteActivated(
  *
  * Backspace's repeat also starts from here, so hold-to-delete begins sooner too.
  */
-internal const val LONG_PRESS_MS = 150L
+internal const val LONG_PRESS_MS = 200L
+
+/**
+ * How long backspace must be held before continuous repeat or word-delete begins.
+ *
+ * Kept distinct from [LONG_PRESS_MS] because backspace commits its first delete immediately on
+ * press and is frequently tapped while the thumb is already accelerating leftward toward the
+ * next letter key (such as 'a'). A 300ms hold window prevents an ordinary backspace tap from
+ * entering repeat or word-delete mode mid-flight.
+ */
+internal const val REPEAT_HOLD_MS = 300L
 
 /**
  * Longest a *moving* finger is given to leave its key before the press is called a hold.
