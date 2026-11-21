@@ -66,7 +66,10 @@ internal fun handleKeyPress(
             // 4R.3). Same one round-trip the undo chip uses, minus the trailing space.
             val revert = viewModel.autocorrectToRevert(textBefore)
             if (revert != null) {
-                controller.replaceTextBeforeCursor(revert.corrected.length + 1, revert.original)
+                controller.replaceTextBeforeCursor(
+                    revert.corrected.length + revert.suffix.length,
+                    revert.original,
+                )
                 viewModel.onAutocorrectReverted(revert.original)
                 return
             }
@@ -99,12 +102,20 @@ internal fun handleKeyPress(
             // a word the user finished stays a word they finished however much they type next.
             if (viewModel.enterEndsAWord()) {
                 val typedWord = currentWordText(controller)
+                val touches = viewModel.consumeWordTouches()
                 controller.sendEnter()
                 viewModel.onSentenceStarted()
                 if (typedWord.isNotBlank()) {
                     coroutineScope.launch {
-                        val corrected = viewModel.getAutoCorrectionFor(typedWord)
-                        viewModel.onWordAccepted(corrected ?: typedWord)
+                        val corrected =
+                            viewModel.getAutoCorrectionFor(
+                                typedWord,
+                                touchesSnapshot = touches,
+                            )
+                        viewModel.onWordAccepted(
+                            corrected ?: typedWord,
+                            touchesSnapshot = if (corrected == null) touches else emptyList(),
+                        )
                     }
                 }
                 setMode(
@@ -153,6 +164,7 @@ internal fun handleKeyPress(
                 val replacement =
                     doubleSpaceReplacement(controller.textBeforeCursor(WORD_CONTEXT_CHARS))
                 if (replacement != null) {
+                    viewModel.consumeWordTouches()
                     controller.replaceTextBeforeCursor(1, replacement)
                     viewModel.onSentenceStarted()
                     setMode(
@@ -166,6 +178,7 @@ internal fun handleKeyPress(
                 }
             }
 
+            val touches = viewModel.consumeWordTouches()
             // Commit the space FIRST, synchronously, so key order can never invert.
             // Waiting on the autocorrect lookup here used to let a following letter
             // commit before the space ("a b" arriving as "ab ").
@@ -188,29 +201,48 @@ internal fun handleKeyPress(
                 )
             }
 
-            coroutineScope.launch {
-                val corrected = viewModel.getAutoCorrectionFor(typedWord, clauseStart)
-                // Only rewrite if nothing else touched the text meanwhile -- otherwise
-                // the replace would eat characters the user typed during the lookup.
-                if (corrected != null && viewModel.isCurrent(token)) {
-                    // Replace "<typedWord> " with "<corrected> " in one round-trip.
-                    controller.replaceTextBeforeCursor(typedWord.length + 1, "$corrected ")
-                    viewModel.onAutoCorrected(typedWord, corrected)
-                } else {
-                    viewModel.onWordAccepted(typedWord, offerCorrections = true)
+            if (typedWord.isNotBlank()) {
+                coroutineScope.launch {
+                    val corrected =
+                        viewModel.getAutoCorrectionFor(
+                            typedWord,
+                            clauseStart,
+                            touchesSnapshot = touches,
+                        )
+                    // Only rewrite if nothing else touched the text meanwhile -- otherwise
+                    // the replace would eat characters the user typed during the lookup.
+                    if (corrected != null && viewModel.isCurrent(token)) {
+                        // Replace "<typedWord> " with "<corrected> " in one round-trip.
+                        controller.replaceTextBeforeCursor(typedWord.length + 1, "$corrected ")
+                        viewModel.onAutoCorrected(
+                            typedWord,
+                            corrected,
+                            suffix = " ",
+                            touchesSnapshot = touches,
+                        )
+                    } else if (corrected == null) {
+                        viewModel.onWordAccepted(
+                            typedWord,
+                            offerCorrections = true,
+                            touchesSnapshot = touches,
+                        )
+                    }
                 }
             }
         }
         else -> {
             val isLetter = keyLabel.length == 1 && keyLabel.first().isLetter()
             if (isLetter) {
-                viewModel.onKeyPressed(keyLabel, touchPoint)
-                controller.commitText(keyLabel)
+                val (resolvedLabel, resolvedTouch) =
+                    viewModel.resolveContextWeightedKey(keyLabel, touchPoint)
+                viewModel.onKeyPressed(resolvedLabel, resolvedTouch)
+                controller.commitText(resolvedLabel)
             } else {
                 // Editor-derived, same as the space bar and for the same reason.
                 val textBefore = controller.textBeforeCursor(WORD_CONTEXT_CHARS)
                 val typedWord = wordUnderCaret(textBefore)
                 val clauseStart = startsClause(textBefore)
+                val touches = viewModel.consumeWordTouches()
                 // Committed first and synchronously, for the same reason the space bar is:
                 // waiting on the correction lookup here would let a following key land before
                 // this one and invert what the user typed.
@@ -222,7 +254,12 @@ internal fun handleKeyPress(
                     // who ends sentences with punctuation -- which is everyone -- saw it work
                     // on some words and not others with no discernible pattern.
                     coroutineScope.launch {
-                        val corrected = viewModel.getAutoCorrectionFor(typedWord, clauseStart)
+                        val corrected =
+                            viewModel.getAutoCorrectionFor(
+                                typedWord,
+                                clauseStart,
+                                touchesSnapshot = touches,
+                            )
                         if (corrected != null && viewModel.isCurrent(token)) {
                             // Replace "<typed><punctuation>" in one round-trip, so the
                             // punctuation the user just saw appear never flickers.
@@ -230,13 +267,37 @@ internal fun handleKeyPress(
                                 typedWord.length + keyLabel.length,
                                 corrected + keyLabel,
                             )
-                            viewModel.onAutoCorrected(typedWord, corrected)
+                            viewModel.onAutoCorrected(
+                                typedWord,
+                                corrected,
+                                suffix = keyLabel,
+                                touchesSnapshot = touches,
+                            )
+                        } else if (corrected != null) {
+                            val currentTail =
+                                controller.textBeforeCursor(
+                                    typedWord.length + keyLabel.length + 2,
+                                )
+                            if (viewModel.getCurrentWord().isEmpty() &&
+                                currentTail.endsWith(typedWord + keyLabel + " ")
+                            ) {
+                                controller.replaceTextBeforeCursor(
+                                    typedWord.length + keyLabel.length + 1,
+                                    corrected + keyLabel + " ",
+                                )
+                                viewModel.onAutoCorrected(
+                                    typedWord,
+                                    corrected,
+                                    suffix = keyLabel + " ",
+                                    touchesSnapshot = touches,
+                                )
+                            }
                         } else {
-                            viewModel.onWordAccepted(typedWord)
+                            viewModel.onWordAccepted(typedWord, touchesSnapshot = touches)
                         }
                     }
                 } else {
-                    viewModel.onWordAccepted(typedWord)
+                    viewModel.onWordAccepted(typedWord, touchesSnapshot = touches)
                 }
             }
 
